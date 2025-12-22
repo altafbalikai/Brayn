@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+
+# Build output (generated)
+dist
+
+# Environment variables (NEVER COMMIT)
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS / Editor
+.DS_Store
+.vscode
+.idea

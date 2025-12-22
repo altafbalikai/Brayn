@@ -1,0 +1,34 @@
+import React from "react";
+import MessageItem from "./MessageItem";
+import { formatGroupTime } from "../../utils/messageGrouping";
+
+/**
+ * @param {{group: {messages: Array, timestamp: string}, isFirst?: boolean}} props
+ */
+function MessageGroup({ group, isFirst }) {
+  return (
+    <div className="mb-4">
+      {!isFirst && (
+        <div className="text-center my-3">
+          <span className="text-xs opacity-50 bg-theme-light px-3 py-1 rounded-full">
+            {formatGroupTime(group.timestamp)}
+          </span>
+        </div>
+      )}
+      <div className="space-y-1">
+        {group.messages.map((msg, idx) => (
+          <MessageItem
+            key={msg._id || msg.id || `${msg.role}-${idx}`}
+            msg={msg}
+            style={{}}
+            showTime={
+              group.messages.length === 1 || idx === group.messages.length - 1
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default React.memo(MessageGroup);
