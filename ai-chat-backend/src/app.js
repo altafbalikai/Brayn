@@ -76,7 +76,9 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'tru
 }
 
 // health check endpoint
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // metrics endpoint
 app.get('/metrics', (req, res) => {
