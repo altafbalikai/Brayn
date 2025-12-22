@@ -1,4 +1,4 @@
-import api from '../api/axios';
+import api from '../axios';
 
 export const llmService = {
     ask: async (message, conversationId) => {
