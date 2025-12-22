@@ -51,7 +51,7 @@
 
 // export default api;
 
-
+console.log('ENV API BASE:', import.meta.env.VITE_API_BASE_URL);
 import axios from 'axios';
 
 // Use relative URL when using Vite proxy, or absolute URL if VITE_API_URL is set
