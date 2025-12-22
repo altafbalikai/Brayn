@@ -2,6 +2,11 @@ const { verifyAccessToken } = require('../utils/jwt');
 const User = require('../models/User');
 
 module.exports = async function auth(req, res, next) {
+  // 🔥 Allow CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  
   try {
     const h = req.headers.authorization;
     if (!h) return res.status(401).json({ error: 'Missing Authorization' });
