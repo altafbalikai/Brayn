@@ -10,7 +10,7 @@ export const llmService = {
         const signal = controller.signal;
 
         async function start(onChunk) {
-            const url = '/api/llm/ask';
+            const url = `${import.meta.env.VITE_API_BASE_URL}/llm/ask`;
             const token = localStorage.getItem('accessToken');
             const headers = { 'Content-Type': 'application/json' };
             if (token) {
