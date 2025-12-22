@@ -2,7 +2,11 @@
 const winston = require('winston');
 const path = require('path');
 
-// Define log levels
+// Detect serverless (Vercel)
+const isServerless =
+  process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+
+// Log levels
 const levels = {
   error: 0,
   warn: 1,
@@ -11,7 +15,6 @@ const levels = {
   debug: 4,
 };
 
-// Define log colors
 const colors = {
   error: 'red',
   warn: 'yellow',
@@ -22,65 +25,55 @@ const colors = {
 
 winston.addColors(colors);
 
-// Define log format
+// Log format
 const format = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.colorize({ all: true }),
   winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`
+    ({ timestamp, level, message }) =>
+      `${timestamp} ${level}: ${message}`
   )
 );
 
-// Define which transports to use
+// Always-safe transports
 const transports = [
-  // Console transport
-  new winston.transports.Console({
-    format: format,
-  }),
+  new winston.transports.Console({ format }),
 ];
 
-// Add file transports in production
-if (process.env.NODE_ENV === 'production') {
+// ❌ File logging ONLY for NON-serverless environments
+if (!isServerless) {
   const logDir = process.env.LOG_DIR || 'logs';
-  
-  // Error log file
+
   transports.push(
     new winston.transports.File({
       filename: path.join(logDir, 'error.log'),
       level: 'error',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      ),
     })
   );
 
-  // Combined log file
   transports.push(
     new winston.transports.File({
       filename: path.join(logDir, 'combined.log'),
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      ),
     })
   );
 }
 
-// Create the logger
+// Create logger
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  level:
+    process.env.LOG_LEVEL ||
+    (isServerless ? 'info' : 'debug'),
   levels,
-  format,
   transports,
-  // Handle exceptions and rejections
-  exceptionHandlers: [
-    new winston.transports.File({ filename: path.join(process.env.LOG_DIR || 'logs', 'exceptions.log') })
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({ filename: path.join(process.env.LOG_DIR || 'logs', 'rejections.log') })
-  ],
+
+  // ❌ Disable file-based handlers in serverless
+  exceptionHandlers: isServerless
+    ? []
+    : [new winston.transports.File({ filename: 'logs/exceptions.log' })],
+
+  rejectionHandlers: isServerless
+    ? []
+    : [new winston.transports.File({ filename: 'logs/rejections.log' })],
 });
 
 module.exports = logger;
-
