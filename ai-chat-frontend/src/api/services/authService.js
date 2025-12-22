@@ -47,7 +47,7 @@
 //     },
 // };
 
-import api from '../axios';
+import api from '../api/axios';
 
 export const authService = {
     signup: async (email, password, name) => {
