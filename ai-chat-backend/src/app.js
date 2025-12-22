@@ -52,14 +52,35 @@ app.use(cookieParser());
 
 
 // configure and enable CORS before routes
-const allowedOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:4200';
-app.use(cors({
-  origin: allowedOrigin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
-}));
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
+// Dynamic CORS for Vercel + local dev
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (Postman, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Allow local dev
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow all Vercel preview + prod domains
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  })
+);
 
 // define routes
 // app.use('/api/auth', authLimiter, authRoutes);
