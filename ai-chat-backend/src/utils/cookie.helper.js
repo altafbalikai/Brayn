@@ -12,9 +12,9 @@ function buildRefreshCookieOptions() {
 
   const opts = {
     httpOnly: true,
-    secure: !!isProd, // must be true for SameSite=None to be accepted in browsers
-    sameSite: isProd ? 'None' : 'Lax', // None for cross-site (prod with HTTPS), Lax simpler for dev
-    path: process.env.REFRESH_COOKIE_PATH || '/',
+    secure: true, // must be true for SameSite=None to be accepted in browsers
+    sameSite: 'None', // None for cross-site (prod with HTTPS), Lax simpler for dev
+    path: '/api/auth',
     maxAge: COOKIE_MAX_AGE,
   };
 
