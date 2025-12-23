@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
-import { signup } from "../features/auth/authSlice";
+import { signup, clearError } from "../features/auth/authSlice";
 import { GiBrain } from "react-icons/gi";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
@@ -43,6 +43,13 @@ export default function Signup() {
     }
   };
 
+  // Clear error on login page unmounted
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
   return (
     <div className="min-h-screen p-5 bg-theme-dark animated-gradient overflow-y-auto flex justify-center">
       {/* Glass Card */}
@@ -78,7 +85,10 @@ export default function Signup() {
               type="text"
               value={name}
               required
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) dispatch(clearError());
+              }}
               placeholder="Your name"
               className="
                 w-full px-4 py-3
@@ -105,7 +115,10 @@ export default function Signup() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) dispatch(clearError());
+              }}
               required
               placeholder="you@example.com"
               className="
@@ -134,7 +147,10 @@ export default function Signup() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) dispatch(clearError());
+                }}
                 required
                 minLength={8}
                 placeholder="At least 8 characters"
@@ -174,7 +190,10 @@ export default function Signup() {
                 id="Confirmpassword"
                 type={showConfirmpassword ? "text" : "password"}
                 value={Confirmpassword}
-                onChange={(e) => setConfirmpassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmpassword(e.target.value);
+                  if (error) dispatch(clearError());
+                }}
                 required
                 minLength={8}
                 placeholder="At least 8 characters"

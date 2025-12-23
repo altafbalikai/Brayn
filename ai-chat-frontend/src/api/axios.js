@@ -54,8 +54,8 @@
 import axios from 'axios';
 
 // Use relative URL when using Vite proxy, or absolute URL if VITE_API_URL is set
-console.log('ENV API BASE:', import.meta.env.VITE_API_BASE_URL);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 if (!API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL is not defined');
 }
