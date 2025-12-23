@@ -4,6 +4,7 @@ import { logout } from "../../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../../api/services/authService";
 import ModalPortal from "../ui/ModalPortal";
+import { clearCurrentConversation } from "../../features/conversations/conversationSlice";
 
 function UserProfile({ user, onClose }) {
   const dispatch = useDispatch();
@@ -62,6 +63,9 @@ function UserProfile({ user, onClose }) {
 
   const handleLogout = async () => {
     await dispatch(logout());
+
+    dispatch(clearCurrentConversation());
+
     navigate("/login");
     onClose();
   };

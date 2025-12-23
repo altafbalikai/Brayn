@@ -56,17 +56,21 @@ export const signup = createAsyncThunk(
 
 export const logout = createAsyncThunk(
     "auth/logout",
-    async (_, { rejectWithValue }) => {
-        try {
-            await authService.logout();
-            localStorage.removeItem("accessToken");
-        } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.error || "Logout failed"
-            );
-        }
+    async (_, { dispatch }) => {
+        // Clear client state FIRST
+        localStorage.removeItem("accessToken");
+
+        // Fire-and-forget server logout
+        authService.logout().catch(() => {
+            // optional: log error, but DO NOT block logout
+            console.warn("Server logout failed");
+        });
+
+        // No await needed
+        return;
     }
 );
+
 
 /**
  * 🔑 AUTH INITIALIZATION (CRITICAL)
