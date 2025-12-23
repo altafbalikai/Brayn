@@ -36,7 +36,7 @@ body {
 
 html,
 body {
-  overflow: hidden; /* page never scrolls */
+  /* overflow: hidden; page never scrolls */
 }
 
 #root {
