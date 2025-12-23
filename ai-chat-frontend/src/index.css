@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================= */
+/* Theme Variables */
+/* ============================= */
 @layer base {
   :root {
     --theme-dark: theme(colors.theme-dark);
@@ -11,209 +14,51 @@
     --theme-text: theme(colors.theme-text);
     --theme-muted: theme(colors.theme-muted);
     --theme-textaccent: theme(colors.theme-textaccent);
+
+    --scrollbar-thumb: var(--theme-secondary);
+    --scrollbar-thumb-hover: var(--theme-accent);
   }
 }
 
+/* ============================= */
+/* Global Reset */
+/* ============================= */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* outline: 1px solid red; */
 }
 
 html,
 body {
   height: 100%;
-  margin: 0;
+}
+
+html,
+body {
   /* overflow: hidden; page never scrolls */
 }
 
 #root {
-  height: 100dvh; /* NOT 100vh */
+  height: 100dvh;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
     "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: #d8cfbc;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #565449;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #11120d;
-}
-
-/* ================================
-   Code block scrollbar (theme driven)
-   ================================ */
+/* ============================= */
+/* Global Scrollbars */
+/* ============================= */
 
 /* Chrome / Edge / Safari */
-pre::-webkit-scrollbar {
-  height: 8px;
+::-webkit-scrollbar {
   width: 8px;
-}
-
-pre::-webkit-scrollbar-track {
-  background: var(--theme-accent);
-  border-radius: 6px;
-}
-
-/* hidden by default */
-pre::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 6px;
-  transition: background-color 0.2s ease-in-out;
-}
-
-/* visible on hover */
-pre:hover::-webkit-scrollbar-thumb {
-  background-color: var(--theme-secondary);
-}
-
-pre::-webkit-scrollbar-thumb:hover {
-  background-color: var(--theme-muted);
-}
-
-/* Firefox */
-pre {
-  scrollbar-width: thin;
-  scrollbar-color: transparent var(--theme-accent);
-}
-
-pre:hover {
-  scrollbar-color: var(--theme-secondary) var(--theme-accent);
-}
-
-/* ============================= */
-/* Global App Scrollbars */
-/* ============================= */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --theme-dark: theme(colors.theme-dark);
-    --theme-light: theme(colors.theme-light);
-    --theme-secondary: theme(colors.theme-secondary);
-    --theme-accent: theme(colors.theme-accent);
-    --theme-text: theme(colors.theme-text);
-    --theme-muted: theme(colors.theme-muted);
-  }
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  /* outline: 1px solid red; */
-}
-
-html,
-body {
-  height: 100%;
-  margin: 0;
-  overflow: hidden; /* page never scrolls */
-}
-
-#root {
-  height: 100dvh; /* NOT 100vh */
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: #d8cfbc;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #565449;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #11120d;
-}
-
-/* ================================
-   Code block scrollbar (theme driven)
-   ================================ */
-
-/* Chrome / Edge / Safari */
-pre::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-
-pre::-webkit-scrollbar-track {
-  background: var(--theme-accent);
-  border-radius: 6px;
-}
-
-/* hidden by default */
-pre::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 6px;
-  transition: background-color 0.2s ease-in-out;
-}
-
-/* visible on hover */
-pre:hover::-webkit-scrollbar-thumb {
-  background-color: var(--theme-secondary);
-}
-
-pre::-webkit-scrollbar-thumb:hover {
-  background-color: var(--theme-muted);
-}
-
-/* Firefox */
-pre {
-  scrollbar-width: thin;
-  scrollbar-color: transparent var(--theme-accent);
-}
-
-pre:hover {
-  scrollbar-color: var(--theme-secondary) var(--theme-accent);
-}
-
-/* ============================= */
-/* Global App Scrollbars */
-/* ============================= */
-
-:root {
-  --scrollbar-thumb: var(--theme-secondary);
-  --scrollbar-thumb-hover: var(--theme-accent);
-}
-
-/* Chrome / Edge / Safari */
-::-webkit-scrollbar {
-  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -221,14 +66,13 @@ pre:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: transparent; /* hidden by default */
+  background-color: transparent;
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
   transition: background-color 0.2s ease;
 }
 
-/* 👇 This WORKS */
 *:hover::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
 }
@@ -237,7 +81,79 @@ pre:hover {
   background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Animated Gradient Background */
+/* Hide scrollbar but keep scroll (mobile) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Desktop scrollbar */
+.show-scrollbar {
+  scrollbar-gutter: stable; /* ⬅️ THIS IS CRITICAL */
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.show-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* ============================= */
+/* Code Block Scrollbars */
+/* ============================= */
+
+pre::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+pre::-webkit-scrollbar-track {
+  background: var(--theme-accent);
+  border-radius: 6px;
+}
+
+pre::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 6px;
+}
+
+pre:hover::-webkit-scrollbar-thumb {
+  background-color: var(--theme-secondary);
+}
+
+/* Firefox */
+pre {
+  scrollbar-width: thin;
+  scrollbar-color: transparent var(--theme-accent);
+}
+
+pre:hover {
+  scrollbar-color: var(--theme-secondary) var(--theme-accent);
+}
+
+/* ============================= */
+/* Animated Gradient */
+/* ============================= */
+
 .animated-gradient {
   background: linear-gradient(
     135deg,

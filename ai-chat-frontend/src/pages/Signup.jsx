@@ -44,11 +44,11 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen p-5 flex items-center justify-center bg-theme-dark animated-gradient">
+    <div className="min-h-screen p-5 bg-theme-dark animated-gradient overflow-y-auto flex justify-center">
       {/* Glass Card */}
       <div
         className="
-          w-full max-w-md p-8 rounded-2xl shadow-2xl
+          w-full max-w-md mx-auto my-auto p-8 rounded-2xl shadow-2xl
           bg-theme-light backdrop-blur-xl
           border border-theme-secondary
         "

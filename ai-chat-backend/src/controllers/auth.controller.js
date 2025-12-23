@@ -201,7 +201,6 @@ async function refresh(req, res, next) {
   }
 }
 
-
 async function logout(req, res, next) {
   try {
     const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME] || req.body?.refreshToken;

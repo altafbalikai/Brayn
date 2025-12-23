@@ -151,13 +151,6 @@ async function ask(req, res, next) {
       }
     }
 
-    // command to check streaming from terminal:
-    //   curl.exe -N -X POST "http://localhost:4000/api/llm/ask" ^
-    // -H "Content-Type: application/json" ^
-    // -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZjcwNzg1MWRhYWVkMTI0MWUxNTg0YyIsImVtYWlsIjoiaHVzc2FpbmJhbGlrYWlAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTc2NTU4NDM3NSwiZXhwIjoxNzY1NTg1Mjc1fQ.muBJj2-MdRxVgNtQgVuYiSG4BU4G2t0WxIw45mNFFsg" ^
-    // -d "{\"conversationId\":\"6939f751ca5e3deb56b21db3\",\"message\":\"What you say about football sport?\"}"
-
-
     // 5) Save final assistant message
     await ConversationService.addMessage(userId, conversationId, {
       role: "assistant",
@@ -174,3 +167,10 @@ async function ask(req, res, next) {
 }
 
 module.exports = { ask };
+
+
+// command to check streaming from terminal:
+//   curl.exe -N -X POST "http://localhost:4000/api/llm/ask" ^
+// -H "Content-Type: application/json" ^
+// -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZjcwNzg1MWRhYWVkMTI0MWUxNTg0YyIsImVtYWlsIjoiaHVzc2FpbmJhbGlrYWlAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTc2NTU4NDM3NSwiZXhwIjoxNzY1NTg1Mjc1fQ.muBJj2-MdRxVgNtQgVuYiSG4BU4G2t0WxIw45mNFFsg" ^
+// -d "{\"conversationId\":\"6939f751ca5e3deb56b21db3\",\"message\":\"What you say about football sport?\"}"

@@ -32,6 +32,12 @@ export default function Login() {
       console.error("Login error:", err);
     }
   };
+  // Clear error on login page unmounted
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
 
   return (
     <div className="min-h-screen p-5 flex items-center justify-center bg-theme-dark animated-gradient">

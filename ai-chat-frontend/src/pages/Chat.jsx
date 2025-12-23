@@ -451,12 +451,12 @@ export default function Chat() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {!currentConversation ? (
-          <div className="flex-1 flex items-center justify-center animated-gradient px-4">
+          <div className="flex-1 flex items-center justify-center px-4">
             <div className="max-w-xl w-full text-center">
               {/* Logo / Identity */}
               <div className="flex items-center justify-center gap-2 mb-4">
                 <GiBrain size={32} className="text-theme-highlight" />
-                <h1 className="text-3xl font-bold text-theme-text">Brayn</h1>
+                <h1 className="text-3xl font-bold text-theme-dark">Brayn</h1>
               </div>
 
               {/* Value Proposition */}
@@ -493,7 +493,7 @@ export default function Chat() {
               </div>
 
               {/* Hint */}
-              <p className="mt-6 text-xs text-theme-muted">
+              <p className="mt-6 text-xs text-theme-textaccent">
                 Or type your own question creating a new conversation.
               </p>
 
