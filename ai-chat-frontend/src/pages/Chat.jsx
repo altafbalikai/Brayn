@@ -11,6 +11,7 @@ import {
   setCurrentConversation,
   updateConversationTitle,
   setConversationTitle,
+  clearMessages,
 } from "../features/conversations/conversationSlice";
 
 import { cache, CACHE_KEYS } from "../utils/cache";
@@ -70,6 +71,10 @@ export default function Chat() {
     (state) => state.conversation.messagesLoadingMore,
     shallowEqual
   );
+
+  const messagesLoading =
+    !!currentConversation?._id &&
+    messagesPages?.[currentConversation._id] === undefined;
 
   // Load conversations with cache
   useEffect(() => {
@@ -160,30 +165,6 @@ export default function Chat() {
     },
     [dispatch]
   );
-
-  // Memoized callbacks to prevent unnecessary re-renders
-  // const handleNewChat = useCallback(async () => {
-  //   const result = await dispatch(
-  //     createConversation({ agentId: "default", title: "New Conversation" })
-  //   );
-  //   if (createConversation.fulfilled.match(result)) {
-  //     dispatch(setCurrentConversation(result.payload));
-  //     titleUpdatedRef.current = false; // Reset title update flag for new conversation
-  //   }
-  // }, [dispatch])
-
-  // const handleSendMessage = useCallback(async (message) => {
-  //   if (!message?.trim() || !currentConversation) return;
-
-  //   const tempAssistantId = `temp-assistant-${Date.now()}`;
-  //   await dispatch(
-  //     sendMessage({
-  //       message: message.trim(),
-  //       conversationId: currentConversation._id,
-  //       tempAssistantId,
-  //     })
-  //   );
-  // });
 
   useEffect(() => {
     const handleResize = () => {
@@ -309,6 +290,7 @@ export default function Chat() {
 
   const handleLogout = useCallback(async () => {
     await dispatch(logout());
+    dispatch(clearMessages());
     navigate("/login");
   }, [dispatch, navigate]);
 
@@ -525,6 +507,7 @@ export default function Chat() {
               onScroll={handleMessagesScroll}
               groupedMessages={groupedMessages}
               isLoadingMore={messagesLoadingMore[currentConversation._id]}
+              isLoading={messagesLoading}
             />
             {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
 

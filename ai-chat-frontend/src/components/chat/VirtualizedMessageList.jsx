@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import MessageItem from "./MessageItem";
 import MessageGroup from "./MessageGroup";
+import MessageListSkeleton from "./../PageSkeletonLoaders/MessageListSkeleton";
 
 /**
  * Virtualized message list with fallback to regular rendering for small lists.
@@ -13,6 +14,7 @@ function VirtualizedMessageList({
   onScroll,
   groupedMessages,
   isLoadingMore,
+  isLoading,
 }) {
   const listRef = useRef(null);
   const sizeMap = useRef({});
@@ -75,6 +77,11 @@ function VirtualizedMessageList({
     if (messages.length < 10) sizeMap.current = {};
   }, [messages.length]);
 
+  // 🔹 Initial load skeleton
+  if (isLoading && !messages.length) {
+    return <MessageListSkeleton />;
+  }
+
   /* ------------------------------------------------------------------ */
   /* NON-VIRTUALIZED                                   */
   /* ------------------------------------------------------------------ */
@@ -89,9 +96,7 @@ function VirtualizedMessageList({
         {/* Centered content column */}
         <div className="mx-auto w-full max-w-4xl px-4 py-6 min-w-0">
           {isLoadingMore && (
-            <div className="text-center py-3 text-theme-muted text-sm">
-              Loading older messages…
-            </div>
+            <MessageListSkeleton showTopLoader groupCount={1} />
           )}
 
           {groupedMessages?.length

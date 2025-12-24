@@ -167,6 +167,11 @@ const conversationSlice = createSlice({
             }
             state.messages[conversationId].push(message);
         },
+        clearMessages(state) {
+            state.messagesPages = {};
+            state.messagesLoadingMore = {};
+            state.currentConversationId = null;
+        },
         clearError: (state) => {
             state.error = null;
         },
@@ -301,6 +306,7 @@ export const {
     updateAssistantText,
     finalizeAssistantMessage,
     setConversationTitle,
+    clearMessages,
     clearError,
 } = conversationSlice.actions;
 export default conversationSlice.reducer;

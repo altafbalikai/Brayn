@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { initializeAuth } from "./features/auth/authSlice";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AuthSkeletonLoader from "./components/PageSkeletonLoaders/AuthSkeletonLoader";
+import ChatSkeletonLoader from "./components/PageSkeletonLoaders/ChatSkeletonLoader";
 
 // Lazy-loaded pages
 const Login = lazy(() => import("./pages/Login"));
@@ -13,7 +15,7 @@ const Chat = lazy(() => import("./pages/Chat"));
 // Loading fallback
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-theme-dark">
-    <div className="text-theme-accent">Loading...</div>
+    <div className="text-theme-text">Loading...</div>
   </div>
 );
 
@@ -30,36 +32,47 @@ function App() {
 
   // 🚫 BLOCK routing until auth is initialized
   if (!initialized) {
-    return <LoadingFallback />;
+    return <AuthSkeletonLoader />;
   }
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+      <Routes>
+        {/* Auth routes */}
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<AuthSkeletonLoader />}>
+              <Login />
+            </Suspense>
+          }
+        />
 
-          {/* Protected route */}
-          <Route
-            path="/chat"
-            element={
+        <Route
+          path="/signup"
+          element={
+            <Suspense fallback={<AuthSkeletonLoader />}>
+              <Signup />
+            </Suspense>
+          }
+        />
+
+        {/* Protected chat route */}
+        <Route
+          path="/chat"
+          element={
+            <Suspense fallback={<ChatSkeletonLoader />}>
               <ProtectedRoute>
                 <Chat />
               </ProtectedRoute>
-            }
-          />
+            </Suspense>
+          }
+        />
 
-          {/* Root redirect (no auth logic here) */}
-          {/* <Route path="/" element={<Navigate to="/chat" replace />} /> */}
-
-          {/* Catch-all */}
-          {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
+        {/* Redirects */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
