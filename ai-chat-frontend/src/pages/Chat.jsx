@@ -76,6 +76,11 @@ export default function Chat() {
     !!currentConversation?._id &&
     messagesPages?.[currentConversation._id] === undefined;
 
+  const assistantTyping = useSelector(
+    (state) =>
+      state.conversation.assistantTyping?.[currentConversation?._id] ?? false
+  );
+
   // Load conversations with cache
   useEffect(() => {
     // Check cache first
@@ -195,7 +200,6 @@ export default function Chat() {
   const handleSendMessage = useCallback(
     async (message) => {
       if (!message?.trim() || !currentConversation) return;
-      console.log("Sending message:", message);
 
       const convo_title = message.trim();
       let conversationId = currentConversation._id;
@@ -512,7 +516,10 @@ export default function Chat() {
             {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
 
             {/* <div className="flex-shrink-0"> */}
-            <Composer onSend={handleSendMessage} disabled={sending} />
+            <Composer
+              onSend={handleSendMessage}
+              disabled={sending || assistantTyping}
+            />
           </>
         )}
       </div>

@@ -72,6 +72,7 @@ export const sendMessage = createAsyncThunk(
             // Add placeholder for assistant message
             dispatch({ type: 'conversation/addAssistantPlaceholder', payload: { conversationId, message: { _id: tempId, role: 'assistant', text: '', createdAt: new Date().toISOString(), status: 'streaming' } } });
 
+            dispatch(setAssistantTyping({ conversationId, value: true }));
             let accumulated = '';
 
             const full = await stream.start((chunk) => {
@@ -116,6 +117,7 @@ const initialState = {
     conversationsPage: 1,
     conversationsHasMore: true,
     conversationsLoadingMore: false,
+    assistantTyping: {},
     messagesPages: {}, // { conversationId: { page: 1, hasMore: true } }
     messagesLoadingMore: {},
 };
@@ -166,6 +168,13 @@ const conversationSlice = createSlice({
                 state.messages[conversationId] = [];
             }
             state.messages[conversationId].push(message);
+        },
+        setAssistantTyping(state, action) {
+            const { conversationId, value } = action.payload;
+
+            if (conversationId) {
+                state.assistantTyping[conversationId] = value;
+            }
         },
         clearMessages(state) {
             state.messagesPages = {};
@@ -278,11 +287,19 @@ const conversationSlice = createSlice({
             })
             .addCase(sendMessage.fulfilled, (state, action) => {
                 state.sending = false;
+                const { conversationId } = action.payload;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                }
                 // Streaming flow updates messages locally via placeholder actions; nothing else required here
             })
             .addCase(sendMessage.rejected, (state, action) => {
                 state.sending = false;
                 state.error = action.payload;
+                const { conversationId } = action.meta.arg;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                }
             })
             // Update conversation title
             .addCase(updateConversationTitle.fulfilled, (state, action) => {
@@ -302,6 +319,7 @@ export const {
     setCurrentConversation,
     clearCurrentConversation,
     addMessageToConversation,
+    setAssistantTyping,
     addAssistantPlaceholder,
     updateAssistantText,
     finalizeAssistantMessage,
