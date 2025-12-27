@@ -1,12 +1,17 @@
 import React from "react";
-import { MdOutlinePostAdd } from "react-icons/md";
+import { GrAddCircle } from "react-icons/gr";
 import { GiBrain } from "react-icons/gi";
+import {
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
+} from "react-icons/tb";
+import { IoIosAddCircle } from "react-icons/io";
 
 /**
  * NewChatControl - presentational New Chat button
- * @param {{onNewChat: function}} props
+ * @param {{toggleSidebar: function}} props
  */
-function NewChatControl({ onNewChat }) {
+function NewChatControl({ toggleSidebar }) {
   return (
     <div className="p-3 border-b border-theme-secondary flex items-center justify-between">
       {/* Left Side: Logo/Icon */}
@@ -17,13 +22,19 @@ function NewChatControl({ onNewChat }) {
         </span> */}
       </div>
 
-      {/* Right Side: New Chat Button */}
+      {/* Mobile Hamburger Button (Top Left) */}
       <button
-        onClick={onNewChat}
-        className="flex items-center gap-1.5 py-1.5 px-3 bg-theme-secondary text-theme-text rounded-md hover:bg-opacity-90 transition-all font-medium text-xs"
+        className="
+                  flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-opacity-90 transition-all font-medium text-xs
+                "
+        onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
       >
-        <MdOutlinePostAdd size={20} className="text-base text-3xl" />
-        <span>New Chat</span>
+        {toggleSidebar ? (
+          <TbLayoutSidebarLeftCollapse size={28} />
+        ) : (
+          <TbLayoutSidebarLeftExpand size={28} />
+        )}
       </button>
     </div>
   );

@@ -41,7 +41,7 @@ function NewChatHero({
 
       {/* Value Proposition */}
       {!isCompact && (
-        <p className="text-theme-text mb-8">
+        <p className="text-theme-text mb-4">
           Your AI assistant for thinking, creating, and problem-solving.
         </p>
       )}
@@ -52,7 +52,6 @@ function NewChatHero({
           className="
       flex flex-wrap gap-2
       justify-center
-      mt-4
     "
         >
           {[

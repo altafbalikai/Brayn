@@ -25,7 +25,10 @@ import {
 import RewindBackground from "../components/ui/RewindBackground.jsx";
 import NewChatHero from "../components/chat/NewChatHero";
 import { isDraft } from "@reduxjs/toolkit";
-
+import {
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
+} from "react-icons/tb";
 // Component implementations moved to `src/components/chat/*`
 
 export default function Chat() {
@@ -199,6 +202,10 @@ export default function Chat() {
 
     titleUpdatedRef.current = false;
   }, [dispatch]);
+
+  const handleSidebarToggle = () => {
+    setSidebarOpen((v) => !v);
+  };
 
   const handleSendMessage = useCallback(
     async (message) => {
@@ -408,26 +415,36 @@ export default function Chat() {
     <>
       <div className="relative h-full w-full bg-transparent overflow-hidden flex">
         {/* Mobile Hamburger Button (Top Left) */}
-        <button
-          className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-md bg-theme-dark text-theme-muted"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-        >
-          ☰
-        </button>
+        {!sidebarOpen && (
+          <button
+            className="
+            fixed top-3 left-3 z-50
+            p-2 rounded-md
+            bg-theme-dark
+            z-[60]
+            text-theme-text
+            hover:text-theme-text
+            transition-colors
+          "
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label="Toggle sidebar"
+          >
+            <TbLayoutSidebarLeftExpand size={28} />
+          </button>
+        )}
 
         {/* Sidebar Drawer - Hidden on mobile unless opened */}
         <div
           className={`
-          fixed inset-y-0 left-0 z-50 md:z-10 w-64 bg-theme-dark
-          transform transition-transform duration-300
+          fixed inset-y-0 left-0 z-50 w-64 bg-theme-dark
+          transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          md:static  md:transform-none
         `}
         >
           <Sidebar
             user={user}
             onNewChat={handleNewChat}
+            toggleSidebar={handleSidebarToggle}
             onLogout={handleLogout}
             conversations={conversations}
             currentConversationId={currentConversation?._id}
@@ -447,48 +464,59 @@ export default function Chat() {
         )}
 
         {/* Main Chat Area */}
-        <RewindBackground />
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
-          {showHero ? (
-            <div className="flex-1 flex items-center justify-center px-4">
-              <div className="max-w-4xl w-full">
-                <NewChatHero
-                  onNewChat={handleNewChat}
-                  onPromptClick={handlePromptClick}
-                  showPrompts
-                  showComposer
-                  Composer={(props) => (
-                    <Composer
-                      {...props}
-                      onSend={handlePromptClick}
-                      disabled={sending || assistantTyping}
-                      position="center"
-                    />
-                  )}
-                />
+        <div
+          className={`
+          flex-1 flex flex-col min-h-0
+          transition-[margin] duration-300 ease-in-out
+          ${sidebarOpen ? "md:ml-64" : "md:ml-0"}
+        `}
+        >
+          <RewindBackground />
+          <div
+            className="flex-1 flex flex-col min-h-0 
+                min-w-0 relative overflow-hidden "
+          >
+            {showHero ? (
+              <div className="flex-1 flex items-center justify-center px-4">
+                <div className="max-w-4xl w-full">
+                  <NewChatHero
+                    onNewChat={handleNewChat}
+                    onPromptClick={handlePromptClick}
+                    showPrompts
+                    showComposer
+                    Composer={(props) => (
+                      <Composer
+                        {...props}
+                        onSend={handlePromptClick}
+                        disabled={sending || assistantTyping}
+                        position="center"
+                      />
+                    )}
+                  />
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              {/* Messages - Virtualized for long conversations */}
-              <VirtualizedMessageList
-                messages={currentMessages}
-                messagesEndRef={messagesEndRef}
-                containerRef={messagesContainerRef}
-                onScroll={handleMessagesScroll}
-                groupedMessages={groupedMessages}
-                isLoadingMore={messagesLoadingMore[currentConversation._id]}
-                isLoading={messagesLoading}
-              />
-              {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
+            ) : (
+              <>
+                {/* Messages - Virtualized for long conversations */}
+                <VirtualizedMessageList
+                  messages={currentMessages}
+                  messagesEndRef={messagesEndRef}
+                  containerRef={messagesContainerRef}
+                  onScroll={handleMessagesScroll}
+                  groupedMessages={groupedMessages}
+                  isLoadingMore={messagesLoadingMore[currentConversation._id]}
+                  isLoading={messagesLoading}
+                />
+                {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
 
-              {/* <div className="flex-shrink-0"> */}
-              <Composer
-                onSend={handleSendMessage}
-                disabled={sending || assistantTyping}
-              />
-            </>
-          )}
+                {/* <div className="flex-shrink-0"> */}
+                <Composer
+                  onSend={handleSendMessage}
+                  disabled={sending || assistantTyping}
+                />
+              </>
+            )}
+          </div>
         </div>
       </div>
     </>
