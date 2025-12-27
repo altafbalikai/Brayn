@@ -9,7 +9,7 @@ function MessageGroup({ group, isFirst }) {
   return (
     <div className="mb-4">
       {!isFirst && (
-        <div className="text-center my-3">
+        <div className="text-center text-theme-muted my-3">
           <span className="text-xs opacity-50 bg-theme-light px-3 py-1 rounded-full">
             {formatGroupTime(group.timestamp)}
           </span>

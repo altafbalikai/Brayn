@@ -4,7 +4,7 @@ import { FaArrowCircleUp } from "react-icons/fa";
 /**
  * Composer - floating glass input
  */
-function Composer({ onSend, disabled }) {
+function Composer({ onSend, disabled, position }) {
   const [text, setText] = useState("");
 
   const submit = (e) => {
@@ -14,16 +14,21 @@ function Composer({ onSend, disabled }) {
     setText("");
   };
 
+  const positionClasses =
+    position === "center"
+      ? `relative`
+      : `absolute bottom-4 left-1/2 -translate-x-1/2`;
+
   return (
     <form
       onSubmit={submit}
-      className="
-        fixed bottom-4 left-1/2 -translate-x-1/2
+      className={`
+        ${positionClasses}
         z-30
-        w-[calc(100%-2rem)]
+        w-[100%]
         max-w-4xl
         px-4
-      "
+      `}
     >
       {/* Floating glass bar */}
       <div

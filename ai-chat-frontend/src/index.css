@@ -177,3 +177,34 @@ pre:hover {
     background-position: 0% 50%;
   }
 }
+
+/* ============================= */
+/* shimmer Classes */
+/* ============================= */
+@layer utilities {
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: rgba(148, 163, 184, 0.15); /* theme-secondary base */
+  }
+
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(203, 213, 225, 0.25),
+      /* theme-textaccent */ transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}

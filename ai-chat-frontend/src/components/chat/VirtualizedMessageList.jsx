@@ -83,13 +83,13 @@ function VirtualizedMessageList({
   }
 
   /* ------------------------------------------------------------------ */
-  /* NON-VIRTUALIZED                                   */
+  /* NON-VIRTUALIZED                                                    */
   /* ------------------------------------------------------------------ */
   if (messages.length < 50 || !VariableSizeList) {
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-scroll bg-theme-light pb-28 no-scrollbar md:show-scrollbar"
+        className="flex-1 min-h-0 overflow-y-scroll bg-transparent pb-28 no-scrollbar md:show-scrollbar"
         onScroll={onScroll}
         style={{ overscrollBehavior: "contain" }}
       >
@@ -131,7 +131,7 @@ function VirtualizedMessageList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 min-h-0 overflow-y-scroll bg-theme-light pb-28 no-scrollbar md:show-scrollbar"
+      className="flex-1 min-h-0 overflow-y-scroll bg-transparent pb-28 no-scrollbar md:show-scrollbar"
       style={{ overscrollBehavior: "contain" }}
     >
       <VariableSizeList

@@ -143,7 +143,7 @@ function MessageItem({ msg, style, showTime }) {
       <div className="flex flex-col min-w-0 max-w-[90%] sm:max-w-[80%] md:max-w-[70%]">
         {showTime && (
           <div
-            className={`text-xs opacity-50 mb-1 ${
+            className={`text-xs text-theme-muted opacity-50 mb-1 ${
               msg.role === "user" ? "text-right" : "text-left"
             }`}
           >

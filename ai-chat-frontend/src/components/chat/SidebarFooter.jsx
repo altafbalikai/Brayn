@@ -22,7 +22,7 @@ function SidebarFooter({ user, onLogout }) {
           className="w-full flex items-center gap-2 p-1 rounded-md hover:bg-theme-secondary/20 transition"
         >
           {/* User Avatar */}
-          <div className="w-8 h-8 bg-theme-secondary rounded-full flex items-center justify-center text-theme-text font-bold text-[20px] flex-shrink-0">
+          <div className="w-8 h-8 bg-theme-secondary rounded-full flex items-center justify-center text-theme-text text-[20px] flex-shrink-0">
             {getInitial()}
           </div>
           {/* User Info */}

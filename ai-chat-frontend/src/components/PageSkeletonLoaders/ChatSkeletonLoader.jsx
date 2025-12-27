@@ -1,63 +1,53 @@
 const ChatSkeletonLoader = () => {
   return (
-    <div className="relative h-full w-full bg-theme-light overflow-hidden flex">
+    <div className="relative h-full w-full bg-theme-dark overflow-hidden flex">
       {/* Sidebar Skeleton */}
-      <div className="hidden md:flex w-64 bg-theme-dark p-4 flex-col animate-pulse">
-        {/* App title */}
-        <div className="h-6 w-32 bg-theme-secondary/40 rounded mb-6" />
+      <div className="hidden md:flex w-64 bg-theme-dark p-4 flex-col">
+        <div className="h-6 w-32 rounded shimmer mb-6" />
 
-        {/* New chat button */}
-        <div className="h-10 w-full bg-theme-secondary/30 rounded-lg mb-6" />
+        <div className="h-10 w-full rounded-lg shimmer mb-6" />
 
-        {/* Conversation list */}
         <div className="space-y-3 flex-1 overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-12 w-full bg-theme-secondary/20 rounded-lg"
-            />
+            <div key={i} className="h-12 w-full rounded-lg shimmer" />
           ))}
         </div>
 
-        {/* Footer actions */}
         <div className="mt-4 space-y-3">
-          <div className="h-4 w-24 bg-theme-secondary/30 rounded" />
-          <div className="h-4 w-20 bg-theme-secondary/20 rounded" />
+          <div className="h-4 w-24 rounded shimmer" />
+          <div className="h-4 w-20 rounded shimmer" />
         </div>
       </div>
 
       {/* Main Chat Area Skeleton */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 animate-pulse">
-        {/* Empty-state header */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        {/* Hero Skeleton */}
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-xl w-full text-center">
-            {/* Logo */}
-            <div className="mx-auto mb-4 h-8 w-40 bg-theme-secondary/40 rounded" />
+            {/* Logo + Title */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="h-8 w-8 rounded-full shimmer" />
+              <div className="h-7 w-24 rounded shimmer" />
+            </div>
 
-            {/* Subtitle */}
-            <div className="mx-auto mb-8 h-4 w-72 bg-theme-secondary/20 rounded" />
+            {/* Value Proposition */}
+            <div className="mx-auto mb-6 h-4 w-80 rounded shimmer" />
 
-            {/* Prompt cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Prompt Chips */}
+            <div className="flex flex-wrap justify-center gap-2 mb-6">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-20 rounded-xl bg-theme-secondary/20"
-                />
+                <div key={i} className="h-7 w-28 rounded-full shimmer" />
               ))}
             </div>
 
-            {/* Hint */}
-            <div className="mx-auto mt-6 h-3 w-64 bg-theme-secondary/20 rounded" />
+            {/* Hint text */}
+            <div className="mx-auto mb-4 h-3 w-48 rounded shimmer" />
 
-            {/* Primary action */}
-            <div className="mx-auto mt-6 h-12 w-48 bg-theme-secondary/40 rounded-xl" />
+            {/* Composer Skeleton (INLINE, not floating) */}
+            <div className="mx-auto mt-2 w-full max-w-4xl px-2">
+              <div className="h-12 rounded-3xl shimmer" />
+            </div>
           </div>
-        </div>
-
-        {/* Composer Skeleton */}
-        <div className="flex-shrink-0 p-4 border-t border-theme-secondary bg-theme-light">
-          <div className="h-12 w-full rounded-xl bg-theme-secondary/30" />
         </div>
       </div>
     </div>

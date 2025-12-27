@@ -22,6 +22,9 @@ import {
   Sidebar,
   ConversationItem,
 } from "../components/chat";
+import RewindBackground from "../components/ui/RewindBackground.jsx";
+import NewChatHero from "../components/chat/NewChatHero";
+import { isDraft } from "@reduxjs/toolkit";
 
 // Component implementations moved to `src/components/chat/*`
 
@@ -186,8 +189,8 @@ export default function Chat() {
   const handleNewChat = useCallback(() => {
     dispatch(
       setCurrentConversation({
-        _id: null, // 👈 not created yet
-        isDraft: true, // 👈 important flag
+        _id: null,
+        isDraft: true,
         agentId: "default",
         title: "New Chat",
         messages: [],
@@ -199,8 +202,9 @@ export default function Chat() {
 
   const handleSendMessage = useCallback(
     async (message) => {
+      console.log("Sending message:", message);
       if (!message?.trim() || !currentConversation) return;
-
+      console.log("Sending message:", message);
       const convo_title = message.trim();
       let conversationId = currentConversation._id;
 
@@ -247,6 +251,7 @@ export default function Chat() {
 
   const handlePromptClick = useCallback(
     async (prompt) => {
+      console.log("Prompt clicked:", prompt);
       if (!prompt?.trim()) return;
 
       console.log("Prompt clicked:", prompt);
@@ -394,135 +399,92 @@ export default function Chat() {
   }, [conversations, currentConversation, loading, handleSelectConversation]);
 
   return (
-    <div className="relative h-full w-full bg-theme-light overflow-hidden flex">
-      {/* Mobile Hamburger Button (Top Left) */}
-      <button
-        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-md bg-theme-dark text-theme-muted"
-        onClick={() => setSidebarOpen(true)}
-        aria-label="Open sidebar"
-      >
-        ☰
-      </button>
+    <>
+      <RewindBackground />
+      <div className="relative h-full w-full bg-theme-light overflow-hidden flex">
+        {/* Mobile Hamburger Button (Top Left) */}
+        <button
+          className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-md bg-theme-dark text-theme-muted"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open sidebar"
+        >
+          ☰
+        </button>
 
-      {/* Sidebar Drawer - Hidden on mobile unless opened */}
-      <div
-        className={`
+        {/* Sidebar Drawer - Hidden on mobile unless opened */}
+        <div
+          className={`
           fixed inset-y-0 left-0 z-50 md:z-10 w-64 bg-theme-dark
           transform transition-transform duration-300
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           md:static  md:transform-none
         `}
-      >
-        <Sidebar
-          user={user}
-          onNewChat={handleNewChat}
-          onLogout={handleLogout}
-          conversations={conversations}
-          currentConversationId={currentConversation?._id}
-          loading={loading}
-          conversationsLoadingMore={conversationsLoadingMore}
-          onSelectConversation={handleSelectConversation}
-          containerRef={conversationsScrollRef}
-          onScroll={handleConversationsScroll}
-        />
-      </div>
-      {/* Mobile overlay to close sidebar */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {!currentConversation ? (
-          <div className="flex-1 flex items-center justify-center px-4">
-            <div className="max-w-xl w-full text-center">
-              {/* Logo / Identity */}
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <GiBrain size={32} className="text-theme-highlight" />
-                <h1 className="text-3xl font-bold text-theme-dark">Brayn</h1>
-              </div>
-
-              {/* Value Proposition */}
-              <p className="text-theme-text mb-8">
-                Your AI assistant for thinking, creating, and problem-solving.
-              </p>
-
-              {/* Prompt Suggestions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  "Explain a concept simply",
-                  "Summarize this document",
-                  "Generate ideas for a project",
-                  "Help debug my code",
-                ].map((prompt) => (
-                  <button
-                    key={prompt}
-                    onClick={() => handlePromptClick(prompt)}
-                    className="
-                text-left
-                p-4
-                rounded-xl
-                bg-theme-light
-                border border-theme-secondary
-                text-theme-text
-                hover:bg-opacity-80
-                hover:border-theme-highlight
-                transition-all
-              "
-                  >
-                    <span className="text-sm">{prompt}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Hint */}
-              <p className="mt-6 text-xs text-theme-textaccent">
-                Or type your own question creating a new conversation.
-              </p>
-
-              {/* Primary Action */}
-              <button
-                onClick={handleNewChat}
-                className="
-                  mx-auto mb-10
-                  py-3 px-8
-                  bg-theme-secondary text-theme-dark
-                  rounded-xl font-medium
-                  shadow-lg
-                  hover:scale-[1.02]
-                  hover:shadow-xl
-                  transition-all
-                  mt-6"
-              >
-                Start a New Chat
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Messages - Virtualized for long conversations */}
-            <VirtualizedMessageList
-              messages={currentMessages}
-              messagesEndRef={messagesEndRef}
-              containerRef={messagesContainerRef}
-              onScroll={handleMessagesScroll}
-              groupedMessages={groupedMessages}
-              isLoadingMore={messagesLoadingMore[currentConversation._id]}
-              isLoading={messagesLoading}
-            />
-            {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
-
-            {/* <div className="flex-shrink-0"> */}
-            <Composer
-              onSend={handleSendMessage}
-              disabled={sending || assistantTyping}
-            />
-          </>
+        >
+          <Sidebar
+            user={user}
+            onNewChat={handleNewChat}
+            onLogout={handleLogout}
+            conversations={conversations}
+            currentConversationId={currentConversation?._id}
+            loading={loading}
+            conversationsLoadingMore={conversationsLoadingMore}
+            onSelectConversation={handleSelectConversation}
+            containerRef={conversationsScrollRef}
+            onScroll={handleConversationsScroll}
+          />
+        </div>
+        {/* Mobile overlay to close sidebar */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
         )}
+
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
+          {!currentConversation ? (
+            <div className="flex-1 flex items-center justify-center px-4">
+              <div className="max-w-4xl w-full">
+                <NewChatHero
+                  onNewChat={handleNewChat}
+                  onPromptClick={handlePromptClick}
+                  showPrompts
+                  showComposer
+                  Composer={(props) => (
+                    <Composer
+                      {...props}
+                      onSend={handlePromptClick}
+                      disabled={sending || assistantTyping}
+                      position="center"
+                    />
+                  )}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Messages - Virtualized for long conversations */}
+              <VirtualizedMessageList
+                messages={currentMessages}
+                messagesEndRef={messagesEndRef}
+                containerRef={messagesContainerRef}
+                onScroll={handleMessagesScroll}
+                groupedMessages={groupedMessages}
+                isLoadingMore={messagesLoadingMore[currentConversation._id]}
+                isLoading={messagesLoading}
+              />
+              {/* sending indicator removed - streaming placeholder is rendered inside the messages list */}
+
+              {/* <div className="flex-shrink-0"> */}
+              <Composer
+                onSend={handleSendMessage}
+                disabled={sending || assistantTyping}
+              />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

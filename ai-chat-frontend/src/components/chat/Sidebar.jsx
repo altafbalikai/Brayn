@@ -19,6 +19,7 @@ export default function Sidebar({
     <div className="w-full bg-theme-dark border-r border-theme-secondary flex flex-col h-full overflow-hidden">
       <NewChatControl onNewChat={onNewChat} />
 
+      <p className="text-theme-muted pl-3 p-1">Recents</p>
       <ConversationList
         conversations={conversations}
         currentConversationId={currentConversationId}
