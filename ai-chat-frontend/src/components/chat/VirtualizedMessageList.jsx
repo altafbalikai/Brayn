@@ -89,9 +89,11 @@ function VirtualizedMessageList({
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-scroll bg-transparent pb-28 no-scrollbar md:show-scrollbar"
+        className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar bg-theme-light"
         onScroll={onScroll}
-        style={{ overscrollBehavior: "contain" }}
+        style={{
+          overscrollBehavior: "contain",
+        }}
       >
         {/* Centered content column */}
         <div className="mx-auto w-full max-w-4xl px-4 py-6 min-w-0">
@@ -131,7 +133,7 @@ function VirtualizedMessageList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 min-h-0 overflow-y-scroll bg-transparent pb-28 no-scrollbar md:show-scrollbar"
+      className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar bg-theme-light"
       style={{ overscrollBehavior: "contain" }}
     >
       <VariableSizeList

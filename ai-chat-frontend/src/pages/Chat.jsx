@@ -398,10 +398,15 @@ export default function Chat() {
     ));
   }, [conversations, currentConversation, loading, handleSelectConversation]);
 
+  const showHero =
+    !currentConversation ||
+    (currentConversation.isDraft &&
+      (!currentConversation.messages ||
+        currentConversation.messages.length === 0));
+
   return (
     <>
-      <RewindBackground />
-      <div className="relative h-full w-full bg-theme-light overflow-hidden flex">
+      <div className="relative h-full w-full bg-transparent overflow-hidden flex">
         {/* Mobile Hamburger Button (Top Left) */}
         <button
           className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-md bg-theme-dark text-theme-muted"
@@ -442,8 +447,9 @@ export default function Chat() {
         )}
 
         {/* Main Chat Area */}
+        <RewindBackground />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
-          {!currentConversation ? (
+          {showHero ? (
             <div className="flex-1 flex items-center justify-center px-4">
               <div className="max-w-4xl w-full">
                 <NewChatHero
