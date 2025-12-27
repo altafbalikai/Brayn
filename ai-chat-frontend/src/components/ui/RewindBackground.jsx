@@ -2,46 +2,57 @@ import React, { useEffect, useRef } from "react";
 
 const RewindBackground = () => {
   const canvasRef = useRef(null);
-  let t = 0;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    let width, height, dpr;
-    let particles = [];
-    const PARTICLE_COUNT = 120;
-    const MAX_DISTANCE = 150;
+    /* -------------------- Device & Performance -------------------- */
+    const isMobile =
+      window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent);
 
+    const PARTICLE_COUNT = isMobile ? 60 : 120;
+    const MAX_DISTANCE = isMobile ? 100 : 150;
+
+    /* -------------------- Brain Clusters -------------------- */
+    const CLUSTERS = 4;
+    const CLUSTER_RADIUS = 220;
+
+    /* -------------------- Theme Colors -------------------- */
     const css = getComputedStyle(document.documentElement);
-
     const COLORS = {
-      bg: css.getPropertyValue("--theme-dark").trim(),
-      ambient: css.getPropertyValue("--theme-light").trim(),
-      link: css.getPropertyValue("--theme-secondary").trim(),
-      accent: css.getPropertyValue("--theme-accent").trim(),
-      node: css.getPropertyValue("--theme-text").trim(),
-      muted: css.getPropertyValue("--theme-muted").trim(),
-      active: css.getPropertyValue("--theme-textaccent").trim(),
+      bg: css.getPropertyValue("--theme-dark").trim() || "#05080f",
+      ambient: css.getPropertyValue("--theme-light").trim() || "#1b2a4a",
+      accent: css.getPropertyValue("--theme-accent").trim() || "#4f8cff",
+      link: "rgba(120,140,255,",
+      node: "rgba(220,225,255,",
+      active: css.getPropertyValue("--theme-textaccent").trim() || "#8ab4ff",
     };
 
-    class Particle {
-      constructor() {
-        this.reset();
-      }
+    /* -------------------- State -------------------- */
+    let width, height, dpr;
+    let particles = [];
+    let signals = [];
+    let t = 0;
 
-      reset() {
-        this.x = Math.random() * width;
-        this.y = Math.random() * height;
+    let mouse = { x: null, y: null };
+    let lastInteraction = Date.now();
+    let activeMode = true;
+
+    /* -------------------- Particle -------------------- */
+    class Particle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
         this.vx = (Math.random() - 0.5) * 0.35;
         this.vy = (Math.random() - 0.5) * 0.35;
-        this.r = Math.random() * 1.6 + 0.8;
+        this.r = Math.random() * 1.0 + 0.2;
         this.energy = Math.random();
       }
 
       update() {
         this.x += this.vx;
         this.y += this.vy;
-
         this.energy += 0.01;
         if (this.energy > 1) this.energy = 0;
 
@@ -49,20 +60,67 @@ const RewindBackground = () => {
         if (this.y < 0 || this.y > height) this.vy *= -1;
       }
 
-      draw() {
-        const alpha = 0.6 + this.energy * 0.4;
+      draw(glow) {
+        const pulse = Math.sin(this.energy * Math.PI * 2) * 0.5 + 0.5;
+        const alpha = 0.4 + pulse * 0.6;
 
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(229,231,235,${alpha})`;
+        ctx.arc(this.x, this.y, this.r + pulse * 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = `${COLORS.node}${alpha})`;
+        ctx.shadowBlur = glow;
+        ctx.shadowColor = COLORS.ambient;
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
     }
 
+    /* -------------------- Signal -------------------- */
+    class Signal {
+      constructor(from, to) {
+        this.from = from;
+        this.to = to;
+        this.progress = 0;
+        this.speed = 0.015 + Math.random() * 0.02;
+      }
+
+      update() {
+        this.progress += this.speed;
+        return this.progress <= 1;
+      }
+
+      draw(glow) {
+        const x = this.from.x + (this.to.x - this.from.x) * this.progress;
+        const y = this.from.y + (this.to.y - this.from.y) * this.progress;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.active;
+        ctx.shadowBlur = glow;
+        ctx.shadowColor = COLORS.active;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    /* -------------------- Init -------------------- */
     const initParticles = () => {
       particles = [];
+      const centers = Array.from({ length: CLUSTERS }).map(() => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+      }));
+
       for (let i = 0; i < PARTICLE_COUNT; i++) {
-        particles.push(new Particle());
+        const c = centers[i % CLUSTERS];
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * CLUSTER_RADIUS;
+
+        particles.push(
+          new Particle(
+            c.x + Math.cos(angle) * radius,
+            c.y + Math.sin(angle) * radius
+          )
+        );
       }
     };
 
@@ -77,44 +135,33 @@ const RewindBackground = () => {
       canvas.style.height = `${height}px`;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
       initParticles();
     };
 
+    /* -------------------- Background -------------------- */
     const drawBackground = () => {
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, width, height);
 
-      // Animate gradient positions
-      const x1 = width * (0.3 + Math.sin(t * 0.0005) * 0.1);
-      const y1 = height * (0.3 + Math.cos(t * 0.0004) * 0.1);
+      const g = ctx.createRadialGradient(
+        width * 0.4,
+        height * 0.3,
+        0,
+        width * 0.4,
+        height * 0.3,
+        width * 0.9
+      );
+      g.addColorStop(0, COLORS.ambient);
+      g.addColorStop(1, "transparent");
 
-      const x2 = width * (0.7 + Math.cos(t * 0.0003) * 0.1);
-      const y2 = height * (0.7 + Math.sin(t * 0.0006) * 0.1);
-
-      // Gradient 1 (ambient glow)
-      const g1 = ctx.createRadialGradient(x1, y1, 0, x1, y1, width * 0.9);
-      g1.addColorStop(0, COLORS.ambient);
-      g1.addColorStop(1, "transparent");
-
-      // Gradient 2 (depth accent)
-      const g2 = ctx.createRadialGradient(x2, y2, 0, x2, y2, width * 0.8);
-      g2.addColorStop(0, COLORS.accent);
-      g2.addColorStop(1, "transparent");
-
-      // Blend gradients
-      ctx.save();
-      ctx.globalAlpha = 0.8;
-      ctx.fillStyle = g1;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
-
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = g2;
-      ctx.fillRect(0, 0, width, height);
-      ctx.restore();
+      ctx.globalAlpha = 1;
     };
 
-    const connectParticles = () => {
+    /* -------------------- Connections -------------------- */
+    const connectParticles = (signalRate) => {
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
@@ -123,32 +170,91 @@ const RewindBackground = () => {
 
           if (dist < MAX_DISTANCE) {
             const opacity = 1 - dist / MAX_DISTANCE;
-            ctx.strokeStyle = `${COLORS.link}${opacity * 0.4})`;
-            ctx.lineWidth = 0.7;
+            ctx.strokeStyle = `${COLORS.link}${opacity * 0.35})`;
+            ctx.lineWidth = 0.6;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.stroke();
+
+            if (Math.random() < signalRate) {
+              signals.push(new Signal(particles[i], particles[j]));
+            }
           }
         }
       }
     };
 
+    /* -------------------- Glow Pass -------------------- */
+    const postGlow = () => {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.15;
+      ctx.filter = "blur(12px)";
+      ctx.drawImage(canvas, 0, 0);
+      ctx.restore();
+    };
+
+    /* -------------------- Animate -------------------- */
     const animate = () => {
-      t += 16; // ~1 frame (ms)
+      t += 8;
+
+      if (Date.now() - lastInteraction > 5000) activeMode = false;
+
+      const SIGNAL_RATE = activeMode ? 0.0012 : 0.0002;
+      const GLOW = activeMode ? 8 : 3;
 
       drawBackground();
 
       particles.forEach((p) => {
         p.update();
-        p.draw();
+        p.draw(GLOW);
+
+        if (mouse.x) {
+          const dx = p.x - mouse.x;
+          const dy = p.y - mouse.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 120 && Math.random() < 0.02) {
+            const target =
+              particles[Math.floor(Math.random() * particles.length)];
+            signals.push(new Signal(p, target));
+          }
+        }
       });
 
-      connectParticles();
+      connectParticles(SIGNAL_RATE);
+
+      signals = signals.filter((s) => {
+        s.draw(GLOW);
+        return s.update();
+      });
+
+      postGlow();
       requestAnimationFrame(animate);
     };
 
+    /* -------------------- Interaction -------------------- */
+    const markActive = () => {
+      lastInteraction = Date.now();
+      activeMode = true;
+    };
+
+    window.addEventListener("mousemove", (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      markActive();
+    });
+
+    window.addEventListener("keydown", () => {
+      markActive();
+      for (let i = 0; i < 6; i++) {
+        const a = particles[Math.floor(Math.random() * particles.length)];
+        const b = particles[Math.floor(Math.random() * particles.length)];
+        signals.push(new Signal(a, b));
+      }
+    });
+
     window.addEventListener("resize", resize);
+
     resize();
     animate();
 
@@ -157,7 +263,7 @@ const RewindBackground = () => {
 
   return (
     <div className="fixed inset-0 -z-10 pointer-events-none">
-      <canvas ref={canvasRef} className="h-full w-full" />
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 };
