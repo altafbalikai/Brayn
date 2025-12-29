@@ -466,7 +466,7 @@ export default function Chat() {
         {/* Main Chat Area */}
         <div
           className={`
-          flex-1 flex flex-col min-h-0
+          flex-1 flex flex-col min-h-0 overflow-auto
           transition-[margin] duration-300 ease-in-out
           ${sidebarOpen ? "md:ml-64" : "md:ml-0"}
         `}
