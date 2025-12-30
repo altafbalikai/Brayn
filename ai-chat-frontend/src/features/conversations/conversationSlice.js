@@ -63,30 +63,50 @@ export const sendMessage = createAsyncThunk(
                 createdAt: new Date().toISOString(),
                 status: 'sent'
             };
-            dispatch({ type: 'conversation/addMessageToConversation', payload: { conversationId, message: userMsg } });
+            dispatch(addMessageToConversation({ conversationId, message: userMsg }));
 
             // Use streaming API
             const stream = llmService.askStream({ message, conversationId });
             const tempId = tempAssistantId || `temp-assistant-${Date.now()}`;
 
             // Add placeholder for assistant message
-            dispatch({ type: 'conversation/addAssistantPlaceholder', payload: { conversationId, message: { _id: tempId, role: 'assistant', text: '', createdAt: new Date().toISOString(), status: 'streaming' } } });
-
+            const placeholderMsg = {
+                _id: tempId,
+                role: 'assistant',
+                text: '',
+                createdAt: new Date().toISOString(),
+                status: 'streaming'
+            };
+            dispatch(addAssistantPlaceholder({ conversationId, message: placeholderMsg }));
             dispatch(setAssistantTyping({ conversationId, value: true }));
+
             let accumulated = '';
 
+            // Stream chunks in real-time
             const full = await stream.start((chunk) => {
                 accumulated += chunk;
-                dispatch({ type: 'conversation/updateAssistantText', payload: { conversationId, tempId, text: accumulated } });
+                // Update text with accumulated content
+                dispatch(updateAssistantText({
+                    conversationId,
+                    tempId,
+                    text: accumulated,
+                    status: 'streaming'
+                }));
             });
 
-            // finalize locally
-            const finalMsg = { _id: tempId, role: 'assistant', text: full, createdAt: new Date().toISOString(), status: 'sent' };
-            dispatch({ type: 'conversation/finalizeAssistantMessage', payload: { conversationId, tempId, finalMsg } });
+            // Finalize message when streaming completes
+            dispatch(finalizeAssistantMessage({
+                conversationId,
+                tempId,
+                text: full,
+                status: 'sent'
+            }));
+            dispatch(setAssistantTyping({ conversationId, value: false }));
 
-            return { conversationId, aiMessage: finalMsg };
+            return { conversationId, aiMessage: { _id: tempId, text: full } };
         } catch (error) {
             const errMsg = error.message || 'Failed to stream message';
+            dispatch(setAssistantTyping({ conversationId, value: false }));
             return rejectWithValue(errMsg);
         }
     }
@@ -131,23 +151,40 @@ const conversationSlice = createSlice({
         },
         addAssistantPlaceholder: (state, action) => {
             const { conversationId, message } = action.payload;
-            if (!state.messages[conversationId]) state.messages[conversationId] = [];
+            if (!state.messages[conversationId]) {
+                state.messages[conversationId] = [];
+            }
             state.messages[conversationId].push(message);
         },
+        // CRITICAL: Immutable update for real-time streaming
         updateAssistantText: (state, action) => {
-            const { conversationId, tempId, text } = action.payload;
-            const list = state.messages[conversationId] || [];
+            const { conversationId, tempId, text, status } = action.payload;
+            const list = state.messages[conversationId];
+            if (!list) return;
+
             const idx = list.findIndex(m => m._id === tempId);
             if (idx !== -1) {
-                list[idx] = { ...list[idx], text };
+                // Create new message object to trigger React re-render
+                list[idx] = {
+                    ...list[idx],
+                    text,
+                    status: status || 'streaming'
+                };
             }
         },
         finalizeAssistantMessage: (state, action) => {
-            const { conversationId, tempId, finalMsg } = action.payload;
-            const list = state.messages[conversationId] || [];
+            const { conversationId, tempId, text, status } = action.payload;
+            const list = state.messages[conversationId];
+            if (!list) return;
+
             const idx = list.findIndex(m => m._id === tempId);
             if (idx !== -1) {
-                list[idx] = finalMsg;
+                list[idx] = {
+                    ...list[idx],
+                    text,
+                    status: status || 'sent',
+                    createdAt: new Date().toISOString()
+                };
             }
         },
         setConversationTitle: (state, action) => {
@@ -171,7 +208,6 @@ const conversationSlice = createSlice({
         },
         setAssistantTyping(state, action) {
             const { conversationId, value } = action.payload;
-
             if (conversationId) {
                 state.assistantTyping[conversationId] = value;
             }
@@ -281,7 +317,7 @@ const conversationSlice = createSlice({
                 state.error = action.payload;
             })
             // Send message
-            .addCase(sendMessage.pending, (state, action) => {
+            .addCase(sendMessage.pending, (state) => {
                 state.sending = true;
                 state.error = null;
             })
@@ -291,7 +327,6 @@ const conversationSlice = createSlice({
                 if (conversationId) {
                     state.assistantTyping[conversationId] = false;
                 }
-                // Streaming flow updates messages locally via placeholder actions; nothing else required here
             })
             .addCase(sendMessage.rejected, (state, action) => {
                 state.sending = false;

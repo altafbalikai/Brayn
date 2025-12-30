@@ -173,6 +173,9 @@ export default function Chat() {
   const handleSelectConversation = useCallback(
     (conv) => {
       dispatch(setCurrentConversation(conv));
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false); // close sidebar in Mobile screens after selecting new chat
+      }
     },
     [dispatch]
   );
@@ -199,7 +202,9 @@ export default function Chat() {
         messages: [],
       })
     );
-
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false); // close sidebar in Mobile screens after selecting new chat
+    }
     titleUpdatedRef.current = false;
   }, [dispatch]);
 
@@ -471,7 +476,7 @@ export default function Chat() {
           ${sidebarOpen ? "md:ml-64" : "md:ml-0"}
         `}
         >
-          <RewindBackground />
+          {!currentConversation?._id && <RewindBackground />}
           <div
             className="flex-1 flex flex-col min-h-0 
                 min-w-0 relative overflow-hidden "

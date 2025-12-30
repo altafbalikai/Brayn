@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaArrowCircleUp } from "react-icons/fa";
 
 /**
@@ -6,6 +6,7 @@ import { FaArrowCircleUp } from "react-icons/fa";
  */
 function Composer({ onSend, disabled, position }) {
   const [text, setText] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   const submit = (e) => {
     e.preventDefault();
@@ -18,6 +19,21 @@ function Composer({ onSend, disabled, position }) {
     position === "center"
       ? `relative`
       : `absolute bottom-4 left-1/2 -translate-x-1/2`;
+
+  const PLACEHOLDERS = [
+    "Explain something you're stuck on…",
+    "Paste code and ask for help…",
+    "Summarize notes or a document…",
+    "What do you want to figure out today?",
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDERS.length);
+    }, 3000); // every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <form
@@ -56,7 +72,7 @@ function Composer({ onSend, disabled, position }) {
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Ask anything..."
+          placeholder={PLACEHOLDERS[placeholderIndex]}
           disabled={disabled}
           className="
             flex-1 min-w-0
@@ -83,7 +99,7 @@ function Composer({ onSend, disabled, position }) {
             h-10 w-10 md:h-11 md:w-11
             rounded-full
 
-            bg-theme-accent
+            bg-theme-secondary
             text-theme-text
 
             flex items-center justify-center

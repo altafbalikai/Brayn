@@ -15,6 +15,8 @@ export default {
         'theme-light': 'rgba(30, 41, 59, 0.6)', // Glass cards
         'theme-secondary': 'rgba(148, 163, 184, 0.25)', // Borders / muted
         'theme-accent': 'rgba(15, 23, 42, 0.7)', // Inputs
+        'theme-surface': 'rgba(24, 32, 48, 0.85)', // Chat assistant message background
+
 
         /* Text */
         'theme-text': '#E5E7EB',

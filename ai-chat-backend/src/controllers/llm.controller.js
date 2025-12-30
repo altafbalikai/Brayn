@@ -172,5 +172,5 @@ module.exports = { ask };
 // command to check streaming from terminal:
 //   curl.exe -N -X POST "http://localhost:4000/api/llm/ask" ^
 // -H "Content-Type: application/json" ^
-// -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZjcwNzg1MWRhYWVkMTI0MWUxNTg0YyIsImVtYWlsIjoiaHVzc2FpbmJhbGlrYWlAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTc2NTU4NDM3NSwiZXhwIjoxNzY1NTg1Mjc1fQ.muBJj2-MdRxVgNtQgVuYiSG4BU4G2t0WxIw45mNFFsg" ^
-// -d "{\"conversationId\":\"6939f751ca5e3deb56b21db3\",\"message\":\"What you say about football sport?\"}"
+// -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZjcwNzg1MWRhYWVkMTI0MWUxNTg0YyIsImVtYWlsIjoiaHVzc2FpbmJhbGlrYWlAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTc2NzA0MzAzMywiZXhwIjoxNzY3MDQzOTMzfQ.OWIIazxaPTVkzBAbwr-awpM4iblmIIIIvtRz0YrNT88" ^
+// -d "{\"conversationId\":\"6952f00ddede948744c4d1c7\",\"message\":\"write hello world code and explain??\"}"

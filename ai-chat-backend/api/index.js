@@ -1,7 +1,7 @@
 /**
  * Vercel Serverless Entry
  * -----------------------
- * This file converts your existing Express app into a serverless function.
+ * This file converts existing Express app into a serverless function.
  */
 
 const app = require('../src/app');

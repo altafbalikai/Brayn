@@ -89,7 +89,7 @@ function VirtualizedMessageList({
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar bg-theme-light"
+        className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar bg-theme-dark"
         onScroll={onScroll}
         style={{
           overscrollBehavior: "contain",
