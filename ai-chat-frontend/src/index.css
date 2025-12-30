@@ -16,7 +16,7 @@
     --theme-textaccent: theme(colors.theme-textaccent);
 
     --scrollbar-thumb: var(--theme-secondary);
-    --scrollbar-thumb-hover: var(--theme-accent);
+    --scrollbar-thumb-hover: var(--theme-muted);
   }
 }
 
@@ -62,11 +62,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--theme-dark);
+  background: var(--theme-light);
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: transparent;
+  background-color: var(--scrollbar-thumb);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
@@ -127,7 +127,7 @@ pre::-webkit-scrollbar {
 }
 
 pre::-webkit-scrollbar-track {
-  background: var(--theme-accent);
+  background: var(--theme-secondary);
   border-radius: 6px;
 }
 
