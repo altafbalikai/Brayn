@@ -11,11 +11,11 @@ const RewindBackground = () => {
     const isMobile =
       window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent);
 
-    const PARTICLE_COUNT = isMobile ? 60 : 120;
-    const MAX_DISTANCE = isMobile ? 100 : 150;
+    const PARTICLE_COUNT = isMobile ? 100 : 150;
+    const MAX_DISTANCE = isMobile ? 150 : 200;
 
     /* -------------------- Brain Clusters -------------------- */
-    const CLUSTERS = 4;
+    const CLUSTERS = 8;
     const CLUSTER_RADIUS = 220;
 
     /* -------------------- Theme Colors -------------------- */
@@ -93,7 +93,7 @@ const RewindBackground = () => {
         const y = this.from.y + (this.to.y - this.from.y) * this.progress;
 
         ctx.beginPath();
-        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+        ctx.arc(x, y, 0.8, 0, Math.PI * 2);
         ctx.fillStyle = COLORS.active;
         ctx.shadowBlur = glow;
         ctx.shadowColor = COLORS.active;

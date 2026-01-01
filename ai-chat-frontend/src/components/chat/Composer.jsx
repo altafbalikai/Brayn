@@ -4,7 +4,7 @@ import { FaArrowCircleUp } from "react-icons/fa";
 /**
  * Composer - floating glass input with multi-line support
  */
-function Composer({ onSend, disabled, position }) {
+function Composer({ onSend, disabled, position, currentConversationId }) {
   const [text, setText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef(null);
@@ -17,8 +17,9 @@ function Composer({ onSend, disabled, position }) {
   };
 
   const handleKeyDown = (e) => {
-    // Send on Enter, new line on Shift+Enter
-    if (e.key === "Enter" && !e.shiftKey) {
+    const isDesktop = window.matchMedia("(hover: hover)").matches;
+
+    if (e.key === "Enter" && !e.shiftKey && isDesktop) {
       e.preventDefault();
       submit(e);
     }
@@ -62,21 +63,22 @@ function Composer({ onSend, disabled, position }) {
         z-30
         w-[100%]
         max-w-4xl
-        px-4
+        px-4 md:px-6
       `}
     >
       {/* Floating glass bar */}
       <div
         className="
           relative
-          flex items-end gap-2
+          flex items-start gap-2
           rounded-3xl
-          px-3 py-2 md:px-4 md:py-3
+          px-2 md:px-4
+          min-h-12 md:min-h-14
+          pt-0.5 pb-0.5
 
           bg-theme-light
           backdrop-blur-xl
           border border-theme-secondary
-
           shadow-[0_12px_40px_rgba(0,0,0,0.35)]
 
           focus-within:ring-2
@@ -92,7 +94,11 @@ function Composer({ onSend, disabled, position }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={PLACEHOLDERS[placeholderIndex]}
+          placeholder={
+            currentConversationId
+              ? "Ask anything"
+              : PLACEHOLDERS[placeholderIndex]
+          }
           disabled={disabled}
           rows={1}
           className="
@@ -101,19 +107,18 @@ function Composer({ onSend, disabled, position }) {
             border-none
             outline-none
             resize-none
-            pr-1
             text-theme-text
             placeholder:text-theme-muted
-
+            
             text-sm md:text-base
-            leading-tight
+            leading-6
+            px-0.5 md:px-1
+            py-2 md:py-3  
 
             max-h-[200px]
             overflow-y-auto
 
             disabled:opacity-60
-
-            py-1
           "
         />
 
@@ -123,12 +128,13 @@ function Composer({ onSend, disabled, position }) {
           disabled={!text.trim() || disabled}
           className="
             shrink-0
-            h-10 w-10 md:h-11 md:w-11
+            h-8 w-8 md:h-10 md:w-10
             rounded-full
-
+            self-end
+            mb-1.5
             bg-theme-secondary
             text-theme-text
-
+            
             flex items-center justify-center
 
             shadow-lg
@@ -140,8 +146,6 @@ function Composer({ onSend, disabled, position }) {
             disabled:opacity-40
             disabled:cursor-not-allowed
             disabled:scale-100
-
-            mb-0.5
           "
         >
           <FaArrowCircleUp className="w-5 h-5 md:w-6 md:h-6" />
@@ -150,6 +154,7 @@ function Composer({ onSend, disabled, position }) {
         {/* Glass edge highlight */}
         <div
           className="
+
             pointer-events-none
             absolute inset-0 rounded-3xl
             ring-1 ring-white/20

@@ -35,7 +35,7 @@ function ConversationList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-x-hidden overflow-y-auto min-h-0"
+      className="flex-1 overflow-x-hidden overflow-y-auto scroll-container show-scrollbar"
       onScroll={onScroll}
     >
       {content}

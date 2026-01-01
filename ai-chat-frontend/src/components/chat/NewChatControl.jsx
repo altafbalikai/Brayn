@@ -16,7 +16,7 @@ function NewChatControl({ toggleSidebar }) {
     <div className="p-3 border-b border-theme-secondary flex items-center justify-between">
       {/* Left Side: Logo/Icon */}
       <div className="flex items-center gap-2">
-        <GiBrain size={28} className="text-theme-text text-2xl" />
+        <GiBrain size={24} className="text-theme-text text-2xl" />
         {/* <span className="font-bold text-theme-secondary text-sm hidden sm:block">
           BrainAI
         </span> */}
@@ -31,9 +31,9 @@ function NewChatControl({ toggleSidebar }) {
         aria-label="Toggle sidebar"
       >
         {toggleSidebar ? (
-          <TbLayoutSidebarLeftCollapse size={28} />
+          <TbLayoutSidebarLeftCollapse size={24} />
         ) : (
-          <TbLayoutSidebarLeftExpand size={28} />
+          <TbLayoutSidebarLeftExpand size={24} />
         )}
       </button>
     </div>

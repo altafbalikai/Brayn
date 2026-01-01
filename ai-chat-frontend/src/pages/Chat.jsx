@@ -425,7 +425,7 @@ export default function Chat() {
             className="
             fixed top-3 left-3 z-50
             p-2 rounded-md
-            bg-theme-dark
+            bg-transparent
             z-[60]
             text-theme-text
             hover:text-theme-text
@@ -434,7 +434,7 @@ export default function Chat() {
             onClick={() => setSidebarOpen((v) => !v)}
             aria-label="Toggle sidebar"
           >
-            <TbLayoutSidebarLeftExpand size={28} />
+            <TbLayoutSidebarLeftExpand size={24} />
           </button>
         )}
 
@@ -495,6 +495,7 @@ export default function Chat() {
                         onSend={handlePromptClick}
                         disabled={sending || assistantTyping}
                         position="center"
+                        currentConversationId={currentConversation?._id}
                       />
                     )}
                   />
@@ -518,6 +519,7 @@ export default function Chat() {
                 <Composer
                   onSend={handleSendMessage}
                   disabled={sending || assistantTyping}
+                  currentConversationId={currentConversation?._id}
                 />
               </>
             )}
