@@ -18,7 +18,6 @@ function NewChatHero({
     w-full
     max-w-[560px]
     mx-auto
-    pt-[6vh]
     ${isCompact ? "text-left" : "text-center"}
   `}
     >
@@ -75,7 +74,7 @@ function NewChatHero({
         </div>
       )}
 
-      <p className="text-theme-muted text-sm mb-3">
+      <p className="text-theme-muted text-xs mb-3">
         Or type what you’re thinking…
       </p>
 
