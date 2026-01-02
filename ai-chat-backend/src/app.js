@@ -16,6 +16,9 @@ const app = express();
 // Security middleware - must be before other middleware
 app.use(helmet());
 
+// Trust first proxy if behind one (e.g., Vercel, Heroku)
+app.set('trust proxy', 1);
+
 // Rate limiting (global)
 const limiter = rateLimit({
   windowMs:
