@@ -225,17 +225,17 @@ async function logout(req, res, next) {
 }
 
 // POST /auth/request-password-reset
-async function requestPasswordResetController(req, res, next) {
+async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body;
     // optional: pass origin so the service can build frontend link
     const origin = req.headers.origin || req.body.origin;
-    await authService.requestPasswordReset({ email, origin });
+    await authService.forgotPassword({ email, origin });
     // Always return 200 OK to avoid user enumeration
     return res.json({ ok: true });
   } catch (err) {
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
-    logger.error('[PASSWORD_RESET_REQUEST] unexpected error', {
+    logger.error('[forgotPassword] unexpected error', {
       message: err?.message,
       stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined,
     });
@@ -281,7 +281,7 @@ async function changePasswordController(req, res, next) {
 
 module.exports = {
   signup, login, me, refresh, logout,
-  requestPasswordResetController,
+  forgotPassword,
   resetPasswordController,
   changePasswordController
 };

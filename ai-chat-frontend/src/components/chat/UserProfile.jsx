@@ -5,13 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { authService } from "../../api/services/authService";
 import ModalPortal from "../ui/ModalPortal";
 import { clearCurrentConversation } from "../../features/conversations/conversationSlice";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 
 function UserProfile({ user, onClose }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,6 +22,17 @@ function UserProfile({ user, onClose }) {
     (state) => state.auth
   );
 
+  const shortPassword = newPassword.length > 0 && newPassword.length < 8;
+  const isPasswordValid = newPassword.length >= 8;
+  const passwordsMatch =
+    newPassword === confirmPassword && confirmPassword.length > 0;
+  const canSubmit =
+    currentPassword.length > 0 && isPasswordValid && passwordsMatch && !loading;
+  // State for eye toggles
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const getInitial = () =>
     user?.name?.charAt(0).toUpperCase() ||
     user?.email?.charAt(0).toUpperCase() ||
@@ -28,34 +40,65 @@ function UserProfile({ user, onClose }) {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+
+    if (loading) return; // prevent double submit
+
     setError("");
     setSuccess("");
 
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    /* ----------------------------
+     Client-side validation
+  ---------------------------- */
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setError("All fields are required");
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters");
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      setError("New password and confirmation do not match");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setError("New password must be different from current password");
+      return;
+    }
+
+    /* ----------------------------
+     API call
+  ---------------------------- */
     setLoading(true);
+
     try {
-      await authService.changePassword(oldPassword, newPassword);
-      setSuccess("Password updated");
+      await authService.changePassword(currentPassword, newPassword);
+
+      setSuccess("Password updated successfully");
+
+      // UX: auto-close + reset
       setTimeout(() => {
         setShowPasswordChange(false);
-        setOldPassword("");
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       }, 1500);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to update password");
+      /**
+       * Normalize errors from backend / network
+       */
+      if (!err.response) {
+        setError("Network error. Please try again.");
+      } else if (err.response.status === 401) {
+        setError("Session expired. Please log in again.");
+      } else if (err.response.status === 400) {
+        setError(err.response.data?.error || "Invalid password details");
+      } else {
+        setError("Failed to update password. Please try later.");
+      }
     } finally {
       setLoading(false);
     }
@@ -69,176 +112,6 @@ function UserProfile({ user, onClose }) {
     navigate("/login");
     onClose();
   };
-
-  // return (
-  //   <div className="fixed inset-0 z-50 flex items-center justify-center">
-  //     {/* Overlay */}
-  //     <div
-  //       className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-  //       onClick={onClose}
-  //     />
-
-  //     {/* Modal */}
-  //     <div
-  //       className="
-  //         relative
-  //         z-10
-  //         w-[90vw] max-w-md
-  //         rounded-3xl
-  //         bg-theme-light
-  //         backdrop-blur-xl
-  //         border border-theme-secondary
-  //         shadow-[0_20px_60px_rgba(0,0,0,0.45)]
-  //         overflow-hidden
-  //       "
-  //     >
-  //       {/* Glow ring */}
-  //       <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-white/20" />
-
-  //       {/* Header */}
-  //       <div className="flex items-center justify-between px-6 py-4 border-b border-theme-secondary">
-  //         <h2 className="text-lg font-semibold text-theme-text">Profile</h2>
-  //         <button
-  //           onClick={onClose}
-  //           className="text-theme-muted hover:text-theme-text transition"
-  //         >
-  //           ✕
-  //         </button>
-  //       </div>
-
-  //       {/* Content */}
-  //       <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-  //         {!showPasswordChange ? (
-  //           <>
-  //             {/* User info */}
-  //             <div className="flex items-center gap-4">
-  //               <div className="w-14 h-14 rounded-full bg-theme-secondary flex items-center justify-center text-xl font-bold text-theme-text">
-  //                 {getInitial()}
-  //               </div>
-  //               <div>
-  //                 <div className="text-theme-text font-medium">
-  //                   {user?.name || "User"}
-  //                 </div>
-  //                 <div className="text-theme-muted text-sm">{user?.email}</div>
-  //               </div>
-  //             </div>
-
-  //             {/* Actions */}
-  //             <div className="space-y-3 pt-4">
-  //               <button
-  //                 onClick={() => setShowPasswordChange(true)}
-  //                 className="
-  //                   w-full py-2.5 rounded-xl
-  //                   bg-theme-secondary
-  //                   text-theme-text
-  //                   hover:brightness-110
-  //                   transition
-  //                 "
-  //               >
-  //                 Change Password
-  //               </button>
-
-  //               <button
-  //                 onClick={handleLogout}
-  //                 className="
-  //                   w-full py-2.5 rounded-xl
-  //                   bg-theme-accent
-  //                   text-theme-text
-  //                   hover:brightness-110
-  //                   transition
-  //                 "
-  //               >
-  //                 Logout
-  //               </button>
-  //             </div>
-  //           </>
-  //         ) : (
-  //           <>
-  //             <h3 className="text-theme-text font-medium">Change Password</h3>
-
-  //             {error && <div className="text-red-400 text-sm">{error}</div>}
-  //             {success && (
-  //               <div className="text-green-400 text-sm">{success}</div>
-  //             )}
-
-  //             <form onSubmit={handleChangePassword} className="space-y-4">
-  //               {[
-  //                 {
-  //                   label: "Current Password",
-  //                   value: oldPassword,
-  //                   setter: setOldPassword,
-  //                 },
-  //                 {
-  //                   label: "New Password",
-  //                   value: newPassword,
-  //                   setter: setNewPassword,
-  //                 },
-  //                 {
-  //                   label: "Confirm Password",
-  //                   value: confirmPassword,
-  //                   setter: setConfirmPassword,
-  //                 },
-  //               ].map((field, i) => (
-  //                 <div key={i}>
-  //                   <label className="text-xs text-theme-muted">
-  //                     {field.label}
-  //                   </label>
-  //                   <input
-  //                     type="password"
-  //                     value={field.value}
-  //                     onChange={(e) => field.setter(e.target.value)}
-  //                     disabled={loading}
-  //                     className="
-  //                       w-full mt-1 px-4 py-2 rounded-xl
-  //                       bg-theme-accent
-  //                       border border-theme-secondary
-  //                       text-theme-text
-  //                       outline-none
-  //                       focus:ring-2 focus:ring-theme-secondary
-  //                     "
-  //                   />
-  //                 </div>
-  //               ))}
-
-  //               <div className="space-y-2 pt-2">
-  //                 <button
-  //                   type="submit"
-  //                   disabled={loading}
-  //                   className="
-  //                     w-full py-2.5 rounded-xl
-  //                     bg-theme-secondary
-  //                     text-theme-text
-  //                     hover:brightness-110
-  //                     disabled:opacity-50
-  //                   "
-  //                 >
-  //                   {loading ? "Saving..." : "Update Password"}
-  //                 </button>
-
-  //                 <button
-  //                   type="button"
-  //                   onClick={() => {
-  //                     setShowPasswordChange(false);
-  //                     setError("");
-  //                     setSuccess("");
-  //                   }}
-  //                   className="
-  //                     w-full py-2.5 rounded-xl
-  //                     bg-theme-accent
-  //                     text-theme-muted
-  //                     hover:text-theme-text
-  //                   "
-  //                 >
-  //                   Back
-  //                 </button>
-  //               </div>
-  //             </form>
-  //           </>
-  //         )}
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
 
   return (
     <ModalPortal>
@@ -334,63 +207,170 @@ function UserProfile({ user, onClose }) {
               </>
             ) : (
               <>
-                <h3 className="text-theme-text font-medium">Change Password</h3>
+                <h3 className="text-theme-text font-medium mb-4">
+                  Change Password
+                </h3>
 
-                {error && <div className="text-red-400 text-sm">{error}</div>}
+                {error && (
+                  <div className="mb-4 p-3 bg-theme-danger/10 border border-theme-danger/30 rounded-lg text-theme-text text-sm">
+                    {error}
+                  </div>
+                )}
                 {success && (
-                  <div className="text-green-400 text-sm">{success}</div>
+                  <div className="mb-4 p-3 bg-theme-danger/10 border border-theme-danger/30 rounded-lg text-theme-text text-sm">
+                    {success}
+                  </div>
                 )}
 
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  {[
-                    {
-                      label: "Current Password",
-                      value: oldPassword,
-                      setter: setOldPassword,
-                    },
-                    {
-                      label: "New Password",
-                      value: newPassword,
-                      setter: setNewPassword,
-                    },
-                    {
-                      label: "Confirm Password",
-                      value: confirmPassword,
-                      setter: setConfirmPassword,
-                    },
-                  ].map((field, i) => (
-                    <div key={i}>
-                      <label className="text-xs text-theme-muted">
-                        {field.label}
-                      </label>
+                <form onSubmit={handleChangePassword} className="space-y-5">
+                  {/* Current Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-theme-text mb-2">
+                      Current Password
+                    </label>
+                    <div className="relative">
                       <input
-                        type="password"
-                        value={field.value}
-                        onChange={(e) => field.setter(e.target.value)}
-                        disabled={loading}
+                        type={showCurrentPassword ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => {
+                          setCurrentPassword(e.target.value);
+                          setError("");
+                        }}
+                        required
                         className="
-                      w-full mt-1 px-4 py-2 rounded-xl
-                      bg-theme-accent
-                      border border-theme-secondary
-                      text-theme-text
-                      outline-none
-                      focus:ring-2 focus:ring-theme-secondary
-                    "
+            w-full px-4 py-3
+            bg-theme-accent
+            border border-theme-secondary
+            rounded-lg
+            text-theme-text
+            focus:outline-none
+            focus:ring-2 focus:ring-theme-secondary
+          "
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text"
+                      >
+                        {showCurrentPassword ? (
+                          <FiEyeOff size={18} />
+                        ) : (
+                          <FiEye size={18} />
+                        )}
+                      </button>
                     </div>
-                  ))}
+                  </div>
 
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-theme-text mb-2">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          setError("");
+                        }}
+                        required
+                        minLength={8}
+                        placeholder="At least 8 characters"
+                        className="
+            w-full px-4 py-3
+            bg-theme-accent
+            border border-theme-secondary
+            rounded-lg
+            text-theme-text
+            focus:outline-none
+            focus:ring-2 focus:ring-theme-secondary
+          "
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text"
+                      >
+                        {showNewPassword ? (
+                          <FiEyeOff size={18} />
+                        ) : (
+                          <FiEye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-theme-text mb-2">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          setError("");
+                        }}
+                        required
+                        minLength={8}
+                        placeholder="Re-enter new password"
+                        className="
+            w-full px-4 py-3
+            bg-theme-accent
+            border border-theme-secondary
+            rounded-lg
+            text-theme-text
+            focus:outline-none
+            focus:ring-2 focus:ring-theme-secondary
+          "
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text"
+                      >
+                        {showConfirmPassword ? (
+                          <FiEyeOff size={18} />
+                        ) : (
+                          <FiEye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Validation messages */}
+                  {shortPassword && (
+                    <p className="text-sm text-theme-text">
+                      Password is too short (minimum 8 characters)
+                    </p>
+                  )}
+
+                  {confirmPassword && !passwordsMatch && isPasswordValid && (
+                    <p className="text-sm text-theme-text">
+                      Passwords do not match
+                    </p>
+                  )}
+
+                  {confirmPassword && passwordsMatch && isPasswordValid && (
+                    <p className="text-sm text-theme-text">Passwords match ✓</p>
+                  )}
+
+                  {/* Actions */}
                   <div className="space-y-2 pt-2">
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={!canSubmit}
                       className="
-                    w-full py-2.5 rounded-xl
-                    bg-theme-secondary
-                    text-theme-text
-                    hover:brightness-110
-                    disabled:opacity-50
-                  "
+          w-full py-2.5 rounded-xl
+          bg-theme-secondary
+          text-theme-text
+          hover:brightness-110
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+        "
                     >
                       {loading ? "Saving..." : "Update Password"}
                     </button>
@@ -403,11 +383,11 @@ function UserProfile({ user, onClose }) {
                         setSuccess("");
                       }}
                       className="
-                    w-full py-2.5 rounded-xl
-                    bg-theme-accent
-                    text-theme-muted
-                    hover:text-theme-text
-                  "
+          w-full py-2.5 rounded-xl
+          bg-theme-accent
+          text-theme-muted
+          hover:text-theme-text
+        "
                     >
                       Back
                     </button>

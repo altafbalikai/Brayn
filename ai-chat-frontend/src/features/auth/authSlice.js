@@ -9,38 +9,28 @@ export const login = createAsyncThunk(
     "auth/login",
     async ({ email, password }, { rejectWithValue }) => {
         try {
-            const data = await authService.login(email, password);
-            localStorage.setItem("accessToken", data.accessToken);
-            return data;
+            return await authService.login(email, password);
         } catch (error) {
             const status = error.response?.status;
-
             let message = "Login failed";
 
-            if (status === 401) {
-                message = "Invalid email or password";
-            } else if (status === 429) {
+            if (status === 401) message = "Invalid email or password";
+            else if (status === 429)
                 message = "Too many attempts. Please try again later.";
-            } else if (error.message === "Network Error") {
+            else if (error.message === "Network Error")
                 message = "Unable to connect. Check your internet.";
-            }
 
             return rejectWithValue({ message, status });
         }
     }
 );
 
-
 export const signup = createAsyncThunk(
     "auth/signup",
     async ({ email, password, name }, { rejectWithValue }) => {
         try {
             await authService.signup(email, password, name);
-
-            const data = await authService.login(email, password);
-            localStorage.setItem("accessToken", data.accessToken);
-
-            return data;
+            return await authService.login(email, password);
         } catch (error) {
             const status = error.response?.status;
             const message =
@@ -53,12 +43,9 @@ export const signup = createAsyncThunk(
     }
 );
 
-
 export const logout = createAsyncThunk(
     "auth/logout",
-    async (_, { dispatch }) => {
-        // Clear client state FIRST
-        localStorage.removeItem("accessToken");
+    async () => {
 
         // Fire-and-forget server logout
         authService.logout().catch(() => {
@@ -68,28 +55,41 @@ export const logout = createAsyncThunk(
 
         // No await needed
         return;
+    });
+
+export const forgotPassword = createAsyncThunk(
+    "auth/forgotPassword",
+    async ({ email }, { rejectWithValue }) => {
+        try {
+            await authService.forgotPassword(email);
+            return true;
+        } catch {
+            return rejectWithValue("Unable to send reset email");
+        }
     }
 );
 
+export const resetPassword = createAsyncThunk(
+    "auth/resetPassword",
+    async ({ token, newPassword }, { rejectWithValue }) => {
+        try {
+            await authService.resetPassword({ token, newPassword });
+            return true;
+        } catch (err) {
+            return rejectWithValue(
+                err.response?.data?.error || "Password reset failed"
+            );
+        }
+    }
+);
 
-/**
- * 🔑 AUTH INITIALIZATION (CRITICAL)
- * Runs once on app startup
- */
 export const initializeAuth = createAsyncThunk(
     "auth/initializeAuth",
     async (_, { rejectWithValue }) => {
         try {
-            const token = localStorage.getItem("accessToken");
-
-            if (!token) {
-                return { user: null, accessToken: null };
-            }
-
             const user = await authService.getProfile();
-            return { user, accessToken: token };
-        } catch (error) {
-            localStorage.removeItem("accessToken");
+            return { user };
+        } catch {
             return rejectWithValue("Auth initialization failed");
         }
     }
@@ -101,11 +101,12 @@ export const initializeAuth = createAsyncThunk(
 
 const initialState = {
     user: null,
-    accessToken: null,
     isAuthenticated: false,
     initialized: false,
     loading: false,
     error: null,
+    forgotPasswordSuccess: false,
+    resetPasswordSuccess: false,
 };
 
 /* =========================
@@ -119,25 +120,20 @@ const authSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+        clearPasswordFlags: (state) => {
+            state.forgotPasswordSuccess = false;
+            state.resetPasswordSuccess = false;
+        },
     },
     extraReducers: (builder) => {
         builder
-            /* -------- Initialize Auth -------- */
-            .addCase(initializeAuth.pending, (state) => {
-                state.loading = true;
-            })
+            /* -------- Initialize -------- */
             .addCase(initializeAuth.fulfilled, (state, action) => {
-                state.loading = false;
                 state.user = action.payload.user;
-                state.accessToken = action.payload.accessToken;
                 state.isAuthenticated = !!action.payload.user;
                 state.initialized = true;
             })
             .addCase(initializeAuth.rejected, (state) => {
-                state.loading = false;
-                state.user = null;
-                state.accessToken = null;
-                state.isAuthenticated = false;
                 state.initialized = true;
             })
 
@@ -149,16 +145,11 @@ const authSlice = createSlice({
             .addCase(login.fulfilled, (state, action) => {
                 state.loading = false;
                 state.user = action.payload.user;
-                state.accessToken = action.payload.accessToken;
                 state.isAuthenticated = true;
-                state.initialized = true;
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
-                state.user = null;
-                state.accessToken = null;
-                state.isAuthenticated = false;
-                state.error = action.payload?.message || "Login failed";
+                state.error = action.payload?.message;
             })
 
             /* -------- Signup -------- */
@@ -166,34 +157,51 @@ const authSlice = createSlice({
                 state.loading = true;
                 state.error = null;
             })
-
             .addCase(signup.fulfilled, (state, action) => {
                 state.loading = false;
                 state.user = action.payload.user;
-                state.accessToken = action.payload.accessToken;
                 state.isAuthenticated = true;
-                state.initialized = true;
             })
-
             .addCase(signup.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.message || "Signup failed";
+                state.error = action.payload?.message;
             })
 
             /* -------- Logout -------- */
-            .addCase(logout.pending, (state) => {
+            .addCase(logout.fulfilled, (state) => {
+                state.user = null;
+                state.isAuthenticated = false;
+            })
+
+            /* -------- Forgot Password -------- */
+            .addCase(forgotPassword.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(logout.fulfilled, (state) => {
+            .addCase(forgotPassword.fulfilled, (state) => {
                 state.loading = false;
-                state.user = null;
-                state.accessToken = null;
-                state.isAuthenticated = false;
-                state.initialized = true;
+                state.forgotPasswordSuccess = true;
+            })
+            .addCase(forgotPassword.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            /* -------- Reset Password -------- */
+            .addCase(resetPassword.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(resetPassword.fulfilled, (state) => {
+                state.loading = false;
+                state.resetPasswordSuccess = true;
+            })
+            .addCase(resetPassword.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, clearPasswordFlags } = authSlice.actions;
 export default authSlice.reducer;

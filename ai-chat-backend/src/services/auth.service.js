@@ -336,169 +336,164 @@ function parseDurationToMs(s) {
 }
 
 /**
- * Request a password reset for the given email.
- * - Does NOT reveal whether the user exists (returns success regardless).
- * - Creates a one-time token, stores hashed token, and sends email with raw token.
+ * forgotPassword - Request password reset (no user enumeration).
+ * - Invalidates old reset tokens
+ * - Creates a single-use, time-bound token
+ * - Sends reset email
  */
-async function requestPasswordReset({ email, origin }) {
+async function forgotPassword({ email, origin }) {
   if (!email) {
     throw new HttpError('Invalid request', 400, 'INVALID_REQUEST');
   }
-  // normalize email if you use normalization elsewhere
-  // email = normalizeEmail(email);
 
-  // Find user; if not found we still respond success to avoid enumeration
   const user = await User.findOne({ email });
 
-  // If user not found -> still return success (but do NOT create token)
+  // Always return success (avoid enumeration)
   if (!user) {
-    // optionally log suspicious request
     return { ok: true };
   }
 
-  // Rate-limit / abuse checks should be applied here (Redis counters, etc).
-  // Generate raw token (sufficient length)
-  const rawToken = crypto.randomBytes(32).toString('hex'); // 64 hex chars
+  // Invalidate previous unused tokens for this user
+  await PasswordResetToken.updateMany(
+    { userId: user._id, used: false },
+    { $set: { used: true, usedAt: new Date() } }
+  );
+
+  // Generate secure token
+  const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
+
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_EXPIRES_MS);
 
-  // Save hashed token (single-use). If you want multiple outstanding tokens, keep as-is.
   await PasswordResetToken.create({
     userId: user._id,
     tokenHash,
     expiresAt,
-    used: false
+    used: false,
   });
 
-  // Build reset link (frontend route) - origin should be provided by caller or from env
-  // e.g., https://app.example.com/reset-password?token=RAW_TOKEN
-  const frontendOrigin = origin || process.env.FRONTEND_ORIGIN || 'http://localhost:4200';
+  const frontendOrigin =
+    origin || process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
   const resetPath = process.env.PASSWORD_RESET_PATH || '/reset-password';
-  const resetUrl = `${frontendOrigin.replace(/\/$/, '')}${resetPath}?token=${rawToken}&uid=${user._id.toString()}`;
 
-  // send email (non-blocking best practice: queue send); here we await for simplicity
+  const resetUrl = `${frontendOrigin.replace(/\/$/, '')}${resetPath}?token=${rawToken}`;
+
   try {
-    await mailer.sendPasswordResetEmail(user.email, resetUrl, { name: user.name });
-  } catch (e) {
-    // If mail failed, you can choose to delete created token to avoid orphan tokens — or keep and let retry.
-    logger.error('Failed to send password reset email', {
-      message: e?.message,
+    await mailer.sendPasswordResetEmail(user.email, resetUrl, {
+      name: user.name || '',
+    });
+  } catch (err) {
+    logger.error('[forgotPassword] email failed', {
+      message: err?.message,
       userId: user._id.toString(),
     });
-    // We intentionally don't reveal to caller; still return ok (or return partial info)
   }
 
   return { ok: true };
 }
 
 /**
- * Reset the password using the raw token received by email + new password.
- * - validates token (exists, not used, not expired)
- * - sets new password on user
- * - marks token used
- * - increments tokenVersion and revokes all refresh tokens for that user
+ * Reset password using email token.
+ * - Validates token (hashed)
+ * - Sets new password
+ * - Revokes refresh tokens
+ * - Invalidates all auth sessions
  */
-// Reset the password using the raw token received by email + new password.
-async function resetPassword({ token: rawToken, newPassword, uid = null }) {
-  // Validate inputs
+async function resetPassword({ token: rawToken, newPassword }) {
   if (!rawToken || !newPassword) {
+    console.log('Missing parameters', { rawToken, newPassword });
     throw new HttpError('Invalid request', 400, 'INVALID_REQUEST');
   }
+
+
   if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    throw new HttpError('Password must be at least 8 characters long', 400, 'WEAK_PASSWORD');
+    throw new HttpError('Password too weak', 400, 'WEAK_PASSWORD');
   }
 
   const now = new Date();
 
-  // Find matching token record efficiently by uid if provided
+  // Fetch recent valid tokens for this user only
+  const candidates = await PasswordResetToken.find({
+    used: false,
+    expiresAt: { $gt: now },
+  })
+    .sort({ createdAt: -1 })
+    .limit(10);
+
   let tokenRecord = null;
-  if (uid) {
-    const candidates = await PasswordResetToken.find({
-      userId: uid,
-      used: false,
-      expiresAt: { $gt: now }
-    }).sort({ createdAt: -1 }).limit(10);
 
-    for (const rec of candidates) {
-      if (await bcrypt.compare(rawToken, rec.tokenHash)) { tokenRecord = rec; break; }
-    }
-  } else {
-    const candidates = await PasswordResetToken.find({
-      used: false,
-      expiresAt: { $gt: now }
-    }).sort({ createdAt: -1 }).limit(50);
-
-    for (const rec of candidates) {
-      if (await bcrypt.compare(rawToken, rec.tokenHash)) { tokenRecord = rec; break; }
+  for (const record of candidates) {
+    if (await bcrypt.compare(rawToken, record.tokenHash)) {
+      tokenRecord = record;
+      break;
     }
   }
 
   if (!tokenRecord) {
-    throw new HttpError('Invalid or expired password reset token', 400, 'INVALID_RESET_TOKEN');
+    throw new HttpError(
+      'Invalid or expired password reset token',
+      400,
+      'INVALID_RESET_TOKEN'
+    );
   }
-
-  // Attempt to start a session & transaction, safely
-  const session = await safeStartTransaction(); // returns session or null
-  const usedTransaction = !!session;
+  const userId = tokenRecord.userId;
+  const session = await safeStartTransaction();
+  const useTxn = !!session;
 
   try {
-    if (usedTransaction) {
-      // transactional path
-      tokenRecord.used = true;
-      tokenRecord.usedAt = new Date();
-      await tokenRecord.save({ session });
+    const user = useTxn
+      ? await User.findById(userId).session(session)
+      : await User.findById(userId);
 
-      const user = await User.findById(tokenRecord.userId).session(session);
-      if (!user) throw new HttpError('User not found', 400, 'USER_NOT_FOUND');
-
-      await user.setPassword(newPassword);
-      user.tokenVersion = (user.tokenVersion || 0) + 1;
-      await user.save({ session });
-
-      // revoke refresh tokens using optional-session helper
-      await updateManyOptionalSession(RefreshToken, { userId: user._id }, { $set: { revoked: true } }, session);
-
-      await session.commitTransaction();
-      await session.endSession();
-    } else {
-      // non-transactional fallback
-      tokenRecord.used = true;
-      tokenRecord.usedAt = new Date();
-      await tokenRecord.save();
-
-      const user = await User.findById(tokenRecord.userId);
-      if (!user) throw new HttpError('User not found', 400, 'USER_NOT_FOUND');
-
-      await user.setPassword(newPassword);
-      user.tokenVersion = (user.tokenVersion || 0) + 1;
-      await user.save();
-
-      // best-effort revoke refresh tokens (no session)
-      await RefreshToken.updateMany({ userId: user._id }, { $set: { revoked: true } });
+    if (!user) {
+      throw new HttpError('User not found', 400, 'USER_NOT_FOUND');
     }
 
-    // best-effort notify
+    // Mark token as used
+    tokenRecord.used = true;
+    tokenRecord.usedAt = new Date();
+    await tokenRecord.save(useTxn ? { session } : undefined);
+
+    // Set new password
+    await user.setPassword(newPassword);
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save(useTxn ? { session } : undefined);
+
+    // Revoke all refresh tokens
+    await RefreshToken.updateMany(
+      { userId: user._id },
+      { $set: { revoked: true } },
+      useTxn ? { session } : undefined
+    );
+
+    if (useTxn) {
+      await session.commitTransaction();
+      await session.endSession();
+    }
+
+    // Notify user (best effort)
     try {
-      const userData = await User.findById(tokenRecord.userId).lean();
-      if (userData && userData.email) {
-        await mailer.sendPasswordChangedNotification(userData.email, { name: userData.name || '' });
-      }
-    } catch (mailErr) {
-      logger.warn('[resetPassword] notification failed', {
-        message: mailErr?.message,
+      await mailer.sendPasswordChangedNotification(user.email, {
+        name: user.name || '',
+      });
+    } catch (e) {
+      logger.warn('[resetPassword] email notification failed', {
+        message: e?.message,
       });
     }
 
     return { ok: true };
   } catch (err) {
-    // cleanup if transaction used
-    if (usedTransaction && session) {
-      try { await session.abortTransaction(); } catch (e) { /* ignore */ }
-      try { await session.endSession(); } catch (e) { /* ignore */ }
+    if (useTxn && session) {
+      try {
+        await session.abortTransaction();
+        await session.endSession();
+      } catch (_) { }
     }
     throw err;
   }
 }
+
 
 /**
  * changePassword for logged-in user (must pass current password)
@@ -560,7 +555,7 @@ module.exports = {
   login,
   refreshTokens,
   revokeRefreshToken,
-  requestPasswordReset,
+  forgotPassword,
   resetPassword,
   changePassword,
   revokeAllRefreshTokensForUser

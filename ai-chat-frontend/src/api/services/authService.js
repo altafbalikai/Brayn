@@ -1,52 +1,3 @@
-// import api from '../axios';
-
-// export const authService = {
-//     signup: async (email, password, name) => {
-//         const response = await api.post('/auth/signup', { email, password, name });
-//         return response.data;
-//     },
-
-//     login: async (email, password) => {
-//         try {
-//             const response = await api.post('/auth/login', { email, password });
-//             const { user, accessToken } = response.data;
-//             if (!accessToken) {
-//                 throw new Error('No access token received');
-//             }
-//             localStorage.setItem('accessToken', accessToken);
-//             return { user, accessToken };
-//         } catch (error) {
-//             console.error('Auth service login error:', error);
-//             throw error;
-//         }
-//     },
-
-//     logout: async () => {
-//         try {
-//             await api.post('/auth/logout', {});
-//         } finally {
-//             localStorage.removeItem('accessToken');
-//         }
-//     },
-
-//     refresh: async () => {
-//         const response = await api.post('/auth/refresh', {});
-//         const { user, accessToken } = response.data;
-//         localStorage.setItem('accessToken', accessToken);
-//         return { user, accessToken };
-//     },
-
-//     changePassword: async (oldPassword, newPassword) => {
-//         const response = await api.post('/auth/change-password', { oldPassword, newPassword });
-//         return response.data;
-//     },
-
-//     getProfile: async () => {
-//         const response = await api.get('/auth/me');
-//         return response.data;
-//     },
-// };
-
 import api from '../axios';
 
 export const authService = {
@@ -77,6 +28,17 @@ export const authService = {
         }
     },
 
+    forgotPassword: async (email) => {
+        await api.post("/auth/forgot-password", { email });
+    },
+
+    resetPassword: async ({ token, newPassword }) => {
+        await api.post("/auth/reset-password", {
+            token,
+            newPassword,
+        });
+    },
+
     // 🔑 Refresh token = ONLY token
     refresh: async () => {
         const response = await api.post('/auth/refresh', {});
@@ -96,11 +58,27 @@ export const authService = {
         return response.data;
     },
 
-    changePassword: async (oldPassword, newPassword) => {
-        const response = await api.post('/auth/change-password', {
-            oldPassword,
-            newPassword,
-        });
-        return response.data;
+    changePassword: async (currentPassword, newPassword) => {
+        const token = localStorage.getItem("accessToken");
+
+        if (!token) {
+            throw new Error("Not authenticated");
+        }
+
+        try {
+            const response = await api.post(
+                "/auth/change-password",
+                { currentPassword, newPassword },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            return response.data;
+        } catch (err) {
+            throw err;
+        }
     },
 };

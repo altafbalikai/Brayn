@@ -41,7 +41,7 @@ const refreshValidation = [
     .withMessage('Refresh token is required'),
 ];
 
-const requestPasswordResetValidation = [
+const forgotPassword = [
   body('email')
     .trim()
     .notEmpty()
@@ -77,7 +77,7 @@ module.exports = {
   signupValidation,
   loginValidation,
   refreshValidation,
-  requestPasswordResetValidation,
+  forgotPassword,
   resetPasswordValidation,
   changePasswordValidation,
 };
