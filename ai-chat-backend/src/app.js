@@ -17,42 +17,48 @@ const app = express();
 app.use(helmet());
 
 // Trust first proxy if behind one (e.g., Vercel, Heroku)
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 // Rate limiting (global)
 const limiter = rateLimit({
   windowMs:
-    parseInt(process.env.RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000, // minutes → ms
+    parseInt(process.env.RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
 
   max:
     process.env.NODE_ENV === 'production'
-      ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)   // prod
-      : parseInt(process.env.RATE_LIMIT_DEV_MAX || '1000', 10), // dev
+      ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)
+      : parseInt(process.env.RATE_LIMIT_DEV_MAX || '1000', 10),
 
-  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 
-  standardHeaders: true,   // Adds RateLimit-* headers
-  legacyHeaders: false,    // Disable X-RateLimit-* headers
+  keyGenerator: (req) => {
+    return req.ip; // ✅ safe after trust proxy
+  },
+
+  message: 'Too many requests, please try again later.',
 });
-
 
 // Apply rate limiting to all requests
 app.use(limiter);
 
 // Stricter rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10), // limit each IP to 5 requests per windowMs
-  message: 'Too many authentication attempts, please try again later.',
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10),
+
   standardHeaders: true,
   legacyHeaders: false,
+
+  keyGenerator: (req) => req.ip,
+
+  message: 'Too many authentication attempts, please try again later.',
 });
 
 // enable JSON body parsing with size limit
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: process.env.URL_ENCODED_LIMIT || '10mb' }));
 app.use(cookieParser());
-
 
 // configure and enable CORS before routes
 const allowedOrigins = [
@@ -86,8 +92,8 @@ app.use(
 );
 
 // define routes
-// app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+// app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);
 app.use('/api/summary', summaryRoutes);
