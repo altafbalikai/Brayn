@@ -17,7 +17,7 @@ const app = express();
 app.use(helmet());
 
 // Trust first proxy if behind one (e.g., Vercel, Heroku)
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 // Rate limiting (global)
 const limiter = rateLimit({
@@ -28,6 +28,12 @@ const limiter = rateLimit({
     process.env.NODE_ENV === 'production'
       ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)
       : parseInt(process.env.RATE_LIMIT_DEV_MAX || '1000', 10),
+
+  skip: (req) =>
+    req.path === '/api/auth/refresh' ||
+    req.path === '/api/auth/me' ||
+    req.path === '/api/health' ||
+    req.path === '/metrics',
 
   standardHeaders: true,
   legacyHeaders: false,
@@ -92,8 +98,8 @@ app.use(
 );
 
 // define routes
-app.use('/api/auth', authLimiter, authRoutes);
-// app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);
 app.use('/api/summary', summaryRoutes);
