@@ -24,9 +24,9 @@ function App() {
     dispatch(initializeAuth());
   }, [dispatch]);
 
-  // 🚫 BLOCK routing until auth is initialized
+  // BLOCK routing until auth is initialized
   if (!initialized) {
-    return <AuthSkeletonLoader />;
+    return <ChatSkeletonLoader />;
   }
 
   return (
