@@ -72,7 +72,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
         className="
           relative
           flex items-end gap-2
-          rounded-[2.5rem]
+          rounded-3xl
           px-2 md:px-2
           py-2
 
@@ -156,7 +156,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
           className="
 
             pointer-events-none
-            absolute inset-0 rounded-[2.5rem]
+            absolute inset-0 rounded-3xl
             ring-1 ring-white/20
           "
         />
