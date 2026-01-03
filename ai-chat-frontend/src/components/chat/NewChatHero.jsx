@@ -16,7 +16,7 @@ function NewChatHero({
     <div
       className={`
     w-full
-    max-w-[560px]
+    max-w-[700px]
     mx-auto
     ${isCompact ? "text-left" : "text-center"}
   `}
@@ -41,13 +41,13 @@ function NewChatHero({
 
       {/* Value Proposition */}
       {!isCompact && (
-        <p className="text-theme-text/80 mb-3">
+        <p className="text-theme-text/80 mb-2">
           Your second brain for thinking, creating, and solving.
         </p>
       )}
 
       {/* Prompt Suggestions */}
-      {showPrompts && (
+      {/* {showPrompts && (
         <div className="flex flex-wrap gap-2 justify-center mb-3">
           {["Learn something", "Work with text", "Fix a problem"].map(
             (prompt) => (
@@ -72,11 +72,9 @@ function NewChatHero({
             )
           )}
         </div>
-      )}
+      )} */}
 
-      <p className="text-theme-muted text-xs mb-3">
-        Or type what you’re thinking…
-      </p>
+      <p className="text-theme-muted text-xs mb-3">What can I help with?</p>
 
       {/* Composer */}
       {showComposer && Composer && (

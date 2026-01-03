@@ -20,7 +20,7 @@ const ChatSkeletonLoader = () => {
       </div>
 
       {/* Main Chat Area Skeleton */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 mb-[8rem]">
         {/* Hero Skeleton */}
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-xl w-full text-center">
@@ -34,11 +34,11 @@ const ChatSkeletonLoader = () => {
             <div className="mx-auto mb-6 h-4 w-80 rounded shimmer" />
 
             {/* Prompt Chips */}
-            <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {/* <div className="flex flex-wrap justify-center gap-2 mb-6">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-7 w-28 rounded-full shimmer" />
               ))}
-            </div>
+            </div> */}
 
             {/* Hint text */}
             <div className="mx-auto mb-4 h-3 w-48 rounded shimmer" />

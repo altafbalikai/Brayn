@@ -483,7 +483,7 @@ export default function Chat() {
           >
             {showHero ? (
               <div className="flex-1 flex items-center justify-center px-4">
-                <div className="max-w-4xl w-full">
+                <div className="max-w-4xl w-full mb-[8rem]">
                   <NewChatHero
                     onNewChat={handleNewChat}
                     onPromptClick={handlePromptClick}

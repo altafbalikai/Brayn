@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FaArrowCircleUp } from "react-icons/fa";
+import { TiArrowUp } from "react-icons/ti";
 
 /**
  * Composer - floating glass input with multi-line support
@@ -31,10 +31,10 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
       : `absolute bottom-4 left-1/2 -translate-x-1/2`;
 
   const PLACEHOLDERS = [
-    "Explain something you're stuck on…",
-    "Paste code and ask for help…",
-    "Summarize notes or a document…",
-    "What you want to figure out today?",
+    "Think through a problem…",
+    "Drop code, get clarity…",
+    "Turn notes into insight…",
+    "What’s on your mind?",
   ];
 
   useEffect(() => {
@@ -64,18 +64,19 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
         w-[100%]
         max-w-4xl
         px-4 md:px-6
+        h-14 sm:h-16 md:h-auto
       `}
     >
       {/* Floating glass bar */}
       <div
         className="
           relative
-          flex items-start gap-2
-          rounded-3xl
-          px-2 md:px-4
-          min-h-12 md:min-h-14
-          pt-0.5 pb-0.5
+          flex items-end gap-2
+          rounded-[2.5rem]
+          px-2 md:px-2
+          py-2
 
+          min-h-14
           bg-theme-light
           backdrop-blur-xl
           border border-theme-secondary
@@ -107,18 +108,19 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
             border-none
             outline-none
             resize-none
+
             text-theme-text
             placeholder:text-theme-muted
-            
             text-sm md:text-base
             leading-6
-            px-0.5 md:px-1
-            py-2 md:py-3  
+
+            px-1
+            py-2.5
 
             max-h-[200px]
             overflow-y-auto
 
-            disabled:opacity-60
+
           "
         />
 
@@ -128,19 +130,17 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
           disabled={!text.trim() || disabled}
           className="
             shrink-0
-            h-8 w-8 md:h-10 md:w-10
+            h-11 w-11
             rounded-full
-            self-end
-            mb-1.5
-            bg-theme-secondary
+
+            bg-theme-muted
             text-theme-text
-            
+
             flex items-center justify-center
 
             shadow-lg
             hover:brightness-110
             active:scale-95
-
             transition-all duration-200
 
             disabled:opacity-40
@@ -148,7 +148,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
             disabled:scale-100
           "
         >
-          <FaArrowCircleUp className="w-5 h-5 md:w-6 md:h-6" />
+          <TiArrowUp className="w-6 h-6 md:w-7 md:h-7 text-theme-accent" />
         </button>
 
         {/* Glass edge highlight */}
@@ -156,7 +156,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
           className="
 
             pointer-events-none
-            absolute inset-0 rounded-3xl
+            absolute inset-0 rounded-[2.5rem]
             ring-1 ring-white/20
           "
         />
