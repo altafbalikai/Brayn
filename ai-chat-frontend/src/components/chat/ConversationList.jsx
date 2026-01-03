@@ -13,6 +13,9 @@ function ConversationList({
   loading,
   conversationsLoadingMore,
   onSelectConversation,
+  onRenameConversation,
+  onDeleteConversation,
+  isRenamingTitle,
   containerRef,
   onScroll,
 }) {
@@ -28,6 +31,9 @@ function ConversationList({
         conversations={conversations}
         currentConversationId={currentConversationId}
         onSelectConversation={onSelectConversation}
+        onRenameConversation={onRenameConversation}
+        onDeleteConversation={onDeleteConversation}
+        isRenamingTitle={isRenamingTitle}
       />
     );
   }, [conversations, loading, currentConversationId, onSelectConversation]);

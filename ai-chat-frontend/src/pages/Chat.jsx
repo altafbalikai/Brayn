@@ -9,7 +9,8 @@ import {
   fetchMessages,
   sendMessage,
   setCurrentConversation,
-  updateConversationTitle,
+  renameConversationTitle,
+  deleteConversation,
   setConversationTitle,
   clearMessages,
 } from "../features/conversations/conversationSlice";
@@ -86,6 +87,9 @@ export default function Chat() {
     (state) =>
       state.conversation.assistantTyping?.[currentConversation?._id] ?? false
   );
+
+  // conversation title renaming state
+  const [isRenamingTitle, setIsRenamingTitle] = useState(false);
 
   // Load conversations with cache
   useEffect(() => {
@@ -173,9 +177,23 @@ export default function Chat() {
   const handleSelectConversation = useCallback(
     (conv) => {
       dispatch(setCurrentConversation(conv));
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 768 && !isRenamingTitle) {
         setSidebarOpen(false); // close sidebar in Mobile screens after selecting new chat
       }
+    },
+    [dispatch, isRenamingTitle]
+  );
+
+  const handleRenameConversation = useCallback(
+    (convId, title) => {
+      dispatch(renameConversationTitle({ conversationId: convId, title }));
+    },
+    [dispatch]
+  );
+
+  const handleDeleteConversation = useCallback(
+    (convId) => {
+      dispatch(deleteConversation(convId));
     },
     [dispatch]
   );
@@ -214,9 +232,7 @@ export default function Chat() {
 
   const handleSendMessage = useCallback(
     async (message) => {
-      console.log("Sending message:", message);
       if (!message?.trim() || !currentConversation) return;
-      console.log("Sending message:", message);
       const convo_title = message.trim();
       let conversationId = currentConversation._id;
 
@@ -263,10 +279,7 @@ export default function Chat() {
 
   const handlePromptClick = useCallback(
     async (prompt) => {
-      console.log("Prompt clicked:", prompt);
       if (!prompt?.trim()) return;
-
-      console.log("Prompt clicked:", prompt);
 
       const convo_title = prompt.trim();
       const MAX_TITLE_LENGTH = 40;
@@ -456,6 +469,9 @@ export default function Chat() {
             loading={loading}
             conversationsLoadingMore={conversationsLoadingMore}
             onSelectConversation={handleSelectConversation}
+            onRenameConversation={handleRenameConversation}
+            onDeleteConversation={handleDeleteConversation}
+            isRenamingTitle={setIsRenamingTitle}
             containerRef={conversationsScrollRef}
             onScroll={handleConversationsScroll}
           />

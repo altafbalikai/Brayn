@@ -14,6 +14,9 @@ export default function Sidebar({
   loading,
   conversationsLoadingMore,
   onSelectConversation,
+  onRenameConversation,
+  onDeleteConversation,
+  isRenamingTitle,
   containerRef,
   onScroll,
 }) {
@@ -38,6 +41,9 @@ export default function Sidebar({
         loading={loading}
         conversationsLoadingMore={conversationsLoadingMore}
         onSelectConversation={onSelectConversation}
+        onRenameConversation={onRenameConversation}
+        onDeleteConversation={onDeleteConversation}
+        isRenamingTitle={isRenamingTitle}
         containerRef={containerRef}
         onScroll={onScroll}
       />

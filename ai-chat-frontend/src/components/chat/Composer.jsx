@@ -119,8 +119,6 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
 
             max-h-[200px]
             overflow-y-auto
-
-
           "
         />
 
@@ -148,13 +146,12 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
             disabled:scale-100
           "
         >
-          <TiArrowUp className="w-6 h-6 md:w-7 md:h-7 text-theme-accent" />
+          <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
         </button>
 
         {/* Glass edge highlight */}
         <div
           className="
-
             pointer-events-none
             absolute inset-0 rounded-3xl
             ring-1 ring-white/20

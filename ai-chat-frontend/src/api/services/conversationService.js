@@ -28,10 +28,15 @@ export const conversationService = {
         return response.data;
     },
 
-    updateConversationTitle: async (conversationId, title) => {
-        const response = await api.patch(`/conversations/${conversationId}`, {
+    renameConversationTitle: async (conversationId, title) => {
+        const response = await api.patch(`/conversations/${conversationId}/rename`, {
             title,
         });
         return response.data;
     },
+
+    deleteConversation: async (conversationId) => {
+        const response = await api.delete(`/conversations/${conversationId}`);
+        return response.data;
+    }
 };

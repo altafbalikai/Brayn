@@ -10,6 +10,8 @@ const {
   listConversationsValidation,
   addMessageValidation,
   getMessagesValidation,
+  renameConversationValidation,
+  deleteConversationValidation
 } = require('../validators/conversation.validator');
 
 // ensure auth middleware is required before protected routes
@@ -19,5 +21,7 @@ router.post('/', createConversationValidation, handleValidationErrors, convContr
 router.get('/my', listConversationsValidation, handleValidationErrors, cacheMiddleware(60000), convController.listConversations); // Cache for 1 minute
 router.post('/:cid/messages', addMessageValidation, handleValidationErrors, convController.addMessage);
 router.get('/:cid/messages', getMessagesValidation, handleValidationErrors, cacheMiddleware(30000), convController.getMessages); // Cache for 30 seconds
+router.patch('/:cid/rename', renameConversationValidation, handleValidationErrors, convController.renameConversation);
+router.delete('/:cid', deleteConversationValidation, handleValidationErrors, convController.deleteConversation);
 
 module.exports = router;

@@ -16,6 +16,9 @@ function ConversationListItems({
   conversations,
   currentConversationId,
   onSelectConversation,
+  onRenameConversation,
+  onDeleteConversation,
+  isRenamingTitle,
 }) {
   return (
     <>
@@ -25,6 +28,9 @@ function ConversationListItems({
           conv={conv}
           isActive={currentConversationId === conv._id}
           onSelect={onSelectConversation}
+          onRename={onRenameConversation}
+          onDelete={onDeleteConversation}
+          isRenamingTitle={isRenamingTitle}
         />
       ))}
     </>

@@ -69,10 +69,26 @@ const getMessagesValidation = [
     .withMessage('Limit must be between 1 and 200'),
 ];
 
+const renameConversationValidation = [
+  ...conversationIdValidation,
+  body('title')
+    .notEmpty()
+    .withMessage('Title is required')
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Title must be less than 200 characters'),
+];
+
+const deleteConversationValidation = [
+  ...conversationIdValidation,
+];
+
 module.exports = {
   createConversationValidation,
   listConversationsValidation,
   addMessageValidation,
   getMessagesValidation,
+  renameConversationValidation,
+  deleteConversationValidation
 };
 

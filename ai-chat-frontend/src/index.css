@@ -218,3 +218,21 @@ pre:hover {
     }
   }
 }
+
+/* ============================= */
+/* Context Menu Class */
+/* ============================= */
+.context-menu {
+  animation: scaleIn 0.12s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

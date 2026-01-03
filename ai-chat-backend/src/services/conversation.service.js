@@ -98,4 +98,30 @@ async function getMessages(userId, conversationId, { page = 1, limit = 50 }) {
   return { items, total, page, limit };
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages };
+async function renameConversation(userId, conversationId, title) {
+  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+
+  conv.title = title;
+  await conv.save();
+
+  return conv.toObject();
+}
+
+async function deleteConversation(userId, conversationId) {
+  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+  await Message.deleteMany({ conversationId: conv._id });
+  await conv.deleteOne();
+  return true;
+}
+
+module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation };

@@ -112,15 +112,29 @@ export const sendMessage = createAsyncThunk(
     }
 );
 
-export const updateConversationTitle = createAsyncThunk(
-    'conversation/updateConversationTitle',
+export const renameConversationTitle = createAsyncThunk(
+    'conversation/renameConversationTitle',
     async ({ conversationId, title }, { rejectWithValue }) => {
         try {
-            const data = await conversationService.updateConversationTitle(conversationId, title);
+            const data = await conversationService.renameConversationTitle(conversationId, title);
             return data;
         } catch (error) {
             return rejectWithValue(
-                error.response?.data?.error || 'Failed to update conversation title'
+                error.response?.data?.error || 'Failed to rename conversation title'
+            );
+        }
+    }
+);
+
+export const deleteConversation = createAsyncThunk(
+    'conversation/deleteConversation',
+    async (conversationId, { rejectWithValue }) => {
+        try {
+            const data = await conversationService.deleteConversation(conversationId);
+            return conversationId;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.error || 'Failed to delete conversation'
             );
         }
     }
@@ -336,17 +350,29 @@ const conversationSlice = createSlice({
                     state.assistantTyping[conversationId] = false;
                 }
             })
-            // Update conversation title
-            .addCase(updateConversationTitle.fulfilled, (state, action) => {
+            // Rename conversation title
+            .addCase(renameConversationTitle.fulfilled, (state, action) => {
                 const updatedConv = action.payload;
                 state.currentConversation = { ...state.currentConversation, title: updatedConv.title };
                 state.conversations = state.conversations.map(conv =>
                     conv._id === updatedConv._id ? { ...conv, title: updatedConv.title } : conv
                 )
             })
-            .addCase(updateConversationTitle.rejected, (state, action) => {
-                state.error = action.payload || 'Failed to update conversation title';
+            .addCase(renameConversationTitle.rejected, (state, action) => {
+                state.error = action.payload || 'Failed to rename conversation title';
+            })
+            // Delete conversation
+            .addCase(deleteConversation.fulfilled, (state, action) => {
+                const deletedConvId = action.payload;
+                state.conversations = state.conversations.filter(conv => conv._id !== deletedConvId);
+                if (state.currentConversation && state.currentConversation._id === deletedConvId) {
+                    state.currentConversation = null;
+                }
+            })
+            .addCase(deleteConversation.rejected, (state, action) => {
+                state.error = action.payload || 'Failed to delete conversation';
             });
+
     },
 });
 

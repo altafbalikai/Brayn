@@ -57,4 +57,26 @@ async function getMessages(req, res, next) {
   }
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages };
+async function renameConversation(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+    const { title } = req.body;
+    const conv = await ConversationService.renameConversation(userId, cid, title);
+    res.json(conv);
+  } catch (err) {
+    next(err);
+  }
+}
+async function deleteConversation(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+    await ConversationService.deleteConversation(userId, cid);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation };
