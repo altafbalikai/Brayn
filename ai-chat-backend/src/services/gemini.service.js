@@ -68,6 +68,7 @@ function buildMessagesPayload(normalizedMessages) {
 async function askGemini(
   conversation,
   model = "tngtech/deepseek-r1t2-chimera:free"
+  // model = "google/gemma-3n-e2b-it:free"
 ) {
   try {
     const openrouter = await getOpenRouter();
@@ -103,7 +104,9 @@ async function askGemini(
  */
 async function askGeminiStream(
   conversation,
-  model = "tngtech/deepseek-r1t2-chimera:free"
+  // model = "tngtech/deepseek-r1t2-chimera:free"
+  // model = "google/gemma-3n-e2b-it:free"
+  model = "nvidia/nemotron-3-nano-30b-a3b:free"
 ) {
   try {
     const openrouter = await getOpenRouter();
