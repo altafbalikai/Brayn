@@ -64,7 +64,6 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
         w-[100%]
         max-w-4xl
         px-4 md:px-6
-        h-14 sm:h-16 md:h-auto
       `}
     >
       {/* Floating glass bar */}
