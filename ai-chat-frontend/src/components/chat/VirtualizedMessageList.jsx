@@ -89,7 +89,7 @@ function VirtualizedMessageList({
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar"
+        className="flex-1 min-h-0 overflow-y-scroll pb-28 show-scrollbar"
         onScroll={onScroll}
         style={{
           overscrollBehavior: "contain",
@@ -133,7 +133,7 @@ function VirtualizedMessageList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 min-h-0 overflow-y-scroll pb-28 no-scrollbar md:show-scrollbar"
+      className="flex-1 min-h-0 overflow-y-scroll pb-28 show-scrollbar"
       style={{ overscrollBehavior: "contain" }}
     >
       <VariableSizeList

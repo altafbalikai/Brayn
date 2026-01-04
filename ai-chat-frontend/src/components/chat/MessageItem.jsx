@@ -85,7 +85,7 @@ function CodeBlock({ node, inline, className, children, ...props }) {
 /**
  * Message bubble with real-time streaming support
  */
-function MessageItem({ msg, style, showTime }) {
+function MessageItem({ msg, showTime }) {
   const isStreaming = msg.status === "streaming";
   const isLoading = isStreaming && !msg.text;
   const displayText = msg.text || "";
@@ -99,7 +99,6 @@ function MessageItem({ msg, style, showTime }) {
 
   return (
     <div
-      style={style}
       className={`flex w-full min-w-0 ${
         msg.role === "user" ? "justify-end" : "justify-start"
       } px-2 md:px-4 mb-1`}

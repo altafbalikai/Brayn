@@ -20,7 +20,6 @@ function MessageGroup({ group, isFirst }) {
           <MessageItem
             key={msg._id || msg.id || `${msg.role}-${idx}`}
             msg={msg}
-            style={{}}
             showTime={
               group.messages.length === 1 || idx === group.messages.length - 1
             }
