@@ -9,7 +9,7 @@ const MessageListSkeleton = ({
         flex-1
         min-h-0
         overflow-y-scroll
-        bg-theme-dark
+        bg-theme-appbg
         pb-28
         no-scrollbar
         md:show-scrollbar

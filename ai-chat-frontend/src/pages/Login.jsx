@@ -43,7 +43,7 @@ export default function Login() {
   return (
     <>
       <RewindBackground />
-      <div className="min-h-screen p-5 flex items-center justify-center bg-transparent">
+      <div className="relative z-10 min-h-screen p-5 flex items-center justify-center bg-transparent">
         <div className="w-full max-w-md p-8 bg-theme-light rounded-2xl shadow-2xl border border-theme-secondary">
           <h1 className="text-2xl font-bold text-theme-text mb-2 flex items-center justify-center gap-2">
             <GiBrain size={28} className="text-theme-text" /> Brayn
@@ -59,7 +59,7 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
+            <div className="relative">
               <label
                 htmlFor="email"
                 className="block text-sm font-medium text-theme-text mb-2"

@@ -46,7 +46,7 @@ export default function ResetPassword() {
   return (
     <>
       <RewindBackground />
-      <div className="min-h-screen p-5 flex items-center justify-center bg-transparent">
+      <div className="relative z-10 min-h-screen p-5 flex items-center justify-center bg-transparent">
         <div className="w-full max-w-md p-8 bg-theme-light rounded-2xl shadow-2xl border border-theme-secondary">
           <h1 className="text-2xl font-bold text-theme-text mb-2 flex items-center justify-center gap-2">
             <GiBrain size={28} /> Brayn

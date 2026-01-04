@@ -262,7 +262,7 @@ const RewindBackground = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 pointer-events-none">
+    <div className="fixed z-0 inset-0 pointer-events-none">
       <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );

@@ -54,7 +54,7 @@ export default function Signup() {
   return (
     <>
       <RewindBackground />
-      <div className="min-h-screen p-5 bg-transparent overflow-y-auto flex justify-center">
+      <div className=" relative z-10 min-h-screen p-5 bg-transparent overflow-y-auto flex justify-center">
         {/* Glass Card */}
         <div
           className="
