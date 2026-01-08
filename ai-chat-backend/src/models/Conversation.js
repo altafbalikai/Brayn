@@ -5,6 +5,11 @@ const ConversationSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   agentId: { type: String, index: true }, // e.g. 'technical', 'medical'
   title: { type: String, default: 'New Conversation' },
+  selectedModelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "LLMModel",
+    index: true,
+  },
   isArchived: { type: Boolean, default: false, index: true },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { timestamps: true });

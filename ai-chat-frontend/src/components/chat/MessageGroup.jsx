@@ -6,6 +6,7 @@ import { formatGroupTime } from "../../utils/messageGrouping";
  * @param {{group: {messages: Array, timestamp: string}, isFirst?: boolean}} props
  */
 function MessageGroup({ group, isFirst }) {
+  console.log("MessageGroup.jsx replainting");
   return (
     <div className="mb-4">
       {!isFirst && (

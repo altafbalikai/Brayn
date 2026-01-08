@@ -9,6 +9,6 @@ const { askValidation } = require('../validators/llm.validator');
 router.use(auth);
 
 // POST /api/llm/ask
-router.post('/ask', askValidation, handleValidationErrors, ask);
+router.post('/conversations/:cid/ask', askValidation, handleValidationErrors, ask);
 
 module.exports = router;

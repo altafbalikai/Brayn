@@ -1,10 +1,15 @@
 import api from '../axios';
 
 export const conversationService = {
-    createConversation: async (agentId, title) => {
-        const response = await api.post('/conversations', { agentId, title });
+    createConversation: async ({ agentId, title, modelId }) => {
+        const response = await api.post("/conversations", {
+            agentId,
+            title,
+            modelId, // optional
+        });
         return response.data;
     },
+
 
     listConversations: async (agent, page = 1, limit = 50) => {
         const params = { page, limit };
@@ -38,5 +43,14 @@ export const conversationService = {
     deleteConversation: async (conversationId) => {
         const response = await api.delete(`/conversations/${conversationId}`);
         return response.data;
-    }
+    },
+
+    updateConversationModel: async (conversationId, modelId) => {
+        const response = await api.patch(
+            `/conversations/${conversationId}/model`,
+            { modelId }
+        );
+        return response.data;
+    },
+
 };

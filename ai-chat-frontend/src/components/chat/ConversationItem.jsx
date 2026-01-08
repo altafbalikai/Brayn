@@ -146,11 +146,11 @@ function ConversationItem({
           opacity-1000 md:opacity-0 group-hover:opacity-100
           text-theme-muted hover:text-theme-text
           transition-opacity
-          p-1 rounded-md
+          py-1 rounded-md
         "
         aria-label="Conversation options"
       >
-        <PiDotsThreeBold size={24} />
+        <PiDotsThreeBold className="size-[18px] md:size-[24px]" />
       </button>
 
       {/* Context menu */}

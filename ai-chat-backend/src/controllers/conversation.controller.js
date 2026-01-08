@@ -8,7 +8,8 @@ async function createConversation(req, res, next) {
     const userId = req.user?.id;
     const { agentId } = req.body;
     const { title } = req.body;
-    const conv = await ConversationService.createConversation(userId, agentId, title);
+    const { modelId } = req.body;
+    const conv = await ConversationService.createConversation(userId, agentId, title, modelId);
     res.status(201).json(conv);
   } catch (err) {
     next(err);
@@ -79,4 +80,26 @@ async function deleteConversation(req, res, next) {
   }
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation };
+/**
+ * PATCH /api/conversations/:cid/model
+ * ⭐ NEW — switch active LLM model
+ */
+async function updateConversationModel(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+    const { modelId } = req.body;
+
+    const conv = await ConversationService.updateConversationModel(
+      userId,
+      cid,
+      modelId
+    );
+
+    res.json(conv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel };

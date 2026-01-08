@@ -1,4 +1,6 @@
 const logger = require("../config/logger");
+const Conversation = require("../models/Conversation");
+const LLMModel = require("../models/LLMModel");
 
 let openRouterClient = null;
 
@@ -60,6 +62,102 @@ function buildMessagesPayload(normalizedMessages) {
     }
     return { role: m.role, content: m.text };
   });
+}
+
+/* ===========================
+   Core Resolver
+   =========================== */
+
+async function resolveConversationModel(conversationId) {
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) {
+    throw Object.assign(new Error("Conversation not found"), { status: 404 });
+  }
+
+  if (!conv.selectedModelId) {
+    throw Object.assign(
+      new Error("Conversation has no selected model"),
+      { status: 400 }
+    );
+  }
+
+  const model = await LLMModel.findById(conv.selectedModelId);
+  if (!model || model.status !== "active") {
+    throw Object.assign(
+      new Error("Selected LLM model is unavailable"),
+      { status: 400 }
+    );
+  }
+
+  return model;
+}
+
+/* ===========================
+   STREAMING RESPONSE
+   =========================== */
+
+async function askConversationStream(conversationId, messages) {
+  try {
+    const openrouter = await getOpenRouter();
+    const model = await resolveConversationModel(conversationId);
+
+    const MAX_CONTEXT = 8;
+    const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
+    const payload = buildMessagesPayload(normalized);
+
+    return {
+      stream: await openrouter.chat.send({
+        model: model.openRouterModelId,
+        messages: payload,
+        stream: true,
+      }),
+      modelId: model._id,
+    };
+  } catch (err) {
+    logger.error("LLM stream error", {
+      message: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+    throw err;
+  }
+}
+
+/* ===========================
+   FULL RESPONSE
+   =========================== */
+
+async function askConversation(conversationId, messages) {
+  try {
+    const openrouter = await getOpenRouter();
+    const model = await resolveConversationModel(conversationId);
+
+    const MAX_CONTEXT = 8;
+    const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
+    const payload = buildMessagesPayload(normalized);
+
+    const stream = await openrouter.chat.send({
+      model: model.openRouterModelId,
+      messages: payload,
+      stream: true,
+    });
+
+    let reply = "";
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) reply += content;
+    }
+
+    return {
+      text: reply || "No response from model",
+      modelId: model._id,
+    };
+  } catch (err) {
+    logger.error("LLM ask error", {
+      message: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -129,4 +227,4 @@ async function askGeminiStream(
   }
 }
 
-module.exports = { askGemini, askGeminiStream };
+module.exports = { askConversation, askConversationStream, askGemini, askGeminiStream };

@@ -27,7 +27,7 @@ export default function Sidebar({
       {/* Right Side: New Chat Button */}
       <button
         onClick={onNewChat}
-        className="flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-opacity-90 transition-all font-medium text-ms"
+        className="flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-theme-secondary transition-all font-medium text-ms"
       >
         <IoIosAddCircle size={24} className="text-base text-3xl" />
         <span>New Chat</span>

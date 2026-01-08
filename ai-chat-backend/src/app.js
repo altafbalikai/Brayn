@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth.routes');
 const convRoutes = require('./routes/conversation.routes');
 const llmRoutes = require('./routes/llm.routes');
 const summaryRoutes = require('./routes/summary.routes');
+const llmmodelRoutes = require('./routes/llmmodel.routes');
 
 const app = express();
 
@@ -103,6 +104,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);
 app.use('/api/summary', summaryRoutes);
+app.use('/api/llm-models', llmmodelRoutes); // new LLM model routes
 
 // API Documentation
 if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {

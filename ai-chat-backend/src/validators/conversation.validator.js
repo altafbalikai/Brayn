@@ -13,6 +13,15 @@ const createConversationValidation = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Title must be less than 200 characters'),
+
+  body("modelId")
+    .optional()
+    .custom((value) => {
+      if (!mongoose.isValidObjectId(value)) {
+        throw new Error("Invalid modelId format");
+      }
+      return true;
+    }),
 ];
 
 const listConversationsValidation = [
@@ -83,12 +92,27 @@ const deleteConversationValidation = [
   ...conversationIdValidation,
 ];
 
+const updateConversationModelValidation = [
+  ...conversationIdValidation,
+
+  body("modelId")
+    .notEmpty()
+    .withMessage("modelId is required")
+    .custom((value) => {
+      if (!mongoose.isValidObjectId(value)) {
+        throw new Error("Invalid modelId format");
+      }
+      return true;
+    }),
+];
+
 module.exports = {
   createConversationValidation,
   listConversationsValidation,
   addMessageValidation,
   getMessagesValidation,
   renameConversationValidation,
+  updateConversationModelValidation,
   deleteConversationValidation
 };
 

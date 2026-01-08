@@ -1,10 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
 import { TiArrowUp } from "react-icons/ti";
+import ConversationModelSelector from "./ConversationModelSelector";
 
 /**
  * Composer - floating glass input with multi-line support
  */
-function Composer({ onSend, disabled, position, currentConversationId }) {
+function Composer({
+  onSend,
+  disabled,
+  position,
+  currentConversationId,
+  llmmodels,
+  selectedModelId,
+  llmsloading,
+}) {
   const [text, setText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef(null);
@@ -55,6 +64,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
     }
   }, [text]);
 
+  // console.log("Composer.jsx Page repainting.");
   return (
     <form
       onSubmit={submit}
@@ -70,7 +80,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
       <div
         className="
           relative
-          flex items-end gap-2
+          flex flex-col
           rounded-3xl
           px-2 md:px-2
           py-2
@@ -99,10 +109,11 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
               ? "Ask anything"
               : PLACEHOLDERS[placeholderIndex]
           }
+          // placeholder="Ask anything"
           disabled={disabled}
           rows={1}
           className="
-            flex-1 min-w-0
+            w-full
             bg-transparent
             border-none
             outline-none
@@ -113,7 +124,7 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
             text-sm md:text-base
             leading-6
 
-            px-1
+            px-2
             py-2.5
 
             max-h-[200px]
@@ -121,11 +132,50 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
           "
         />
 
-        {/* Send button */}
-        <button
-          type="submit"
-          disabled={!text.trim() || disabled}
+        {/* ROW 2 — Controls (3 columns) */}
+        <div
           className="
+            grid
+            grid grid-cols-[auto_1fr_auto]
+            items-center
+            gap-2
+          "
+        >
+          {/* Column 1 — Upload (future use) */}
+          <div className="flex items-center justify-start">
+            {/* <button
+              type="button"
+              disabled
+              className="
+              h-9 w-9
+              rounded-lg
+              border border-theme-secondary
+              text-theme-muted
+              opacity-40
+              cursor-not-allowed
+            "
+              title="Upload coming soon"
+            >
+              +
+            </button> */}
+          </div>
+
+          {/* Column 2 — Model selector */}
+          <div className="flex justify-end">
+            <ConversationModelSelector
+              llmmodels={llmmodels}
+              selectedModelId={selectedModelId}
+              llmsloading={llmsloading}
+            />
+          </div>
+
+          {/* Column 3 — Send button */}
+          <div className="flex justify-end">
+            {/* Send button */}
+            <button
+              type="submit"
+              disabled={!text.trim() || disabled}
+              className="
             shrink-0
             h-11 w-11
             rounded-full
@@ -144,9 +194,11 @@ function Composer({ onSend, disabled, position, currentConversationId }) {
             disabled:cursor-not-allowed
             disabled:scale-100
           "
-        >
-          <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
-        </button>
+            >
+              <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+            </button>
+          </div>
+        </div>
 
         {/* Glass edge highlight */}
         <div

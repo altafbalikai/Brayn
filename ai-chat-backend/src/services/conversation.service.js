@@ -2,12 +2,25 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
+const LLMModel = require("../models/LLMModel");
 
-async function createConversation(userId, agentId, title) {
-  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c') {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  }
+
+  if (selectedModelId && !mongoose.isValidObjectId(selectedModelId)) {
+    throw Object.assign(new Error("Invalid modelId"), { status: 400 });
+  }
 
   // You can pass the string userId directly; Mongoose will cast it.
-  const conv = await Conversation.create({ userId: new mongoose.Types.ObjectId(userId), agentId: agentId, title: title || 'New Conversation' });
+  const conv = await Conversation.create(
+    {
+      userId: new mongoose.Types.ObjectId(userId),
+      agentId: agentId,
+      title: title || 'New Conversation',
+      selectedModelId,
+    });
   return conv.toObject();
 }
 
@@ -55,8 +68,13 @@ async function listConversations(userId, agentId, page = 1, limit = 50) {
 
 
 async function addMessage(userId, conversationId, { role, text }) {
-  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
-  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+  if (!mongoose.isValidObjectId(userId)) {
+    throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  }
+
+  if (!mongoose.isValidObjectId(conversationId)) {
+    throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+  }
 
   const conv = await Conversation.findById(conversationId);
   if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
@@ -67,7 +85,9 @@ async function addMessage(userId, conversationId, { role, text }) {
     userId: new mongoose.Types.ObjectId(userId),
     role,
     text,
-    createdAt: new Date()
+    createdAt: new Date(),
+    modelId: conv.selectedModelId, // ⭐ SNAPSHOT
+    createdAt: new Date(),
   });
 
   // update conversation updatedAt for sorting
@@ -124,4 +144,45 @@ async function deleteConversation(userId, conversationId) {
   return true;
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation };
+async function updateConversationModel(userId, conversationId, modelId) {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw Object.assign(new Error("Invalid userId"), { status: 400 });
+  }
+  if (!mongoose.isValidObjectId(conversationId)) {
+    throw Object.assign(new Error("Invalid conversationId"), { status: 400 });
+  }
+  if (!mongoose.isValidObjectId(modelId)) {
+    throw Object.assign(new Error("Invalid modelId"), { status: 400 });
+  }
+
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw Object.assign(new Error("Conversation not found"), { status: 404 });
+  if (conv.userId.toString() !== userId) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
+
+  // No-op if same model
+  if (conv.selectedModelId?.toString() === modelId) {
+    return conv.toObject();
+  }
+
+  conv.selectedModelId = modelId;
+  await conv.save();
+
+  // Get model display name
+  const model = await LLMModel.findById(modelId);
+  // ⭐ Insert system message for transparency
+  // await Message.create({
+  //   conversationId: conv._id,
+  //   userId: new mongoose.Types.ObjectId(userId),
+  //   role: "system",
+  //   text: `Model switched to ${model.displayName}`,
+  //   modelId,
+  //   createdAt: new Date(),
+  // });
+
+  return conv.toObject();
+}
+
+
+module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel, };

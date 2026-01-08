@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import { useTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../features/auth/authSlice";
 import { GiBrain } from "react-icons/gi";
@@ -30,6 +31,10 @@ import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
+import {
+  getLLMModels,
+  setSelectedModelId,
+} from "../features/LLM-Models/llm-modelsSlice";
 // Component implementations moved to `src/components/chat/*`
 
 export default function Chat() {
@@ -87,6 +92,18 @@ export default function Chat() {
     (state) =>
       state.conversation.assistantTyping?.[currentConversation?._id] ?? false
   );
+
+  const {
+    llmmodels,
+    selectedModelId,
+    loading: llmsloading,
+  } = useSelector((state) => state.llmModels);
+  const memoizedLLMModels = useMemo(() => llmmodels, [llmmodels.length]);
+
+  // 🔍 DEBUG: Check if models are loading
+  // console.log("Chat.js - llmmodels:", llmmodels);
+  // console.log("Chat.js - llmsloading:", llmsloading);
+  // console.log("Chat.js - selectedModelId:", selectedModelId);
 
   // conversation title renaming state
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
@@ -174,6 +191,32 @@ export default function Chat() {
     }
   }, [currentConversation?._id]);
 
+  // ADD THIS: Load LLM models once when Chat component mounts
+  useEffect(() => {
+    // console.log("🔥 Dispatching getLLMModels");
+    dispatch(getLLMModels({ capability: "text" }));
+  }, [dispatch]);
+
+  // ADD THIS: Set default model once models are loaded
+  useEffect(() => {
+    if (!selectedModelId && llmmodels.length > 0) {
+      dispatch(setSelectedModelId(llmmodels[2]._id));
+    }
+  }, [llmmodels.length, selectedModelId, dispatch]);
+
+  // Load from localStorage on app start
+  const hasLoadedFromStorage = useRef(false);
+  useEffect(() => {
+    if (!hasLoadedFromStorage.current && llmmodels.length > 0) {
+      hasLoadedFromStorage.current = true;
+      const savedModelId = localStorage.getItem("selectedModelId");
+
+      if (savedModelId && llmmodels.some((m) => m._id === savedModelId)) {
+        dispatch(setSelectedModelId(savedModelId));
+      }
+    }
+  }, [llmmodels.length, dispatch]); // Use .length, add ref guard
+
   const handleSelectConversation = useCallback(
     (conv) => {
       dispatch(setCurrentConversation(conv));
@@ -248,6 +291,7 @@ export default function Chat() {
           createConversation({
             agentId: currentConversation.agentId,
             title,
+            modelId: selectedModelId,
           })
         );
 
@@ -289,11 +333,14 @@ export default function Chat() {
           ? convo_title.slice(0, MAX_TITLE_LENGTH).trim() + "…"
           : convo_title;
 
+      // console.log(title, selectedModelId);
       // 1️⃣ Create conversation immediately
+      // console.log("model selected:", activeModelId);
       const createResult = await dispatch(
         createConversation({
           agentId: "default",
           title,
+          modelId: selectedModelId,
         })
       );
 
@@ -319,7 +366,7 @@ export default function Chat() {
         })
       );
     },
-    [dispatch]
+    [dispatch, selectedModelId]
   );
 
   const handleLogout = useCallback(async () => {
@@ -429,6 +476,8 @@ export default function Chat() {
       (!currentConversation.messages ||
         currentConversation.messages.length === 0));
 
+  console.log("Chat.jsx Page repainting.");
+
   return (
     <>
       <div className="relative h-full w-full bg-transparent overflow-hidden flex">
@@ -512,6 +561,9 @@ export default function Chat() {
                         disabled={sending || assistantTyping}
                         position="center"
                         currentConversationId={currentConversation?._id}
+                        llmmodels={memoizedLLMModels}
+                        selectedModelId={selectedModelId}
+                        llmsloading={llmsloading}
                       />
                     )}
                   />
@@ -536,6 +588,9 @@ export default function Chat() {
                   onSend={handleSendMessage}
                   disabled={sending || assistantTyping}
                   currentConversationId={currentConversation?._id}
+                  llmmodels={memoizedLLMModels}
+                  selectedModelId={selectedModelId}
+                  llmsloading={llmsloading}
                 />
               </>
             )}

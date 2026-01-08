@@ -19,9 +19,9 @@ export const fetchConversations = createAsyncThunk(
 
 export const createConversation = createAsyncThunk(
     'conversation/createConversation',
-    async ({ agentId, title }, { rejectWithValue }) => {
+    async ({ agentId, title, modelId }, { rejectWithValue }) => {
         try {
-            const data = await conversationService.createConversation(agentId, title);
+            const data = await conversationService.createConversation({ agentId, title, modelId });
             return data;
         } catch (error) {
             return rejectWithValue(
@@ -140,6 +140,25 @@ export const deleteConversation = createAsyncThunk(
     }
 );
 
+export const updateConversationModel = createAsyncThunk(
+    "conversation/updateConversationModel",
+    async ({ conversationId, modelId }, { rejectWithValue }) => {
+        try {
+            const data = await conversationService.updateConversationModel(
+                conversationId,
+                modelId
+            );
+            return data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.error || "Failed to update conversation model"
+            );
+        }
+    }
+);
+
+
+
 const initialState = {
     conversations: [],
     currentConversation: null,
@@ -162,6 +181,7 @@ const conversationSlice = createSlice({
     reducers: {
         setCurrentConversation: (state, action) => {
             state.currentConversation = action.payload;
+            state.loading = false;
         },
         addAssistantPlaceholder: (state, action) => {
             const { conversationId, message } = action.payload;
@@ -371,6 +391,31 @@ const conversationSlice = createSlice({
             })
             .addCase(deleteConversation.rejected, (state, action) => {
                 state.error = action.payload || 'Failed to delete conversation';
+            })
+            // update Conversation Model
+            .addCase(updateConversationModel.fulfilled, (state, action) => {
+                const updatedConv = action.payload;
+
+                // Update in conversations list
+                state.conversations = state.conversations.map(conv =>
+                    conv._id === updatedConv._id
+                        ? { ...conv, selectedModelId: updatedConv.selectedModelId }
+                        : conv
+                );
+
+                // Update current conversation
+                if (
+                    state.currentConversation &&
+                    state.currentConversation._id === updatedConv._id
+                ) {
+                    state.currentConversation = {
+                        ...state.currentConversation,
+                        selectedModelId: updatedConv.selectedModelId,
+                    };
+                }
+            })
+            .addCase(updateConversationModel.rejected, (state, action) => {
+                state.error = action.payload;
             });
 
     },

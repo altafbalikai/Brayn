@@ -82,6 +82,8 @@ function VirtualizedMessageList({
     return <MessageListSkeleton />;
   }
 
+  console.log("MessageList.jsx Page repainting.");
+
   /* ------------------------------------------------------------------ */
   /* NON-VIRTUALIZED                                                    */
   /* ------------------------------------------------------------------ */
