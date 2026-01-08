@@ -68,9 +68,14 @@ app.use(express.urlencoded({ extended: true, limit: process.env.URL_ENCODED_LIMI
 app.use(cookieParser());
 
 // configure and enable CORS before routes
+// const allowedOrigins = [
+//   'http://localhost:3000',
+//   'http://localhost:5173',
+// ];
+
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
+  "https://brayn-ai.vercel.app", // prod frontend
+  "https://brayn-ai-git-feature-development-altafbalikais-projects.vercel.app", // preview frontend
 ];
 
 // Dynamic CORS for Vercel + local dev
