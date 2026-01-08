@@ -127,6 +127,36 @@ app.use(cookieParser());
 //   'http://localhost:5173',
 // ];
 
+const allowedOrigins = [
+  "https://brayn-ai.vercel.app", // prod frontend
+  "https://brayn-ai-git-feature-development-altafbalikais-projects.vercel.app", // preview frontend
+];
+
+// Dynamic CORS for Vercel + local dev
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (Postman, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Allow local dev
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow all Vercel preview + prod domains
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  })
+);
+
 // define routes
 // app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/auth', authRoutes);
