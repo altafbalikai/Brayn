@@ -20,10 +20,31 @@ app.use(helmet());
 // Trust first proxy if behind one (e.g., Vercel, Heroku)
 app.set('trust proxy', 1);
 
-const allowedOrigins = [
-  "https://brayn-ai.vercel.app", // prod frontend
-  "https://brayn-ai-git-feature-development-altafbalikais-projects.vercel.app", // preview frontend
-];
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true; // Postman, server-to-server
+
+  // Local development
+  if (
+    origin === "http://localhost:3000" ||
+    origin === "http://localhost:5173" ||
+    origin === "http://localhost:4000"
+  ) {
+    return true;
+  }
+
+  // Production frontend (custom domain)
+  if (origin === "https://brayn-ai.vercel.app") {
+    return true;
+  }
+
+  // ✅ ALL Vercel preview deployments of YOUR project
+  if (origin.endsWith("-altafbalikais-projects.vercel.app")) {
+    return true;
+  }
+
+  return false;
+};
+
 
 // Dynamic CORS for Vercel + local dev
 app.use(
@@ -33,7 +54,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       // Allow local dev
-      if (allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
