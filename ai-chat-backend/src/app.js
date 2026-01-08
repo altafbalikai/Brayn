@@ -167,17 +167,42 @@ app.get('/metrics', (req, res) => {
 });
 
 // global error handler
+// app.use((err, req, res, next) => {
+//   logger.error('Error:', {
+//     message: err.message,
+//     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+//     status: err.status,
+//     path: req.path,
+//     method: req.method,
+//   });
+//   res
+//     .status(err.status || 500)
+//     .json({ error: err.message || 'Internal Server Error' });
+// });
+
 app.use((err, req, res, next) => {
-  logger.error('Error:', {
+  // ✅ Ensure CORS headers are always present
+  const origin = req.headers.origin;
+  if (origin && origin.endsWith("-altafbalikais-projects.vercel.app")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  if (origin === "https://brayn-ai.vercel.app") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  logger.error("Error:", {
     message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     status: err.status,
     path: req.path,
-    method: req.method,
   });
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || 'Internal Server Error' });
+
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error",
+  });
 });
+
 
 module.exports = app;
