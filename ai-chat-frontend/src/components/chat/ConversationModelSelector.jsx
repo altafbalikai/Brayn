@@ -138,6 +138,7 @@ function Conversationllmmodelselector({
           bg-theme-surface
           hover:bg-theme-secondary
           rounded-lg
+          border border-theme-accent
         "
       >
         <span className="truncate max-w-[160px]">

@@ -137,8 +137,9 @@ function Composer({
           className="
             grid
             grid grid-cols-[auto_1fr_auto]
-            items-center
+            items-end
             gap-2
+            overflow-x-auto scrollbar
           "
         >
           {/* Column 1 — Upload (future use) */}
