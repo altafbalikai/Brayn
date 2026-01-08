@@ -135,7 +135,6 @@ function Conversationllmmodelselector({
           px-2 py-1
           text-sm
           text-theme-text
-          bg-theme-surface
           hover:bg-theme-secondary
           rounded-lg
           border border-theme-accent
