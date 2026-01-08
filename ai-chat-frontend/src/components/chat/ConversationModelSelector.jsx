@@ -140,10 +140,12 @@ function Conversationllmmodelselector({
           rounded-lg
         "
       >
-        {/* <span className="truncate max-w-[140px]"> */}
-        {selectedModel.displayName}
-        {/* </span> */}
-        <FaAngleDown size={14} />
+        <span className="truncate max-w-[160px]">
+          {selectedModel.displayName}
+        </span>
+        <span className="pt-1">
+          <FaAngleDown size={14} />
+        </span>
       </button>
 
       {/* Dropdown menu */}

@@ -94,9 +94,11 @@ async function ask(req, res, next) {
 
   } catch (err) {
     console.error("Streaming error:", err);
-    res.write("\n[Error generating response]");
+    // Inject a styled div with specific data attributes for the frontend to target
+    res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable. You can retry or switch to a different model to continue.`);
     res.end();
   }
+
 }
 
 module.exports = { ask };

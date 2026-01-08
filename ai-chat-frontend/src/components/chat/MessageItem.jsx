@@ -313,7 +313,7 @@ function MessageItem({ msg, showTime }) {
     return isStreaming ? quickFixMarkdown(displayText) : displayText;
   }, [displayText, isStreaming]);
 
-  console.log("MessageItem repainting");
+  // console.log("MessageItem repainting");
   return (
     <div
       className={`flex w-full min-w-0 ${

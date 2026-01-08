@@ -476,7 +476,7 @@ export default function Chat() {
       (!currentConversation.messages ||
         currentConversation.messages.length === 0));
 
-  console.log("Chat.jsx Page repainting.");
+  // console.log("Chat.jsx Page repainting.");
 
   return (
     <>
