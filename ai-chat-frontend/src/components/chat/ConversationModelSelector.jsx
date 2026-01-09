@@ -130,15 +130,17 @@ function Conversationllmmodelselector({
         ref={buttonRef}
         type="button"
         onClick={handleOpen}
-        className="
+        className={`
+          ${
+            !currentConversation || currentConversation.isDraft
+              ? "moving-border"
+              : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
+          }
           flex items-center gap-1
           px-2 py-1
           text-sm
           text-theme-text
-          hover:bg-theme-secondary
-          rounded-lg
-          border border-theme-accent
-        "
+        `}
       >
         <span className="truncate max-w-[160px]">
           {selectedModel.displayName}

@@ -243,3 +243,46 @@ pre:hover {
     transform: scale(1);
   }
 }
+
+/* ============================= */
+/* Context Menu Class Button border*/
+/* ============================= */
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.moving-border {
+  position: relative;
+  border-radius: 0.5rem;
+  background: transparent;
+  isolation: isolate;
+}
+
+/* Animated border */
+.moving-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px; /* border thickness */
+  border-radius: inherit;
+  background: linear-gradient(var(--angle), #032146, #c3f2ff, #b00);
+  animation: rotate 6s linear infinite;
+
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Inner button background */
+.moving-border > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes rotate {
+  to {
+    --angle: 360deg;
+  }
+}

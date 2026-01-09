@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { TiArrowUp } from "react-icons/ti";
 import ConversationModelSelector from "./ConversationModelSelector";
+import { useSelector } from "react-redux";
+import { FaRegCircleStop } from "react-icons/fa6";
 
 /**
  * Composer - floating glass input with multi-line support
@@ -64,6 +66,10 @@ function Composer({
     }
   }, [text]);
 
+  const isStreaming = useSelector(
+    (state) => state.conversation.assistantTyping[currentConversationId]
+  );
+
   // console.log("Composer.jsx Page repainting.");
   return (
     <form
@@ -110,7 +116,7 @@ function Composer({
               : PLACEHOLDERS[placeholderIndex]
           }
           // placeholder="Ask anything"
-          disabled={disabled}
+          // disabled={disabled}
           rows={1}
           className="
             w-full
@@ -196,7 +202,11 @@ function Composer({
             disabled:scale-100
           "
             >
-              <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+              {isStreaming ? (
+                <FaRegCircleStop className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+              ) : (
+                <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+              )}
             </button>
           </div>
         </div>
