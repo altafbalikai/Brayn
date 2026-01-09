@@ -128,6 +128,8 @@ app.use(cookieParser());
 // ];
 
 const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
   "https://brayn-ai.vercel.app", // prod frontend
   "https://brayn-ai-git-feature-development-altafbalikais-projects.vercel.app", // preview frontend
 ];

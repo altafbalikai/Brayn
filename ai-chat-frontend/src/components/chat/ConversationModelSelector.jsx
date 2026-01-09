@@ -33,7 +33,7 @@ function Conversationllmmodelselector({
   const [menuPos, setMenuPos] = useState(null);
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
-
+  const activeItemRef = useRef(null);
   const MENU_HEIGHT = 180;
 
   const handleOpen = (e) => {
@@ -123,6 +123,16 @@ function Conversationllmmodelselector({
     setOpen(false);
   };
 
+  // Auto scroll to active LLM model when menu opened
+  useEffect(() => {
+    if (open && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: "center", // keeps it nicely visible
+        behavior: "instant", // or "smooth" if you prefer
+      });
+    }
+  }, [open]);
+
   return (
     <div className="relative">
       {/* Selected model button */}
@@ -181,6 +191,7 @@ function Conversationllmmodelselector({
               return (
                 <button
                   key={model._id}
+                  ref={isActive ? activeItemRef : null}
                   type="button"
                   onClick={() => handleSelect(model._id)}
                   className={`
