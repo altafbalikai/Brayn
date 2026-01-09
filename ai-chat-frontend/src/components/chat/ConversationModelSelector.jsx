@@ -132,7 +132,7 @@ function Conversationllmmodelselector({
         onClick={handleOpen}
         className={`
           ${
-            !currentConversation || currentConversation.isDraft
+            (!currentConversation || currentConversation.isDraft) && !open
               ? "moving-border"
               : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
           }
@@ -189,7 +189,11 @@ function Conversationllmmodelselector({
                     rounded-lg 
                     text-theme-textaccent 
                     px-2 py-2
-                    ${isActive ? "bg-theme-secondary" : "hover:bg-theme-light"}
+                    ${
+                      isActive
+                        ? "bg-theme-secondary moving-border"
+                        : "hover:bg-theme-light"
+                    }
                   `}
                 >
                   <span className="leading-snug"> {model.displayName} </span>
