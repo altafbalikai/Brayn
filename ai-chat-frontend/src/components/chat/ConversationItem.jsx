@@ -28,6 +28,11 @@ function ConversationItem({
   const handleMenuOpen = (e) => {
     e.stopPropagation();
 
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
     const el = buttonRef.current;
     if (!el) return;
 
@@ -80,16 +85,39 @@ function ConversationItem({
     setIsRenaming(false);
   };
 
-  // Close menu on outside click
+  // Close menu on outside click, resize, or scroll
   useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+    if (!open) return;
+
+    const handleClickOutside = (e) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target)
+      ) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+
+    const handleResize = () => {
+      setOpen(false);
+    };
+
+    const handleScroll = () => {
+      setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open]);
 
   return (
     <div
@@ -164,7 +192,7 @@ function ConversationItem({
               fixed z-[1000]
               w-44 md:w-44
               rounded-md md:rounded-md
-              bg-theme-dark
+              bg-theme-contextMenu
               border border-theme-secondary
               shadow-lg
               text-sm

@@ -169,7 +169,7 @@ function Conversationllmmodelselector({
               fixed z-[1000]
               w-56 h-60
               rounded-lg
-              bg-theme-dark
+              bg-theme-contextMenu
               border border-theme-secondary
               shadow-lg
               text-[14px]

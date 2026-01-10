@@ -17,6 +17,7 @@
     --theme-textaccent: theme(colors.theme-textaccent);
     --theme-chat-text: theme(colors.theme-chat-text);
     --theme-surface: theme(colors.theme-surface);
+    --theme-contextMenu: theme(colors.theme-contextMenu);
     --theme-code-bg: theme(colors.theme-code-bg);
     --theme-code-header: theme(colors.theme-code-header);
     --theme-inline-code: theme(colors.theme-inline-code);

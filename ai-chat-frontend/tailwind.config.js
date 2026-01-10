@@ -18,6 +18,7 @@ export default {
         'theme-secondary': 'rgba(148, 163, 184, 0.25)', // Borders / muted
         'theme-accent': 'rgba(15, 23, 42, 0.7)', // Inputs
         'theme-surface': 'rgba(24, 32, 48, 0.85)', // Chat assistant message background
+        'theme-contextMenu': 'rgba(15, 23, 42)', // Context Menu
         'theme-code-bg': 'rgba(15, 23, 42, 0.9)',
         'theme-code-header': 'rgba(30, 41, 59, 0.8)',
         'theme-inline-code': 'rgba(148, 163, 184, 0.15)',

@@ -7,5 +7,5 @@ export { default as ConversationList } from './ConversationList';
 export { default as Sidebar } from './Sidebar';
 export { default as NewChatControl } from './NewChatControl';
 export { default as SidebarFooter } from './SidebarFooter';
-export { default as UserProfile } from './UserProfile';
+export { default as UserProfile } from './UserMenu/UserProfile';
 export { default as LoadingIndicator } from './LoadingIndicator';

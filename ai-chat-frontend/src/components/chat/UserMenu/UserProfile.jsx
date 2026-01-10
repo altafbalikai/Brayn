@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { logout } from "../../features/auth/authSlice";
+import { logout } from "../../../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
-import { authService } from "../../api/services/authService";
-import ModalPortal from "../ui/ModalPortal";
-import { clearCurrentConversation } from "../../features/conversations/conversationSlice";
+import { authService } from "../../../api/services/authService";
+import ModalPortal from "../../ui/ModalPortal";
+import { clearCurrentConversation } from "../../../features/conversations/conversationSlice";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
 function UserProfile({ user, onClose }) {
@@ -34,9 +34,10 @@ function UserProfile({ user, onClose }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const getInitial = () =>
-    user?.name?.charAt(0).toUpperCase() ||
+    user?.name?.charAt(0).toUpperCase() + user?.name?.charAt(1).toUpperCase() ||
     user?.email?.charAt(0).toUpperCase() ||
     "U";
+  console.log(user);
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -134,16 +135,16 @@ function UserProfile({ user, onClose }) {
         relative
         z-10
         w-full max-w-md
-        rounded-3xl
+        rounded-2xl
         bg-theme-light
         backdrop-blur-xl
-        border border-theme-secondary
+        border border-theme-light
         shadow-[0_20px_60px_rgba(0,0,0,0.45)]
         overflow-hidden
       "
         >
           {/* Glow ring */}
-          <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-white/20" />
+          <div className="pointer-events-none absolute inset-0 rounded-2xl" />
 
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-theme-secondary">
@@ -162,47 +163,88 @@ function UserProfile({ user, onClose }) {
               <>
                 {/* User info */}
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-theme-secondary flex items-center justify-center text-xl font-bold text-theme-text">
-                    {getInitial()}
+                  {/* Avatar */}
+                  <div className="relative">
+                    <div
+                      className="
+      w-14 h-14 rounded-full 
+      bg-theme-secondary 
+      flex items-center justify-center 
+      text-xl font-semibold 
+      text-theme-text
+      ring-2 ring-theme-secondary/40
+    "
+                    >
+                      {getInitial()}
+                    </div>
+
+                    {/* Online indicator (optional) */}
+                    <span
+                      className="
+      absolute bottom-0 right-0 
+      h-3 w-3 rounded-full 
+      bg-green-500 
+      border-2 border-theme-appbg
+    "
+                    />
                   </div>
-                  <div>
-                    <div className="text-theme-text font-medium">
+
+                  {/* User details */}
+                  <div className="min-w-0">
+                    <div className="text-theme-text font-medium truncate">
                       {user?.name || "User"}
                     </div>
-                    <div className="text-theme-muted text-sm">
+
+                    <div className="text-theme-muted text-sm truncate">
                       {user?.email}
+                    </div>
+
+                    {/* Optional role / plan */}
+                    <div className="text-[11px] text-theme-muted mt-0.5">
+                      Personal Account
                     </div>
                   </div>
                 </div>
 
+                {/* Divider */}
+                <div className="border-t border-theme-secondary my-4" />
+
                 {/* Actions */}
-                <div className="space-y-3 pt-4">
+                <div className="space-y-3">
                   <button
                     onClick={() => setShowPasswordChange(true)}
                     className="
-                  w-full py-2.5 rounded-xl
-                  bg-theme-secondary
-                  text-theme-text
-                  hover:brightness-110
-                  transition
-                "
+                      w-full py-2.5 rounded-lg
+                      text-sm font-medium
+                      bg-theme-accent
+                      text-theme-text
+                      border border-theme-secondary
+                      hover:bg-theme-secondary
+                      hover:brightness-110
+                      transition-colors
+                      focus:outline-none
+                      focus:ring-2
+                      focus:ring-theme-accent/40
+                    "
                   >
                     Change Password
                   </button>
 
-                  <button
+                  {/* <button
                     onClick={handleLogout}
                     disabled={authLoading}
                     className="
-                      w-full py-2.5 rounded-xl
+                      w-full py-2.5 rounded-lg
                       bg-theme-accent
                       text-theme-text
                       hover:brightness-110
                       transition
+                      border border-theme-secondary
+                      hover:bg-theme-secondary
                     "
                   >
                     {authLoading ? "Signing out..." : "Logout"}
-                  </button>
+                  </button> */}
                 </div>
               </>
             ) : (
