@@ -12,7 +12,7 @@ import { LuUser, LuSettings, LuInfo, LuLogOut } from "react-icons/lu";
  */
 function SidebarFooter({ user, onLogout }) {
   const [activeMenuOption, setActiveMenuOption] = useState(null);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
