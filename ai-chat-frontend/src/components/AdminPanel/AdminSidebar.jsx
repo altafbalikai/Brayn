@@ -8,7 +8,7 @@ import { IoChevronBackOutline } from "react-icons/io5";
 import { useEffect } from "react";
 import { GiBrain } from "react-icons/gi";
 
-export default function AdminSidebar({ onClose }) {
+export default function AdminSidebar({ onClose, onSelect }) {
   useEffect(() => {
     import("../../pages/Chat");
   }, []);
@@ -49,12 +49,12 @@ export default function AdminSidebar({ onClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-1.5 px-1 space-y-1 text-theme-text">
-        <NavLink to="models" className={linkClass}>
+        <NavLink to="models" className={linkClass} onClick={onSelect}>
           <TbBrain size={18} />
           LLM Models
         </NavLink>
 
-        <NavLink to="prompt-settings" className={linkClass}>
+        <NavLink to="prompt-settings" className={linkClass} onClick={onSelect}>
           <TbSettings size={18} />
           Prompt Settings
         </NavLink>

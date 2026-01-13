@@ -6,6 +6,12 @@ import AdminSidebar from "./AdminSidebar";
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const handleSidebarItem = () => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  };
+
   return (
     <>
       {/* Toggle Button */}
@@ -34,7 +40,10 @@ export default function AdminLayout() {
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <AdminSidebar onClose={() => setSidebarOpen(false)} />
+        <AdminSidebar
+          onClose={() => setSidebarOpen(false)}
+          onSelect={handleSidebarItem}
+        />
       </div>
 
       {/* Mobile Overlay */}
