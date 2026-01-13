@@ -1,7 +1,7 @@
 const logger = require("../config/logger");
 const Conversation = require("../models/Conversation");
 const LLMModel = require("../models/LLMModel");
-
+const { getSystemPrompt } = require("../utils/systemPromptCache");
 let openRouterClient = null;
 
 /**
@@ -95,16 +95,29 @@ async function resolveConversationModel(conversationId) {
 /* ===========================
    STREAMING RESPONSE
    =========================== */
-
 async function askConversationStream(conversationId, messages) {
   try {
     const openrouter = await getOpenRouter();
     const model = await resolveConversationModel(conversationId);
 
     const MAX_CONTEXT = 8;
-    const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
-    const payload = buildMessagesPayload(normalized);
 
+    // 1️⃣ Load system prompt
+    const systemPrompt = await getSystemPrompt();
+
+    // 2️⃣ Trim + normalize conversation messages
+    const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
+
+    // 3️⃣ Inject system prompt FIRST
+    const payload = [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      ...buildMessagesPayload(normalized),
+    ];
+
+    // 4️⃣ Send to LLM
     return {
       stream: await openrouter.chat.send({
         model: model.openRouterModelId,

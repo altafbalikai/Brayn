@@ -127,7 +127,7 @@ async function login(req, res, next) {
 
     // respond with user + access token (do NOT include refreshToken when using cookie mode)
     return res.json({
-      user: { id: user._id, email: user.email, name: user.name },
+      user: { id: user._id, email: user.email, name: user.name, role: user.role },
       accessToken
     });
   } catch (err) {

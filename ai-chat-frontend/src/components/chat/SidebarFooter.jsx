@@ -5,6 +5,9 @@ import Settings from "./UserMenu/Settings";
 import Logout from "./UserMenu/Logout";
 import ModalPortal from "../ui/ModalPortal";
 import { LuUser, LuSettings, LuInfo, LuLogOut } from "react-icons/lu";
+import { RiAdminLine } from "react-icons/ri";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 
 /**
  * Sidebar footer showing user avatar
@@ -18,6 +21,7 @@ function SidebarFooter({ user, onLogout }) {
   const buttonRef = useRef(null);
   const activeItemRef = useRef(null);
   const MENU_HEIGHT = 180;
+  const navigate = useNavigate();
 
   const getInitial = () => {
     return user?.name
@@ -91,8 +95,15 @@ function SidebarFooter({ user, onLogout }) {
 
   const handleUserMenu = (e, itemId) => {
     e.stopPropagation();
+    console.log("Admin user", user);
     setActiveMenuOption(itemId);
     setOpen(false);
+  };
+
+  const handleAdmin = (e) => {
+    e.stopPropagation();
+    navigate("/Admin-panel", { replace: true });
+    return;
   };
 
   return (
@@ -164,6 +175,21 @@ function SidebarFooter({ user, onLogout }) {
                 <span>{label}</span>
               </button>
             ))}
+            {/* Display Admin button only if user role = admin. */}
+            {user.role === "admin" && (
+              <button
+                type="button"
+                onClick={(e) => handleAdmin(e)}
+                className={`
+                  w-full flex items-center gap-3 px-2 py-2 rounded-lg
+                  text-sm text-left transition-colors
+                  text-theme-textaccent hover:bg-theme-secondary
+                `}
+              >
+                <RiAdminLine size={16} className="opacity-80" />
+                <span>Admin</span>
+              </button>
+            )}
           </div>
         </ModalPortal>
       )}

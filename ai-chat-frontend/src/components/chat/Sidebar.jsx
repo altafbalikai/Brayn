@@ -29,11 +29,11 @@ export default function Sidebar({
         onClick={onNewChat}
         className="flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-theme-secondary transition-all font-medium text-ms"
       >
-        <IoIosAddCircle size={24} className="text-base text-3xl" />
-        <span>New Chat</span>
+        <IoIosAddCircle size={20} className="text-base text-3xl" />
+        <span>New chat</span>
       </button>
 
-      <p className="text-theme-muted pl-3 p-1">Recents</p>
+      <p className="text-theme-muted text-[14px] pl-3 p-1">Recents</p>
 
       <ConversationList
         conversations={conversations}

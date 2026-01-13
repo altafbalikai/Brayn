@@ -2,14 +2,14 @@ const ChatSkeletonLoader = () => {
   return (
     <div className="relative h-full w-full bg-theme-dark overflow-hidden flex">
       {/* Sidebar Skeleton */}
-      <div className="hidden md:flex w-64 bg-theme-dark p-4 flex-col">
+      <div className="hidden md:flex w-60 bg-theme-dark p-4 flex-col">
         <div className="h-6 w-32 rounded shimmer mb-6" />
 
-        <div className="h-10 w-full rounded-lg shimmer mb-6" />
+        <div className="h-18 w-full rounded-lg shimmer mb-6" />
 
         <div className="space-y-3 flex-1 overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-12 w-full rounded-lg shimmer" />
+            <div key={i} className="h-8 w-full rounded-lg shimmer" />
           ))}
         </div>
 

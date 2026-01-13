@@ -33,17 +33,48 @@ function setRefreshCookie(res, token) {
   res.cookie(REFRESH_COOKIE_NAME, token, opts);
 }
 
+// function clearRefreshCookie(res) {
+//   if (!res || typeof res.clearCookie !== 'function') return;
+//   const opts = buildRefreshCookieOptions();
+//   // clearCookie uses same options to ensure the cookie removed matches the one set
+//   res.clearCookie(REFRESH_COOKIE_NAME, opts);
+//   // additionally set an expired cookie as a fallback
+//   res.cookie(REFRESH_COOKIE_NAME, '', {
+//     ...opts,
+//     maxAge: 0,
+//     expires: new Date(0)
+//   });
+// }
+
 function clearRefreshCookie(res) {
   if (!res || typeof res.clearCookie !== 'function') return;
+
   const opts = buildRefreshCookieOptions();
-  // clearCookie uses same options to ensure the cookie removed matches the one set
+
+  // Clear current cookie (path=/)
   res.clearCookie(REFRESH_COOKIE_NAME, opts);
-  // additionally set an expired cookie as a fallback
+
+  // lear legacy cookie (path=/api/auth)
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    ...opts,
+    path: '/api/auth',
+  });
+
+  // Extra safety fallback
   res.cookie(REFRESH_COOKIE_NAME, '', {
     ...opts,
+    path: '/',
     maxAge: 0,
-    expires: new Date(0)
+    expires: new Date(0),
+  });
+
+  res.cookie(REFRESH_COOKIE_NAME, '', {
+    ...opts,
+    path: '/api/auth',
+    maxAge: 0,
+    expires: new Date(0),
   });
 }
+
 
 module.exports = { setRefreshCookie, clearRefreshCookie };

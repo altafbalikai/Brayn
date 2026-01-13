@@ -503,7 +503,7 @@ export default function Chat() {
         {/* Sidebar Drawer - Hidden on mobile unless opened */}
         <div
           className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-theme-dark
+          fixed inset-y-0 left-0 z-50 w-60 bg-theme-dark
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}

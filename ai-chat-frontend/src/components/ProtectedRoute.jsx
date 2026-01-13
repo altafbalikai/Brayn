@@ -30,7 +30,7 @@ export default function ProtectedRoute({ children }) {
   if (!initialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-theme-dark">
-        <div className="text-theme-accent">Checking session...</div>
+        <div className="text-theme-text">Checking session...</div>
       </div>
     );
   }

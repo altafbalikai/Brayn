@@ -1,3 +1,15 @@
+process.on("uncaughtException", (err) => {
+  console.error("🔥 UNCAUGHT EXCEPTION:");
+  console.error(err.stack || err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("🔥 UNHANDLED PROMISE REJECTION:");
+  console.error(reason);
+  process.exit(1);
+});
+
 const app = require('./app');
 const { connect } = require('./db/mongoose');
 const logger = require('./config/logger');
