@@ -18,6 +18,7 @@
 
 import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
+import { GiBrain } from "react-icons/gi";
 
 // /**
 //  * ProtectedRoute - Ensures only authenticated users can access protected pages
@@ -30,7 +31,23 @@ export default function ProtectedRoute({ children }) {
   if (!initialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-theme-dark">
-        <div className="text-theme-text">Checking session...</div>
+        <div className="flex flex-col items-center gap-3">
+          <GiBrain
+            size={42}
+            className="text-theme-text animate-pulse drop-shadow-[0_0_12px_rgba(120,180,255,0.35)]"
+          />
+
+          <h1 className="text-lg font-semibold tracking-wide text-theme-text">
+            Brayn
+          </h1>
+
+          <p className="text-sm text-theme-muted tracking-wide">
+            Checking your session
+            <span className="inline-block animate-pulse">.</span>
+            <span className="inline-block animate-pulse delay-150">.</span>
+            <span className="inline-block animate-pulse delay-300">.</span>
+          </p>
+        </div>
       </div>
     );
   }
