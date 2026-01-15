@@ -33,20 +33,16 @@ export default function ProtectedRoute({ children }) {
       <div className="min-h-screen flex items-center justify-center bg-theme-dark">
         <div className="flex flex-col items-center gap-3">
           <GiBrain
-            size={42}
+            size={52}
             className="text-theme-text animate-pulse drop-shadow-[0_0_12px_rgba(120,180,255,0.35)]"
           />
 
           <h1 className="text-lg font-semibold tracking-wide text-theme-text">
             Brayn
-          </h1>
-
-          <p className="text-sm text-theme-muted tracking-wide">
-            Checking your session
             <span className="inline-block animate-pulse">.</span>
             <span className="inline-block animate-pulse delay-150">.</span>
             <span className="inline-block animate-pulse delay-300">.</span>
-          </p>
+          </h1>
         </div>
       </div>
     );

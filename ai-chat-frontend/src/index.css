@@ -44,7 +44,8 @@ body {
 
 html,
 body {
-  /* overflow: hidden; page never scrolls */
+  height: 100%;
+  overflow: hidden;
 }
 
 #root {
@@ -214,10 +215,10 @@ pre:hover {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(203, 213, 225, 0.25),
+      rgba(145, 152, 160, 0.25),
       /* theme-textaccent */ transparent
     );
-    animation: shimmer 1.6s infinite;
+    animation: shimmer 1s infinite;
   }
 
   @keyframes shimmer {

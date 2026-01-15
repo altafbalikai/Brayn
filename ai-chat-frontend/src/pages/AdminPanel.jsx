@@ -52,6 +52,7 @@ export default function AdminPanel() {
     qualityClass: "high",
     status: "active",
   });
+  const [openform, setOpenform] = useState(false);
 
   /* =====================
      Load models
@@ -114,6 +115,7 @@ export default function AdminPanel() {
   };
 
   const handleEdit = (model) => {
+    setOpenform(true);
     setEditingId(model._id);
     setForm({
       ...model,
@@ -129,6 +131,7 @@ export default function AdminPanel() {
   };
 
   const startCreateNew = () => {
+    setOpenform(true);
     resetForm();
 
     // Optional: smooth scroll to form
@@ -137,11 +140,16 @@ export default function AdminPanel() {
       ?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const hanldeformclose = () => {
+    resetForm();
+    setOpenform(false);
+  };
+
   /* =====================
      UI
      ===================== */
   return (
-    <div className="min-h-screen p-6 bg-theme-contextMenu text-theme-text">
+    <div className="min-h-screen p-6 bg-theme-appbg text-theme-text">
       <h1 className="text-2xl font-bold my-6">LLM Models</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -184,7 +192,14 @@ export default function AdminPanel() {
               </li>
             ))}
           </ul>
-          {editingId && (
+          <button
+            onClick={startCreateNew}
+            className="mt-4 w-full py-2 rounded-lg border border-theme-secondary
+               bg-theme-dark hover:bg-theme-light text-sm"
+          >
+            + Add New Model
+          </button>
+          {/* {editingId && (
             <button
               onClick={startCreateNew}
               className="mt-4 w-full py-2 rounded-lg border border-theme-secondary
@@ -192,8 +207,8 @@ export default function AdminPanel() {
             >
               + Add New Model
             </button>
-          )}
-          {editingId && (
+          )} */}
+          {/* {editingId && (
             <button
               type="button"
               onClick={startCreateNew}
@@ -201,218 +216,230 @@ export default function AdminPanel() {
             >
               Cancel Edit
             </button>
-          )}
+          )} */}
         </div>
 
         {/* =====================
             FORM
             ===================== */}
-        <div className="p-4 rounded-xl border border-theme-secondary">
-          <h2 className="font-semibold mb-4">
-            {editingId ? "Edit Model" : "Add New Model"}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Display Name */}
-            <div>
-              <label className="block text-sm mb-1">Display Name</label>
-              <input
-                name="displayName"
-                value={form.displayName}
-                onChange={handleChange}
-                placeholder="Devstral 2512 (Free)"
-                required
-                className="w-full p-2 rounded bg-theme-dark"
-              />
-            </div>
-
-            {/* Provider */}
-            <div>
-              <label className="block text-sm mb-1">Provider</label>
-              <select
-                name="provider"
-                value={form.provider}
-                onChange={handleChange}
-                required
-                className="w-full p-2 rounded bg-theme-dark"
+        {openform && (
+          <div className="p-4 rounded-xl border border-theme-secondary">
+            <div className="font-semibold mb-4 pb-4 flex items-center justify-between border-b border-theme-secondary">
+              <h2 className="ont-semibold text-theme-text">
+                {editingId ? "Edit Model" : "Add New Model"}
+              </h2>
+              <button
+                onClick={hanldeformclose}
+                className="text-theme-muted hover:text-theme-text transition"
               >
-                {PROVIDERS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+                ✕
+              </button>
             </div>
 
-            {/* OpenRouter Model ID */}
-            <div>
-              <label className="block text-sm mb-1">OpenRouter Model ID</label>
-              <input
-                name="openRouterModelId"
-                value={form.openRouterModelId}
-                onChange={handleChange}
-                placeholder="mistralai/devstral-2512:free"
-                required
-                disabled={!!editingId}
-                className="w-full p-2 rounded bg-theme-dark disabled:opacity-50"
-              />
-              {editingId && (
-                <p className="text-xs border border-theme-secondary hover:text-theme-muted mt-1">
-                  Cannot be changed after creation
-                </p>
-              )}
-            </div>
-
-            {/* Family */}
-            <div>
-              <label className="block text-sm mb-1">Model Family</label>
-              <input
-                name="family"
-                value={form.family}
-                onChange={handleChange}
-                placeholder="devstral"
-                required
-                className="w-full p-2 rounded bg-theme-dark"
-              />
-            </div>
-
-            {/* Version */}
-            <div>
-              <label className="block text-sm mb-1">Version</label>
-              <input
-                name="version"
-                value={form.version}
-                onChange={handleChange}
-                placeholder="2512"
-                required
-                className="w-full p-2 rounded bg-theme-dark"
-              />
-            </div>
-
-            {/* Size */}
-            <div>
-              <label className="block text-sm mb-1">Model Size (B)</label>
-              <input
-                name="sizeB"
-                type="number"
-                value={form.sizeB}
-                onChange={handleChange}
-                placeholder="12"
-                className="w-full p-2 rounded bg-theme-dark"
-              />
-            </div>
-
-            {/* Max Context */}
-            <div>
-              <label className="block text-sm mb-1">Max Context</label>
-              <input
-                name="maxContext"
-                type="number"
-                value={form.maxContext}
-                onChange={handleChange}
-                placeholder="32768"
-                className="w-full p-2 rounded bg-theme-dark"
-              />
-            </div>
-
-            {/* Capabilities */}
-            <div>
-              <label className="block text-sm mb-1">Capabilities</label>
-              <div className="flex flex-wrap gap-2">
-                {CAPABILITIES.map((cap) => (
-                  <button
-                    key={cap}
-                    type="button"
-                    onClick={() => toggleCapability(cap)}
-                    className={`px-3 py-1 text-xs rounded ${
-                      form.capabilities.includes(cap)
-                        ? "bg-theme-secondary"
-                        : "bg-theme-dark"
-                    }`}
-                  >
-                    {cap}
-                  </button>
-                ))}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Display Name */}
+              <div>
+                <label className="block text-sm mb-1">Display Name</label>
+                <input
+                  name="displayName"
+                  value={form.displayName}
+                  onChange={handleChange}
+                  placeholder="Devstral 2512 (Free)"
+                  required
+                  className="w-full p-2 rounded bg-theme-dark"
+                />
               </div>
-            </div>
 
-            {/* Cost Tier */}
-            <div>
-              <label className="block text-sm mb-1">Cost Tier</label>
-              <select
-                name="costTier"
-                value={form.costTier}
-                onChange={handleChange}
-                className="w-full p-2 rounded bg-theme-dark"
+              {/* Provider */}
+              <div>
+                <label className="block text-sm mb-1">Provider</label>
+                <select
+                  name="provider"
+                  value={form.provider}
+                  onChange={handleChange}
+                  required
+                  className="w-full p-2 rounded bg-theme-dark"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* OpenRouter Model ID */}
+              <div>
+                <label className="block text-sm mb-1">
+                  OpenRouter Model ID
+                </label>
+                <input
+                  name="openRouterModelId"
+                  value={form.openRouterModelId}
+                  onChange={handleChange}
+                  placeholder="mistralai/devstral-2512:free"
+                  required
+                  disabled={!!editingId}
+                  className="w-full p-2 rounded bg-theme-dark disabled:opacity-50"
+                />
+                {editingId && (
+                  <p className="text-xs border border-theme-secondary hover:text-theme-muted mt-1">
+                    Cannot be changed after creation
+                  </p>
+                )}
+              </div>
+
+              {/* Family */}
+              <div>
+                <label className="block text-sm mb-1">Model Family</label>
+                <input
+                  name="family"
+                  value={form.family}
+                  onChange={handleChange}
+                  placeholder="devstral"
+                  required
+                  className="w-full p-2 rounded bg-theme-dark"
+                />
+              </div>
+
+              {/* Version */}
+              <div>
+                <label className="block text-sm mb-1">Version</label>
+                <input
+                  name="version"
+                  value={form.version}
+                  onChange={handleChange}
+                  placeholder="2512"
+                  required
+                  className="w-full p-2 rounded bg-theme-dark"
+                />
+              </div>
+
+              {/* Size */}
+              <div>
+                <label className="block text-sm mb-1">Model Size (B)</label>
+                <input
+                  name="sizeB"
+                  type="number"
+                  value={form.sizeB}
+                  onChange={handleChange}
+                  placeholder="12"
+                  className="w-full p-2 rounded bg-theme-dark"
+                />
+              </div>
+
+              {/* Max Context */}
+              <div>
+                <label className="block text-sm mb-1">Max Context</label>
+                <input
+                  name="maxContext"
+                  type="number"
+                  value={form.maxContext}
+                  onChange={handleChange}
+                  placeholder="32768"
+                  className="w-full p-2 rounded bg-theme-dark"
+                />
+              </div>
+
+              {/* Capabilities */}
+              <div>
+                <label className="block text-sm mb-1">Capabilities</label>
+                <div className="flex flex-wrap gap-2">
+                  {CAPABILITIES.map((cap) => (
+                    <button
+                      key={cap}
+                      type="button"
+                      onClick={() => toggleCapability(cap)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        form.capabilities.includes(cap)
+                          ? "bg-theme-secondary"
+                          : "bg-theme-dark"
+                      }`}
+                    >
+                      {cap}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cost Tier */}
+              <div>
+                <label className="block text-sm mb-1">Cost Tier</label>
+                <select
+                  name="costTier"
+                  value={form.costTier}
+                  onChange={handleChange}
+                  className="w-full p-2 rounded bg-theme-dark"
+                >
+                  {COST_TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Latency */}
+              <div>
+                <label className="block text-sm mb-1">Latency Class</label>
+                <select
+                  name="latencyClass"
+                  value={form.latencyClass}
+                  onChange={handleChange}
+                  className="w-full p-2 rounded bg-theme-dark"
+                >
+                  {LATENCY_CLASSES.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quality */}
+              <div>
+                <label className="block text-sm mb-1">Quality Class</label>
+                <select
+                  name="qualityClass"
+                  value={form.qualityClass}
+                  onChange={handleChange}
+                  className="w-full p-2 rounded bg-theme-dark"
+                >
+                  {QUALITY_CLASSES.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm mb-1">Status</label>
+                <select
+                  name="status"
+                  value={form.status}
+                  onChange={handleChange}
+                  className="w-full p-2 rounded bg-theme-dark"
+                >
+                  {STATUS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                className="w-full py-2 mt-4 border border-theme-secondary hover:bg-theme-secondary rounded"
               >
-                {COST_TIERS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Latency */}
-            <div>
-              <label className="block text-sm mb-1">Latency Class</label>
-              <select
-                name="latencyClass"
-                value={form.latencyClass}
-                onChange={handleChange}
-                className="w-full p-2 rounded bg-theme-dark"
-              >
-                {LATENCY_CLASSES.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Quality */}
-            <div>
-              <label className="block text-sm mb-1">Quality Class</label>
-              <select
-                name="qualityClass"
-                value={form.qualityClass}
-                onChange={handleChange}
-                className="w-full p-2 rounded bg-theme-dark"
-              >
-                {QUALITY_CLASSES.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm mb-1">Status</label>
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-                className="w-full p-2 rounded bg-theme-dark"
-              >
-                {STATUS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              className="w-full py-2 mt-4 border border-theme-secondary hover:bg-theme-secondary rounded"
-            >
-              {editingId ? "Update Model" : "Create Model"}
-            </button>
-          </form>
-        </div>
+                {editingId ? "Update Model" : "Create Model"}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

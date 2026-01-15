@@ -544,11 +544,11 @@ export default function Chat() {
           {!currentConversation?._id && <RewindBackground />}
           <div
             className="flex-1 flex flex-col min-h-0 
-                min-w-0 relative overflow-hidden "
+                min-w-0 relative overflow-hidden"
           >
             {showHero ? (
               <div className="flex-1 flex items-center justify-center px-4">
-                <div className="max-w-4xl w-full mb-[8rem]">
+                <div className="max-w-4xl w-full mb-[8rem] overflow-hidden">
                   <NewChatHero
                     onNewChat={handleNewChat}
                     onPromptClick={handlePromptClick}
