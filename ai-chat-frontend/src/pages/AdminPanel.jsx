@@ -152,7 +152,7 @@ export default function AdminPanel() {
     <div className="relative p-6 h-full w-full bg-transparent overflow-hidden">
       <h1 className="text-2xl font-bold my-6">LLM Models</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* =====================
             MODEL LIST
             ===================== */}
@@ -192,13 +192,24 @@ export default function AdminPanel() {
               </li>
             ))}
           </ul>
-          <button
-            onClick={startCreateNew}
-            className="mt-4 w-full py-2 rounded-lg border border-theme-secondary
+          {!openform && (
+            <button
+              onClick={startCreateNew}
+              className="mt-4 w-full py-2 rounded-lg border border-theme-secondary
                bg-theme-dark hover:bg-theme-light text-sm"
-          >
-            + Add New Model
-          </button>
+            >
+              Add New Model
+            </button>
+          )}
+          {openform && (
+            <button
+              onClick={hanldeformclose}
+              className="mt-4 w-full py-2 rounded-lg border border-theme-secondary
+               bg-theme-dark hover:bg-theme-light text-sm"
+            >
+              Cancel
+            </button>
+          )}
           {/* {editingId && (
             <button
               onClick={startCreateNew}
