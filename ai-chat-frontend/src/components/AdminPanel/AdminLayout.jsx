@@ -57,7 +57,7 @@ export default function AdminLayout() {
       {/* Main Content */}
       <main
         className={`
-          min-h-screen bg-theme-appbg text-theme-text
+          min-h-screen bg-transparent text-theme-text
           transition-all duration-300
           ${sidebarOpen ? "md:ml-64" : ""}
         `}

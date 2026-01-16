@@ -12,7 +12,7 @@ export default {
         // 'theme-accent': '#a49584',
         // 'theme-light': '#b7a99c',
         // 'theme-appbg': 'rgba(15, 23, 42, 0.75)',
-        'theme-appbg': 'rgba(15, 23, 42, 0.75)',
+        'theme-appbg': '#0F172A',
         'theme-dark': '#0E1117',          // App background
         'theme-light': 'rgba(30, 41, 59, 0.6)', // Glass cards
         'theme-secondary': 'rgba(148, 163, 184, 0.25)', // Borders / muted

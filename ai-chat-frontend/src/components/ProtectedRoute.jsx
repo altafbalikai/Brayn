@@ -38,11 +38,11 @@ export default function ProtectedRoute({ children }) {
           />
 
           <h1 className="text-lg font-semibold tracking-wide text-theme-text">
-            Brayn
-            <span className="inline-block animate-pulse">.</span>
-            <span className="inline-block animate-pulse delay-150">.</span>
-            <span className="inline-block animate-pulse delay-300">.</span>
+            Brayning
           </h1>
+          <span className="inline-block animate-pulse">.</span>
+          <span className="inline-block animate-pulse delay-150">.</span>
+          <span className="inline-block animate-pulse delay-300">.</span>
         </div>
       </div>
     );

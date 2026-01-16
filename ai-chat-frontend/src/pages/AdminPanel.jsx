@@ -149,7 +149,7 @@ export default function AdminPanel() {
      UI
      ===================== */
   return (
-    <div className="min-h-screen p-6 bg-theme-appbg text-theme-text">
+    <div className="relative p-6 h-full w-full bg-transparent overflow-hidden">
       <h1 className="text-2xl font-bold my-6">LLM Models</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
