@@ -3,12 +3,12 @@ import UserProfile from "./UserMenu/UserProfile";
 import About from "./UserMenu/About";
 import Settings from "./UserMenu/Settings";
 import Logout from "./UserMenu/Logout";
-import ModalPortal from "../ui/ModalPortal";
+import ModalPortal from "../../../components/ui/ModalPortal";
 import { LuUser, LuSettings, LuInfo, LuLogOut } from "react-icons/lu";
 import { RiAdminLine } from "react-icons/ri";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-
+import { logout } from "../../../features/auth/authSlice";
 /**
  * Sidebar footer showing user avatar
  * @param {{user: {email?: string, name?: string, _id?: string}, onLogout: function}} props

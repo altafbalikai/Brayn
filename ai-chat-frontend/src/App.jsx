@@ -76,7 +76,7 @@ function App() {
 
         {/* ================= PROTECTED ROUTES ================= */}
         <Route
-          path="/chat"
+          path="/chat/:conversationId?"
           element={
             <Suspense fallback={<ChatSkeletonLoader />}>
               <ProtectedRoute>

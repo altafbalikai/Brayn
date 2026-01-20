@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaAngleDown } from "react-icons/fa";
-import ModalPortal from "../ui/ModalPortal";
+import ModalPortal from "../../../components/ui/ModalPortal";
 import {
   getLLMModel,
   setSelectedModelId,
-} from "../../features/LLM-Models/llm-modelsSlice";
-import { updateConversationModel } from "../../features/conversations/conversationSlice";
+} from "../../../features/LLM-Models/llm-modelsSlice";
+import { updateConversationModel } from "../../../features/conversations/conversationSlice";
 
 function Conversationllmmodelselector({
   llmmodels,
@@ -94,6 +94,16 @@ function Conversationllmmodelselector({
     };
   }, [open]);
 
+  // Auto scroll to active LLM model when menu opened
+  useEffect(() => {
+    if (open && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: "center", // keeps it nicely visible
+        behavior: "instant", // or "smooth" if you prefer
+      });
+    }
+  }, [open]);
+
   // Show loading state
   if (llmsloading || !selectedModel) {
     return (
@@ -122,16 +132,6 @@ function Conversationllmmodelselector({
 
     setOpen(false);
   };
-
-  // Auto scroll to active LLM model when menu opened
-  useEffect(() => {
-    if (open && activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({
-        block: "center", // keeps it nicely visible
-        behavior: "instant", // or "smooth" if you prefer
-      });
-    }
-  }, [open]);
 
   return (
     <div className="relative">

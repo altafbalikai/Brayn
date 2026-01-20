@@ -1,6 +1,6 @@
 import React from "react";
 import MessageItem from "./MessageItem";
-import { formatGroupTime } from "../../utils/messageGrouping";
+import { formatGroupTime } from "../../../utils/messageGrouping";
 
 /**
  * @param {{group: {messages: Array, timestamp: string}, isFirst?: boolean}} props

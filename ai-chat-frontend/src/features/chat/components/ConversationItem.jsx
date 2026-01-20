@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { PiDotsThreeBold } from "react-icons/pi";
 import ConversationMenuItem from "./ConversationMenuItem";
 import { MdOutlineUpdate } from "react-icons/md";
-import ModalPortal from "../ui/ModalPortal";
+import ModalPortal from "../../../components/ui/ModalPortal";
 
 /**
  * ConversationItem presentational component

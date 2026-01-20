@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import ModalPortal from "../../ui/ModalPortal";
+import ModalPortal from "../../../../components/ui/ModalPortal";
 
 function Settings({ onClose }) {
   return (

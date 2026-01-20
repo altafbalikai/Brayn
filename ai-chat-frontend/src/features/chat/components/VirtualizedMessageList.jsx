@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import MessageItem from "./MessageItem";
 import MessageGroup from "./MessageGroup";
-import MessageListSkeleton from "./../PageSkeletonLoaders/MessageListSkeleton";
+import MessageListSkeleton from "../../../components/PageSkeletonLoaders/MessageListSkeleton";
 
 /**
  * Virtualized message list with fallback to regular rendering for small lists.

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { logout } from "../../../features/auth/authSlice";
+import { logout } from "../../../../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
-import { authService } from "../../../api/services/authService";
-import ModalPortal from "../../ui/ModalPortal";
-import { clearCurrentConversation } from "../../../features/conversations/conversationSlice";
+import { authService } from "../../../../api/services/authService";
+import ModalPortal from "../../../../components/ui/ModalPortal";
+import { clearCurrentConversation } from "../../../../features/conversations/conversationSlice";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
 function UserProfile({ user, onClose }) {

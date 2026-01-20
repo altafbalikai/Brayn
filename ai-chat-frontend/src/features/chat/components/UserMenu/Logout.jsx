@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import ModalPortal from "../../ui/ModalPortal";
-import { logout } from "../../../features/auth/authSlice";
+import ModalPortal from "../../../../components/ui/ModalPortal";
+import { logout } from "../../../../features/auth/authSlice";
 
 function Logout({ onClose }) {
   const dispatch = useDispatch();
