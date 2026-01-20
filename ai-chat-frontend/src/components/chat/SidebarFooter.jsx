@@ -137,7 +137,7 @@ function SidebarFooter({ user, onLogout }) {
             ref={menuRef}
             className="
               fixed z-[1000]
-              w-60 h-46
+              w-56 h-46
               rounded-lg
               bg-theme-contextMenu
               border border-theme-secondary
