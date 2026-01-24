@@ -18,6 +18,7 @@ function NewChatHero({
     w-full
     max-w-[700px]
     mx-auto
+    pb-12
     ${isCompact ? "text-left" : "text-center"}
   `}
     >
@@ -41,7 +42,7 @@ function NewChatHero({
 
       {/* Value Proposition */}
       {!isCompact && (
-        <p className="text-theme-text/80 mb-2">
+        <p className="text-theme-muted mb-2">
           Your second brain for thinking, creating, and solving.
         </p>
       )}
@@ -74,7 +75,7 @@ function NewChatHero({
         </div>
       )} */}
 
-      <p className="text-theme-muted text-xs mb-3">What can I help with?</p>
+      <p className="text-theme-text text-xs mb-3">What can I help with?</p>
 
       {/* Composer */}
       {showComposer && Composer && (

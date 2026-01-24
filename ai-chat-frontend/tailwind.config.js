@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: "class",
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -12,54 +13,24 @@ export default {
         // 'theme-accent': '#a49584',
         // 'theme-light': '#b7a99c',
         // 'theme-appbg': 'rgba(15, 23, 42, 0.75)',
-        'theme-appbg': '#0F172A',
-        'theme-dark': '#0E1117',          // App background
-        'theme-light': 'rgba(30, 41, 59, 0.6)', // Glass cards
-        'theme-secondary': 'rgba(148, 163, 184, 0.25)', // Borders / muted
-        'theme-accent': 'rgba(15, 23, 42, 0.7)', // Inputs
-        'theme-surface': 'rgba(24, 32, 48, 0.85)', // Chat assistant message background
-        'theme-contextMenu': 'rgba(15, 23, 42)', // Context Menu
-        'theme-code-bg': 'rgba(15, 23, 42, 0.9)',
-        'theme-code-header': 'rgba(30, 41, 59, 0.8)',
-        'theme-inline-code': 'rgba(148, 163, 184, 0.15)',
+        'theme-appbg': 'var(--theme-appbg)',
+        'theme-dark': 'var(--theme-dark)',          // App background
+        'theme-light': 'var(--theme-light)', // Glass cards
+        'theme-secondary': 'var(--theme-secondary)', // Borders / muted
+        'theme-accent': 'var(--theme-accent)', // Inputs
+        'theme-surface': 'var(--theme-surface)', // Chat assistant message background
+        'theme-contextMenu': 'var(--theme-contextMenu)', // Context Menu
+        'theme-code-bg': 'var(--theme-code-bg)',
+        'theme-code-header': 'var(--theme-code-header)',
+        'theme-inline-code': 'var(--theme-inline-code)',
 
         /* Text */
-        'theme-text': '#E5E7EB',
-        'theme-muted': '#9CA3AF',
-        'theme-textaccent': '#CBD5E1',
-        'theme-chat-text': '#E5E7EB'
+        'theme-text': 'var(--theme-text)',
+        'theme-muted': 'var(--theme-muted)',
+        'theme-textaccent': 'var(--theme-textaccent)',
+        'theme-chat-text': 'var(--theme-chat-text)'
       },
     },
   },
   plugins: [],
 }
-
-// /** @type {import('tailwindcss').Config} */
-// export default {
-//   content: [
-//     "./index.html",
-//     "./src/**/*.{js,ts,jsx,tsx}",
-//   ],
-//   theme: {
-//     extend: {
-//       colors: {
-//         /* Base backgrounds */
-//         'theme-dark': '#0E1117',          // App background
-//         'theme-light': 'rgba(30, 41, 59, 0.6)', // Glass cards
-//         'theme-secondary': 'rgba(148, 163, 184, 0.25)', // Borders / muted
-//         'theme-accent': 'rgba(15, 23, 42, 0.7)', // Inputs
-
-//         /* Text */
-//         'theme-text': '#E5E7EB',
-//         'theme-muted': '#9CA3AF',
-
-//         /* Accents */
-//         'theme-primary': '#38BDF8',
-//         'theme-success': '#22C55E',
-//         'theme-danger': '#EF4444',
-//       },
-//     },
-//   },
-//   plugins: [],
-// };
-

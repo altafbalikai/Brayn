@@ -1,16 +1,20 @@
-import React, { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import React from "react";
 import ModalPortal from "../../../../components/ui/ModalPortal";
+import { ThemeSelector } from "../../../../components/ThemeSelector";
 
+/**
+ * Settings modal with theme selector and future customization options.
+ * @param {{onClose: function}} props
+ */
 function Settings({ onClose }) {
   return (
     <ModalPortal>
       <div
         className="
-      fixed inset-0 z-50
-      grid place-items-center
-      p-4 sm:p-6
-    "
+          fixed inset-0 z-50
+          grid place-items-center
+          p-4 sm:p-6
+        "
       >
         {/* Overlay */}
         <div
@@ -21,16 +25,16 @@ function Settings({ onClose }) {
         {/* Modal */}
         <div
           className="
-                relative
-                z-10
-                w-full max-w-md
-                rounded-2xl
-                bg-theme-light
-                backdrop-blur-xl
-                border border-theme-light
-                shadow-[0_20px_60px_rgba(0,0,0,0.45)]
-                overflow-hidden
-            "
+            relative
+            z-10
+            w-full max-w-md
+            rounded-2xl
+            bg-theme-light
+            backdrop-blur-xl
+            border border-theme-light
+            shadow-[0_20px_60px_rgba(0,0,0,0.45)]
+            overflow-hidden
+          "
         >
           {/* Glow ring */}
           <div className="pointer-events-none absolute inset-0 rounded-2xl" />
@@ -40,27 +44,40 @@ function Settings({ onClose }) {
             <h2 className="text-lg font-semibold text-theme-text">Settings</h2>
             <button
               onClick={onClose}
-              className="text-theme-muted hover:text-theme-text transition"
+              className="text-theme-muted hover:text-theme-text transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-muted)] rounded"
+              aria-label="Close settings"
             >
               ✕
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-theme-text text-sm">
-            <p className="text-theme-muted">
-              Settings are currently under development.
-            </p>
+          <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Appearance Section */}
+            <section>
+              <h3 className="text-sm font-medium text-theme-text mb-3">
+                Appearance
+              </h3>
+              <div className="space-y-3">
+                <div className="w-full">
+                  <ThemeSelector />
+                </div>
+              </div>
+            </section>
 
-            <p className="text-theme-muted">
-              This section will allow you to customize your experience in future
-              updates, including preferences related to appearance, models, and
-              behavior.
-            </p>
+            {/* Divider */}
+            <div className="border-t border-theme-secondary" />
 
-            <div className="pt-4 border-t border-theme-secondary text-xs text-theme-muted">
-              <p>More customization options will be available soon.</p>
-            </div>
+            {/* Future Settings Placeholder */}
+            <section>
+              <h3 className="text-sm font-medium text-theme-text mb-3">
+                More Options
+              </h3>
+              <p className="text-sm text-theme-muted">
+                Additional customization options will be available in future updates,
+                including preferences for models, behavior, and notifications.
+              </p>
+            </section>
           </div>
         </div>
       </div>
@@ -69,3 +86,4 @@ function Settings({ onClose }) {
 }
 
 export default React.memo(Settings);
+

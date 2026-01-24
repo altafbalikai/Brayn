@@ -116,7 +116,7 @@ function About({ onClose }) {
                   href="https://github.com/altafbalikai"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-theme-textaccent hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-theme-textaccent hover:text-theme-text transition-colors"
                 >
                   <FaGithub size={16} />
                   <span className="text-xs">GitHub</span>

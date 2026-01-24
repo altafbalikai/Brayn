@@ -95,7 +95,7 @@ function SidebarFooter({ user, onLogout }) {
 
   const handleUserMenu = (e, itemId) => {
     e.stopPropagation();
-    console.log("Admin user", user);
+    // console.log("Admin user", user);
     setActiveMenuOption(itemId);
     setOpen(false);
   };

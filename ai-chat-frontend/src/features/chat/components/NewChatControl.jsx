@@ -22,11 +22,11 @@ function NewChatControl({ toggleSidebar }) {
         </span> */}
       </div>
 
-      {/* Mobile Hamburger Button (Top Left) */}
+      {/* Sidebar Toggle Button */}
       <button
         className="
-                  flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-opacity-90 transition-all font-medium text-xs
-                "
+          flex items-center gap-1.5 py-1.5 px-3 text-theme-text rounded-md hover:bg-opacity-90 transition-all font-medium text-xs
+        "
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
       >
@@ -41,3 +41,5 @@ function NewChatControl({ toggleSidebar }) {
 }
 
 export default React.memo(NewChatControl);
+
+

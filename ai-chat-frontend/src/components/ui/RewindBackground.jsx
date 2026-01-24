@@ -1,10 +1,15 @@
 import React, { useEffect, useRef } from "react";
+import { useTheme } from "../../hooks/useTheme";
 
 const RewindBackground = () => {
   const canvasRef = useRef(null);
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === "light";
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+    
     const ctx = canvas.getContext("2d");
 
     /* -------------------- Device & Performance -------------------- */
@@ -20,13 +25,14 @@ const RewindBackground = () => {
 
     /* -------------------- Theme Colors -------------------- */
     const css = getComputedStyle(document.documentElement);
+    const getVar = (name) => css.getPropertyValue(name).trim();
+
     const COLORS = {
-      bg: css.getPropertyValue("--theme-dark").trim() || "#05080f",
-      ambient: css.getPropertyValue("--theme-light").trim() || "#1b2a4a",
-      accent: css.getPropertyValue("--theme-accent").trim() || "#4f8cff",
-      link: "rgba(120,140,255,",
-      node: "rgba(220,225,255,",
-      active: css.getPropertyValue("--theme-textaccent").trim() || "#8ab4ff",
+      bg: getVar("--hero-bg") || "#05080f",
+      ambient: getVar("--hero-ambient") || "#1b2a4a",
+      link: `rgba(${getVar("--hero-link") || "120,140,255"},`,
+      node: `rgba(${getVar("--hero-node") || "220,225,255"},`,
+      active: `rgb(${getVar("--hero-active") || "138,180,255"})`,
     };
 
     /* -------------------- State -------------------- */
@@ -34,6 +40,7 @@ const RewindBackground = () => {
     let particles = [];
     let signals = [];
     let t = 0;
+    let animationFrameId;
 
     let mouse = { x: null, y: null };
     let lastInteraction = Date.now();
@@ -46,7 +53,11 @@ const RewindBackground = () => {
         this.y = y;
         this.vx = (Math.random() - 0.5) * 0.35;
         this.vy = (Math.random() - 0.5) * 0.35;
-        this.r = Math.random() * 1.0 + 0.2;
+        // this.r = Math.random() * 1.0 + 0.2;
+        this.r = isLight
+  ? Math.random() * 1.6 + 0.6   // light mode
+  : Math.random() * 1.0 + 0.2; // dark mode
+
         this.energy = Math.random();
       }
 
@@ -93,7 +104,8 @@ const RewindBackground = () => {
         const y = this.from.y + (this.to.y - this.from.y) * this.progress;
 
         ctx.beginPath();
-        ctx.arc(x, y, 0.8, 0, Math.PI * 2);
+        // ctx.arc(x, y, 0.8, 0, Math.PI * 2);
+        ctx.arc(x, y, isLight ? 1.2 : 0.8, 0, Math.PI * 2);
         ctx.fillStyle = COLORS.active;
         ctx.shadowBlur = glow;
         ctx.shadowColor = COLORS.active;
@@ -154,7 +166,8 @@ const RewindBackground = () => {
       g.addColorStop(0, COLORS.ambient);
       g.addColorStop(1, "transparent");
 
-      ctx.globalAlpha = 0.7;
+      // ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = isLight ? 0.85 : 0.7;
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
       ctx.globalAlpha = 1;
@@ -170,8 +183,14 @@ const RewindBackground = () => {
 
           if (dist < MAX_DISTANCE) {
             const opacity = 1 - dist / MAX_DISTANCE;
-            ctx.strokeStyle = `${COLORS.link}${opacity * 0.35})`;
-            ctx.lineWidth = 0.6;
+            // ctx.strokeStyle = `${COLORS.link}${opacity * 0.35})`;
+            // ctx.lineWidth = 0.6;
+            ctx.lineWidth = isLight ? 1.1 : 0.6;
+
+            ctx.strokeStyle = `${COLORS.link}${
+              isLight ? opacity * 0.6 : opacity * 0.35
+            })`;
+
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
@@ -202,7 +221,14 @@ const RewindBackground = () => {
       if (Date.now() - lastInteraction > 5000) activeMode = false;
 
       const SIGNAL_RATE = activeMode ? 0.0012 : 0.0002;
-      const GLOW = activeMode ? 8 : 3;
+      // const GLOW = activeMode ? 8 : 3;
+      const GLOW = activeMode
+        ? isLight
+          ? 6
+          : 8
+        : isLight
+        ? 3
+        : 3;
 
       drawBackground();
 
@@ -229,7 +255,7 @@ const RewindBackground = () => {
       });
 
       postGlow();
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
     };
 
     /* -------------------- Interaction -------------------- */
@@ -238,28 +264,37 @@ const RewindBackground = () => {
       activeMode = true;
     };
 
-    window.addEventListener("mousemove", (e) => {
+    const handleMouseMove = (e) => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
       markActive();
-    });
+    };
 
-    window.addEventListener("keydown", () => {
+    const handleKeyDown = () => {
       markActive();
       for (let i = 0; i < 6; i++) {
-        const a = particles[Math.floor(Math.random() * particles.length)];
-        const b = particles[Math.floor(Math.random() * particles.length)];
-        signals.push(new Signal(a, b));
+        if (particles.length > 0) {
+          const a = particles[Math.floor(Math.random() * particles.length)];
+          const b = particles[Math.floor(Math.random() * particles.length)];
+          if (a && b) signals.push(new Signal(a, b));
+        }
       }
-    });
+    };
 
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("resize", resize);
 
     resize();
     animate();
 
-    return () => window.removeEventListener("resize", resize);
-  }, []);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [resolvedTheme]);
 
   return (
     <div className="fixed z-0 inset-0 pointer-events-none">

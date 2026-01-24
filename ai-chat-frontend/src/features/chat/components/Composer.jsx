@@ -95,7 +95,6 @@ function Composer({
           bg-theme-light
           backdrop-blur-xl
           border border-theme-secondary
-          shadow-[0_12px_40px_rgba(0,0,0,0.35)]
 
           focus-within:ring-2
           focus-within:ring-theme-secondary

@@ -37,7 +37,6 @@ function UserProfile({ user, onClose }) {
     user?.name?.charAt(0).toUpperCase() + user?.name?.charAt(1).toUpperCase() ||
     user?.email?.charAt(0).toUpperCase() ||
     "U";
-  console.log(user);
 
   const handleChangePassword = async (e) => {
     e.preventDefault();

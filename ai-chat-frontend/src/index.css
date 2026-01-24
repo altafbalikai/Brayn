@@ -6,25 +6,166 @@
 /* Theme Variables */
 /* ============================= */
 @layer base {
-  :root {
-    --theme-appbg: theme(colors.theme-appbg);
-    --theme-dark: theme(colors.theme-dark);
-    --theme-light: theme(colors.theme-light);
-    --theme-secondary: theme(colors.theme-secondary);
-    --theme-accent: theme(colors.theme-accent);
-    --theme-text: theme(colors.theme-text);
-    --theme-muted: theme(colors.theme-muted);
-    --theme-textaccent: theme(colors.theme-textaccent);
-    --theme-chat-text: theme(colors.theme-chat-text);
-    --theme-surface: theme(colors.theme-surface);
-    --theme-contextMenu: theme(colors.theme-contextMenu);
-    --theme-code-bg: theme(colors.theme-code-bg);
-    --theme-code-header: theme(colors.theme-code-header);
-    --theme-inline-code: theme(colors.theme-inline-code);
+  /* Light theme (default) */
+    :root {
+    /* ---------- Base Surfaces ---------- */
+    --theme-appbg: #F8FAFC;          /* Page background */
+    --theme-surface: #FFFFFF;        /* Cards / panels */
+    --theme-contextMenu: #FFFFFF;    /* Menus / popovers */
 
-    --scrollbar-thumb: var(--theme-secondary);
-    --scrollbar-thumb-hover: var(--theme-muted);
-  }
+    /* ---------- Structural Neutrals ---------- */
+    --theme-dark: #FFFFFF;           /* Legacy / compatibility */
+    --theme-light: rgba(226, 232, 240, 0.9);
+    --theme-secondary: #FFE4E6;      /* Rose 100 – borders/dividers */
+
+    /* ---------- Neutral Accent (non-brand) ---------- */
+    --theme-accent: #E2E8F0;         /* Hover, subtle highlight */
+
+    /* ---------- Text ---------- */
+    --theme-text: #0F172A;           /* Slate 900 */
+    --theme-chat-text: #0F172A;
+    --theme-muted: #475569;          /* Slate 600 */
+    --theme-textaccent: #334155;     /* Slate 700 */
+
+    /* ---------- Code Blocks ---------- */
+    --theme-code-bg: #E2E8F0;
+    --theme-code-header: #CBD5E1;
+    --theme-inline-code: rgba(100, 116, 139, 0.12);
+
+    /* ---------- Brand Accent (Cyber Rose) ---------- */
+    --theme-accent-rose: #FBCFE8;        /* Rose 200 */
+    --theme-accent-rose-hover: #F9A8D4; /* Rose 300 */
+    --theme-focus-ring: #EC4899;         /* Pink 500 */
+
+    /* ---------- Scrollbar ---------- */
+    --scrollbar-thumb: #FBCFE8;          /* Rose 200 */
+    --scrollbar-thumb-hover: #F9A8D4;    /* Rose 300 */
+
+    /* ---------- Hero Background (Cyber Rose) ---------- */
+    --hero-bg: #FFF1F2;          /* Rose 50 */
+    --hero-ambient: #FEE2E2;     /* Rose 200 */
+
+    --hero-accent: #EC4899;      /* Pink 500 */
+
+    /* Canvas particles & links (RGB) */
+    --hero-node: 159, 18, 57;    /* Rose 700 */
+    --hero-link: 244, 114, 182;  /* Pink 300 */
+    --hero-active: 190, 18, 60;  /* Rose 600 */
+
+    /* Syntax Highlighting - Light Mode */
+    --syntax-keyword: #d73a49;      /* Red */
+    --syntax-string: #032f62;       /* Dark Blue */
+    --syntax-comment: #6a737d;      /* Gray */
+    --syntax-function: #6f42c1;     /* Purple */
+    --syntax-number: #005cc5;       /* Blue */
+    --syntax-tag: #22863a;          /* Green */
+    --syntax-operator: #24292e;     /* Dark Gray */
+
+    /* LLM model animated borders*/
+    --theme-model-border:
+      #EC4899,
+      #6366F1,
+      #F472B6;
+    }
+  
+  /* Dark theme */
+  .dark {
+    --theme-appbg: #0F172A;
+    --theme-dark: #0E1117;
+    --theme-light: rgba(30, 41, 59, 0.6);
+    --theme-secondary: rgba(148, 163, 184, 0.25);
+    --theme-accent: rgba(15, 23, 42, 0.7);
+    --theme-surface: rgba(24, 32, 48, 0.85);
+    --theme-contextMenu: rgba(15, 23, 42, 1);
+    --theme-code-bg: #0E1117;
+    --theme-code-header: rgba(30, 41, 59, 0.8);
+    --theme-inline-code: rgba(148, 163, 184, 0.15);
+    --theme-focus-ring: #4f8cff;  
+    --theme-text: #E5E7EB;
+    --theme-muted: #9CA3AF;
+    --theme-textaccent: #CBD5E1;
+    --theme-chat-text: #E5E7EB;
+    --scrollbar-thumb: rgba(148, 163, 184, 0.25);
+    --scrollbar-thumb-hover: rgba(156, 163, 175, 0.5);
+
+    /* Hero Background - Dark Mode */
+    --hero-bg: #05080f;
+    --hero-ambient: #1b2a4a;
+    --hero-accent: #4f8cff;
+    --hero-node: 220, 225, 255;
+    --hero-link: 120, 140, 255;
+    --hero-active: 138, 180, 255;
+
+    /* Syntax Highlighting - Dark Mode */
+    --syntax-keyword: #ff7b72;      /* Red/Pink */
+    --syntax-string: #a5d6ff;       /* Light Blue */
+    --syntax-comment: #8b949e;      /* Gray */
+    --syntax-function: #d2a8ff;     /* Purple */
+    --syntax-number: #79c0ff;       /* Blue */
+    --syntax-tag: #7ee787;          /* Green */
+    --syntax-operator: #c9d1d9;     /* White/Gray */
+
+    /* LLM model animated borders*/
+    /* Dark — Cyber Rose Night */
+    --theme-model-border:
+      #8B5CF6,  /* Violet 500 */
+      #22D3EE,  /* Cyan 400 */
+      #EC4899;  /* Pink 500 */
+    }
+}
+
+/* ============================= */
+/* Syntax Highlighting Classes */
+/* ============================= */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  background: transparent;
+  color: var(--theme-text);
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: var(--syntax-keyword);
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: var(--syntax-string);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: var(--syntax-comment);
+}
+
+.hljs-attr,
+.hljs-function,
+.hljs-class .hljs-title {
+  color: var(--syntax-function);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-deletion {
+  color: var(--syntax-number);
+}
+
+.hljs-operator,
+.hljs-punctuation {
+  color: var(--theme-text); /* Use main text color or specific operator color */
 }
 
 /* ============================= */
@@ -264,7 +405,8 @@ pre:hover {
   inset: 0;
   padding: 1.5px; /* border thickness */
   border-radius: inherit;
-  background: linear-gradient(var(--angle), #032146, #c3f2ff, #b00);
+  /* background: linear-gradient(var(--angle), #032146, #c3f2ff, #b00); */
+  background: linear-gradient(var(--angle), var(--theme-model-border));
   animation: rotate 6s linear infinite;
 
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
