@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { logout } from '../../auth/authSlice';
 import {
     createConversation,
@@ -9,11 +9,13 @@ import {
     renameConversationTitle,
     deleteConversation,
     clearMessages,
+    clearCurrentConversation
 } from '../../conversations/conversationSlice';
 
 export const useChatActions = (currentConversation, selectedModelId) => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const { conversationId } = useParams();
     const titleUpdatedRef = useRef(false);
 
     // Selectors for loading states
@@ -38,10 +40,16 @@ export const useChatActions = (currentConversation, selectedModelId) => {
     );
 
     const handleDeleteConversation = useCallback(
-        (convId) => {
-            dispatch(deleteConversation(convId));
+        async (convId) => {
+            if (convId === conversationId) {
+                await dispatch(clearCurrentConversation());
+                await dispatch(deleteConversation(convId));
+                navigate("/chat");
+            } else {
+                await dispatch(deleteConversation(convId));
+            }
         },
-        [dispatch]
+        [dispatch, conversationId, navigate]
     );
 
     const handleNewChat = useCallback(() => {
@@ -58,9 +66,12 @@ export const useChatActions = (currentConversation, selectedModelId) => {
     }, [dispatch]);
 
     const handleLogout = useCallback(async () => {
+        // 1. Client-side guard: Prevent auto-login on immediate refresh
+        localStorage.setItem("forceLogout", "true");
+
         await dispatch(logout());
-        dispatch(clearMessages());
-        navigate("/login");
+        // State reset is handled by conversationSlice extraReducer listening to logout.fulfilled
+        navigate("/login", { replace: true });
     }, [dispatch, navigate]);
 
     const handleSendMessage = useCallback(

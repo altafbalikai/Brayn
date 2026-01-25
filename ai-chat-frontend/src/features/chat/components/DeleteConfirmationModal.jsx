@@ -1,16 +1,16 @@
 import React, { useState } from "react";
-import { useSelector } from "react-redux";
-import ModalPortal from "../../../../components/ui/ModalPortal";
-import { useChatActions } from "../../hooks/useChatActions";
+import ModalPortal from "../../../components/ui/ModalPortal";
 
-function Logout({ onClose }) {
-  const { handleLogout } = useChatActions();
-  const { loading: authLoading } = useSelector((state) => state.auth);
+function DeleteConfirmationModal({ onConfirm, onClose, title }) {
+  const [loading, setLoading] = useState(false);
 
-  const onLogoutClick = async () => {
-    await handleLogout();
+  const handleConfirm = async () => {
+    setLoading(true);
+    await onConfirm();
+    setLoading(false);
     onClose();
   };
+
   return (
     <ModalPortal>
       <div
@@ -57,11 +57,11 @@ function Logout({ onClose }) {
           {/* Content */}
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-center text-lg text-theme-text">
-              Are you sure you want to log out?
+              <p>Are you sure you want to delete this conversation?</p>
             </div>
-            {/*  Actions */}
+
+            {/* Actions */}
             <div className="flex gap-4 pt-4">
-        
               <button
                 onClick={onClose}
                 className="
@@ -77,8 +77,8 @@ function Logout({ onClose }) {
                 Cancel
               </button>
               <button
-                onClick={onLogoutClick}
-                disabled={authLoading}
+                onClick={handleConfirm}
+                disabled={loading}
                 className="
                     w-full py-2.5 rounded-lg
                     border border-red-400/50
@@ -88,7 +88,7 @@ function Logout({ onClose }) {
                     transition-colors
                     "
               >
-                {authLoading ? "Signing out..." : "Logout"}
+                {loading ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -98,4 +98,4 @@ function Logout({ onClose }) {
   );
 }
 
-export default React.memo(Logout);
+export default DeleteConfirmationModal;

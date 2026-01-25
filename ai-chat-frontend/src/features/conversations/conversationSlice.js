@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { conversationService } from '../../api/services/conversationService';
 import { llmService } from '../../api/services/llmService';
+import { logout } from '../auth/authSlice';
 
 // Async thunks
 export const fetchConversations = createAsyncThunk(
@@ -416,6 +417,10 @@ const conversationSlice = createSlice({
             })
             .addCase(updateConversationModel.rejected, (state, action) => {
                 state.error = action.payload;
+            })
+            // RESET STATE ON LOGOUT
+            .addCase(logout.fulfilled, () => {
+                return initialState;
             });
 
     },

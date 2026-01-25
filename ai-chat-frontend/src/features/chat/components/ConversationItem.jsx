@@ -3,6 +3,7 @@ import { PiDotsThreeBold } from "react-icons/pi";
 import ConversationMenuItem from "./ConversationMenuItem";
 import { MdOutlineUpdate } from "react-icons/md";
 import ModalPortal from "../../../components/ui/ModalPortal";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 
 /**
  * ConversationItem presentational component
@@ -21,6 +22,7 @@ function ConversationItem({
   const buttonRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState(conv.title || "");
   const inputRef = useRef(null);
   const MENU_HEIGHT = 180; // approximate menu height
@@ -219,7 +221,7 @@ function ConversationItem({
               danger
               onClick={() => {
                 setOpen(false);
-                onDelete(conv._id);
+                setIsDeleteModalOpen(true);
               }}
             >
               Delete
@@ -241,6 +243,15 @@ function ConversationItem({
             </div>
           </div>
         </ModalPortal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <DeleteConfirmationModal
+          title={conv.title}
+          onConfirm={() => onDelete(conv._id)}
+          onClose={() => setIsDeleteModalOpen(false)}
+        />
       )}
     </div>
   );
