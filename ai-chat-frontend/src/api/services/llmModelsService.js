@@ -12,7 +12,7 @@ if (!API_BASE_URL) {
  */
 async function fetchClient(url, options = {}) {
     const token = localStorage.getItem("accessToken");
-    retry = true;
+    const retry = options.retry !== false; // default true
     const res = await fetch(`${API_BASE_URL}/llm-models${url}`, {
         ...options,
         credentials: "include",
