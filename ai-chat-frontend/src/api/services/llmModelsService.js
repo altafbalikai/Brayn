@@ -12,7 +12,7 @@ if (!API_BASE_URL) {
  */
 async function fetchClient(url, options = {}) {
     const token = localStorage.getItem("accessToken");
-
+    retry = true;
     const res = await fetch(`${API_BASE_URL}/llm-models${url}`, {
         ...options,
         credentials: "include",
@@ -22,6 +22,30 @@ async function fetchClient(url, options = {}) {
             ...options.headers,
         },
     });
+
+    // 🔴 Handle unauthorized
+    if (res.status === 401 && retry) {
+        try {
+            // Delegate refresh to axios
+            const newToken = await refreshAccessToken();
+
+            // Retry fetch ONCE with new token
+            return fetchClient(
+                url,
+                {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        Authorization: `Bearer ${newToken}`,
+                    },
+                },
+                false // prevent infinite loop
+            );
+        } catch (refreshError) {
+            localStorage.removeItem("accessToken");
+            throw refreshError;
+        }
+    }
 
     // Handle validation & API errors
     if (!res.ok) {

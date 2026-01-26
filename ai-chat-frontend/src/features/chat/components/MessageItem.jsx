@@ -5,6 +5,7 @@ import rehypeHighlight from "rehype-highlight";
 // import "highlight.js/styles/github-dark.css";
 import remarkBreaks from "remark-breaks";
 import { FaCheck } from "react-icons/fa6";
+import LoadingIndicator from "./LoadingIndicator";
 
 /**
  * Fixes incomplete markdown during streaming
@@ -141,11 +142,7 @@ function MessageItem({ msg, showTime }) {
         >
           {isLoading ? (
             // Initial loading state (no content yet)
-            <div className="flex gap-1 h-6">
-              <span className="animate-bounce">.</span>
-              <span className="animate-bounce [animation-delay:0.15s]">.</span>
-              <span className="animate-bounce [animation-delay:0.3s]">.</span>
-            </div>
+            <LoadingIndicator />
           ) : isAssistant ? (
             // Assistant message with markdown rendering
             <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
@@ -223,18 +220,6 @@ function MessageItem({ msg, showTime }) {
                 >
                   {processedText}
                 </ReactMarkdown>
-
-                {/* Animated cursor while streaming */}
-                {isStreaming && (
-                  <span
-                    className="
-                    inline-block w-[2px] h-[1.2em]
-                    bg-theme-muted
-                    animate-pulse
-                    ml-1 align-middle
-                  "
-                  />
-                )}
               </div>
             </div>
           ) : (

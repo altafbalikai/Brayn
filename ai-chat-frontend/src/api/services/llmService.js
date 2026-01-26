@@ -1,4 +1,5 @@
 import api from '../axios';
+import { refreshAccessToken } from '../axios'; // axios instance
 
 // export const llmService = {
 //     ask: async (message, conversationId) => {
@@ -113,7 +114,7 @@ export const llmService = {
         const controller = new AbortController();
         const signal = controller.signal;
 
-        async function start(onChunk, onComplete) {
+        async function start(onChunk, onComplete, retry = true) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
             const token = localStorage.getItem("accessToken");
 
@@ -139,6 +140,21 @@ export const llmService = {
                     throw new Error("Request was cancelled");
                 }
                 throw new Error(`Network error: ${error.message}`);
+            }
+
+            // 🔐 HANDLE EXPIRED TOKEN (BEFORE STREAMING)
+            if (res.status === 401 && retry) {
+                try {
+                    const newToken = await refreshAccessToken();
+
+                    return start(
+                        onChunk,
+                        onComplete,
+                        false // ❗ retry only once
+                    );
+                } catch (refreshError) {
+                    throw new Error("Session expired. Please log in again.");
+                }
             }
 
             if (!res.ok) {
