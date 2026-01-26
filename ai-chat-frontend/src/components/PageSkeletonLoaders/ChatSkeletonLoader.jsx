@@ -8,7 +8,7 @@ const ChatSkeletonLoader = () => {
         <div className="h-18 w-full rounded-lg shimmer mb-6" />
 
         <div className="space-y-3 flex-1 overflow-hidden">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-8 w-full rounded-lg shimmer" />
           ))}
         </div>
