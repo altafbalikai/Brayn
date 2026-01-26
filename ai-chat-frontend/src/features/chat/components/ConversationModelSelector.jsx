@@ -107,8 +107,21 @@ function Conversationllmmodelselector({
   // Show loading state
   if (llmsloading || !selectedModel) {
     return (
-      <div className="flex items-center gap-1 px-2 py-1 text-sm text-theme-text">
-        <span className="truncate text-xs">Loading...</span>
+      <div
+        className={`
+                    ${
+                      (!currentConversation || currentConversation.isDraft) &&
+                      !open
+                        ? "moving-border"
+                        : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
+                    }
+                    flex items-center justify-center
+                    px-2
+                    h-7 w-32
+                    text-theme-text
+                  `}
+      >
+        <div className="shimmer h-3 w-full rounded-sm" />
       </div>
     );
   }
