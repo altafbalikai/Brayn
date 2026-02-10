@@ -2,6 +2,8 @@ const logger = require("../config/logger");
 const Conversation = require("../models/Conversation");
 const LLMModel = require("../models/LLMModel");
 const { getSystemPrompt } = require("../utils/systemPromptCache");
+const { readRelevantMemory } = require("../services/memoryRead.service");
+const { assemblePrompt } = require("../utils/promptAssembler");
 let openRouterClient = null;
 
 /**
@@ -93,9 +95,30 @@ async function resolveConversationModel(conversationId) {
 }
 
 /* ===========================
+    Vector Memory (with graceful degradation)
+   =========================== */
+async function getVectorMemorySafe({
+  userId,
+  conversationId,
+  userMessage
+}) {
+  try {
+    return await readRelevantMemory({
+      userId,
+      conversationId,
+      query: userMessage,
+      limit: 5
+    });
+  } catch (err) {
+    logger.warn("Vector memory unavailable", { error: err.message });
+    return [];
+  }
+}
+
+/* ===========================
    STREAMING RESPONSE
    =========================== */
-async function askConversationStream(conversationId, messages) {
+async function askConversationStream(conversationId, messages, userId) {
   try {
     const openrouter = await getOpenRouter();
     const model = await resolveConversationModel(conversationId);
@@ -103,10 +126,30 @@ async function askConversationStream(conversationId, messages) {
     const MAX_CONTEXT = 8;
 
     // 1️⃣ Load system prompt
-    const systemPrompt = await getSystemPrompt();
+    let systemPrompt = await getSystemPrompt();
 
     // 2️⃣ Trim + normalize conversation messages
     const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
+
+    const lastUserMessage =
+      [...normalized].reverse().find(m => m.role === "user")?.text || "";
+
+    const retrievedMemory = await getVectorMemorySafe({
+      userId,
+      conversationId,
+      userMessage: lastUserMessage
+    });
+
+    console.log("Retrieved vector memory items:", retrievedMemory);
+
+    if (retrievedMemory.length > 0) {
+      systemPrompt += `
+          Relevant past context:
+          ${retrievedMemory
+          .map(m => `- ${m.payload.role}: ${m.payload.text || ""}`)
+          .join("\n")}
+        `;
+    }
 
     // 3️⃣ Inject system prompt FIRST
     const payload = [
@@ -174,7 +217,7 @@ async function askConversation(conversationId, messages) {
 }
 
 /**
- * 🔵 FULL RESPONSE
+ * FULL RESPONSE
  */
 async function askGemini(
   conversation,
@@ -211,7 +254,7 @@ async function askGemini(
 }
 
 /**
- * 🔴 STREAMING VERSION
+ * STREAMING VERSION
  */
 async function askGeminiStream(
   conversation,

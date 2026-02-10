@@ -68,7 +68,8 @@ async function ask(req, res, next) {
     // const stream = await askGeminiStream(context);
     const { stream, modelId } = await askConversationStream(
       conversationId,
-      context
+      context,
+      userId
     );
 
     let fullReply = "";
@@ -82,7 +83,7 @@ async function ask(req, res, next) {
         res.write(content);
       }
     }
-    console.log("conversation:", conversationId, "model:", modelId, "replay:", fullReply);
+    // console.log("conversation:", conversationId, "model:", modelId, "replay:", fullReply);
 
     // 5) Save final assistant message
     await ConversationService.addMessage(userId, conversationId, {
@@ -98,7 +99,6 @@ async function ask(req, res, next) {
     res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable. You can retry or switch to a different model to continue.`);
     res.end();
   }
-
 }
 
 module.exports = { ask };

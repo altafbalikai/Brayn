@@ -3,6 +3,7 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
 const LLMModel = require("../models/LLMModel");
+const { writeMessageToMemory } = require('../services/memoryWrite.service');
 
 async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c') {
   if (!mongoose.isValidObjectId(userId)) {
@@ -89,6 +90,9 @@ async function addMessage(userId, conversationId, { role, text }) {
     modelId: conv.selectedModelId, // ⭐ SNAPSHOT
     createdAt: new Date(),
   });
+
+  // Side-effect: vector memory write (DO NOT await)
+  writeMessageToMemory(msg);
 
   // update conversation updatedAt for sorting
   conv.updatedAt = new Date();
