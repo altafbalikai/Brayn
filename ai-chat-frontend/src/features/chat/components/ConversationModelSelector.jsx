@@ -12,12 +12,9 @@ function Conversationllmmodelselector({
   llmmodels,
   selectedModelId,
   llmsloading,
+  currentConversation,
 }) {
   const dispatch = useDispatch();
-
-  const currentConversation = useSelector(
-    (state) => state.conversation.currentConversation
-  );
 
   const isStreaming = useSelector(
     (state) =>

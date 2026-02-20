@@ -174,6 +174,7 @@ export default function ChatFeature() {
                         onSend={handlePromptClick}
                         disabled={sending || assistantTyping}
                         position="center"
+                        currentConversation={currentConversation}
                         currentConversationId={currentConversation?._id}
                         llmmodels={memoizedLLMModels}
                         selectedModelId={selectedModelId}
@@ -198,6 +199,7 @@ export default function ChatFeature() {
                 <Composer
                   onSend={handleSendMessage}
                   disabled={sending || assistantTyping}
+                  currentConversation={currentConversation}
                   currentConversationId={currentConversation?._id}
                   llmmodels={memoizedLLMModels}
                   selectedModelId={selectedModelId}

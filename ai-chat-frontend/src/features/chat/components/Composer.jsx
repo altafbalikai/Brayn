@@ -11,6 +11,7 @@ function Composer({
   onSend,
   disabled,
   position,
+  currentConversation,
   currentConversationId,
   llmmodels,
   selectedModelId,
@@ -172,6 +173,7 @@ function Composer({
               llmmodels={llmmodels}
               selectedModelId={selectedModelId}
               llmsloading={llmsloading}
+              currentConversation={currentConversation}
             />
           </div>
 

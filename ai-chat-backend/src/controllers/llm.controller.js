@@ -84,7 +84,7 @@ async function ask(req, res, next) {
   } catch (err) {
     console.error("Streaming error:", err);
     // Inject a styled div with specific data attributes for the frontend to target
-    res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable. You can retry or switch to a different model to continue.`);
+    res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable or free models are temporarily rate-limited upstream. Please retry shortly or switch to a different model to continue.`);
     res.end();
   }
 }
