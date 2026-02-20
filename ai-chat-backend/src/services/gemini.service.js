@@ -118,17 +118,22 @@ async function getVectorMemorySafe({
 /* ===========================
    STREAMING RESPONSE
    =========================== */
-async function askConversationStream(conversationId, messages, userId) {
+async function askConversationStream(conversationId, messages, userId, summaryText = null) {
   try {
     const openrouter = await getOpenRouter();
     const model = await resolveConversationModel(conversationId);
 
-    const MAX_CONTEXT = 8;
+    const MAX_CONTEXT = 4;
 
     // 1️⃣ Load system prompt
     let systemPrompt = await getSystemPrompt();
 
-    // 2️⃣ Trim + normalize conversation messages
+    // 2️⃣ Inject conversation summary (if exists)
+    if (summaryText) {
+      systemPrompt += `\n\nConversation Summary (prior context):\n${summaryText}`;
+    }
+
+    // 3️⃣ Trim + normalize conversation messages
     const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
 
     const lastUserMessage =
@@ -143,15 +148,12 @@ async function askConversationStream(conversationId, messages, userId) {
     console.log("Retrieved vector memory items:", retrievedMemory);
 
     if (retrievedMemory.length > 0) {
-      systemPrompt += `
-          Relevant past context:
-          ${retrievedMemory
-          .map(m => `- ${m.payload.role}: ${m.payload.text || ""}`)
-          .join("\n")}
-        `;
+      systemPrompt += `\n\nRelevant past context:\n${retrievedMemory
+        .map(m => `- ${m.payload.role}: ${m.payload.text || ""}`)
+        .join("\n")}`;
     }
 
-    // 3️⃣ Inject system prompt FIRST
+    // 4️⃣ Inject system prompt FIRST
     const payload = [
       {
         role: "system",
@@ -160,7 +162,7 @@ async function askConversationStream(conversationId, messages, userId) {
       ...buildMessagesPayload(normalized),
     ];
 
-    // 4️⃣ Send to LLM
+    // 5️⃣ Send to LLM
     return {
       stream: await openrouter.chat.send({
         model: model.openRouterModelId,
@@ -221,7 +223,9 @@ async function askConversation(conversationId, messages) {
  */
 async function askGemini(
   conversation,
-  model = "tngtech/deepseek-r1t2-chimera:free"
+  model = "nvidia/nemotron-3-nano-30b-a3b:free"
+  // model = "openai/gpt-oss-120b:free"
+  // model = "tngtech/deepseek-r1t2-chimera:free"
   // model = "google/gemma-3n-e2b-it:free"
 ) {
   try {

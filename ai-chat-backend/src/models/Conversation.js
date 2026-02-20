@@ -12,6 +12,7 @@ const ConversationSchema = new mongoose.Schema({
   },
   isArchived: { type: Boolean, default: false, index: true },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+  messageCount: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // Sort by most-recent updates for user dashboards

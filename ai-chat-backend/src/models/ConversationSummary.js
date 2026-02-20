@@ -9,7 +9,15 @@ const ConversationSummarySchema = new mongoose.Schema(
       index: true,
     },
     summaryText: { type: String, required: true },
-    version: { type: Number, default: 1 }, // in case we store multiple versions
+    version: { type: Number, default: 1 },
+    messageRangeStart: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+    },
+    messageRangeEnd: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+    },
   },
   { timestamps: true }
 );

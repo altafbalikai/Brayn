@@ -3,7 +3,9 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
 const LLMModel = require("../models/LLMModel");
+const ConversationSummary = require('../models/ConversationSummary');
 const { writeMessageToMemory } = require('../services/memoryWrite.service');
+const { triggerSummaryIfNeeded } = require('../services/summary.service');
 
 async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c') {
   if (!mongoose.isValidObjectId(userId)) {
@@ -88,15 +90,20 @@ async function addMessage(userId, conversationId, { role, text }) {
     text,
     createdAt: new Date(),
     modelId: conv.selectedModelId, // ⭐ SNAPSHOT
-    createdAt: new Date(),
   });
 
   // Side-effect: vector memory write (DO NOT await)
   writeMessageToMemory(msg);
 
-  // update conversation updatedAt for sorting
-  conv.updatedAt = new Date();
-  await conv.save();
+  // Atomic increment messageCount + update timestamp
+  const updated = await Conversation.findByIdAndUpdate(
+    conv._id,
+    { $inc: { messageCount: 1 }, $set: { updatedAt: new Date() } },
+    { new: true }
+  );
+
+  // Side-effect: summary generation trigger (DO NOT await)
+  triggerSummaryIfNeeded(conv._id, updated.messageCount);
 
   return msg.toObject();
 }
@@ -144,6 +151,7 @@ async function deleteConversation(userId, conversationId) {
   if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
   if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
   await Message.deleteMany({ conversationId: conv._id });
+  await ConversationSummary.deleteMany({ conversationId: conv._id });
   await conv.deleteOne();
   return true;
 }

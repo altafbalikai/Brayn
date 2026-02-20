@@ -1,7 +1,7 @@
-const { askGeminiStream, askConversationStream } = require('../services/gemini.service');
+const { askConversationStream } = require('../services/gemini.service');
 const ConversationService = require('../services/conversation.service');
 const Message = require('../models/Message');
-const ConversationSummary = require('../models/ConversationSummary');
+const { getLatestSummary } = require('../services/summary.service');
 
 async function ask(req, res, next) {
   try {
@@ -33,8 +33,8 @@ async function ask(req, res, next) {
       text: message,
     });
 
-    // 2) Load last messages
-    const MAX_CONTEXT = 8;
+    // 2) Load last N messages (reduced from 8 → 4; summary carries long-range context)
+    const MAX_CONTEXT = 4;
     const recentMessages = await Message.find({ conversationId })
       .sort({ createdAt: -1 })
       .limit(MAX_CONTEXT)
@@ -49,27 +49,16 @@ async function ask(req, res, next) {
       });
     }
 
-    // 3) Load memory summary
-    let context = [];
-    const latestSummary = await ConversationSummary.findOne({ conversationId })
-      .sort({ version: -1 })
-      .lean();
+    // 3) Load conversation summary (safe — returns null on failure)
+    const latestSummary = await getLatestSummary(conversationId);
+    const summaryText = latestSummary?.summaryText || null;
 
-    if (latestSummary) {
-      context.push({
-        role: "system",
-        text: `Memory Summary: ${latestSummary.summaryText}`,
-      });
-    }
-
-    context = [...context, ...ordered];
-
-    // 4) Ask Gemini STREAMING
-    // const stream = await askGeminiStream(context);
+    // 4) Ask LLM STREAMING (summary + vector memory injected inside gemini.service)
     const { stream, modelId } = await askConversationStream(
       conversationId,
-      context,
-      userId
+      ordered,
+      userId,
+      summaryText
     );
 
     let fullReply = "";
@@ -83,7 +72,6 @@ async function ask(req, res, next) {
         res.write(content);
       }
     }
-    // console.log("conversation:", conversationId, "model:", modelId, "replay:", fullReply);
 
     // 5) Save final assistant message
     await ConversationService.addMessage(userId, conversationId, {
