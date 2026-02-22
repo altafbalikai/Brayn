@@ -72,6 +72,7 @@ async function writeMessageToMemory(message) {
                                 conversationId: message.conversationId?.toString() || "",
                                 role: message.role,
                                 text: cleanText,
+                                importance: message.importance || 0,
                                 createdAt: message.createdAt
                                     ? new Date(message.createdAt).toISOString()
                                     : new Date().toISOString()

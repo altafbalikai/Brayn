@@ -6,6 +6,7 @@ const LLMModel = require("../models/LLMModel");
 const ConversationSummary = require('../models/ConversationSummary');
 const { writeMessageToMemory } = require('../services/memoryWrite.service');
 const { triggerSummaryIfNeeded } = require('../services/summary.service');
+const { computeMessageImportance } = require('../utils/importance.utils');
 
 async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c') {
   if (!mongoose.isValidObjectId(userId)) {
@@ -83,11 +84,14 @@ async function addMessage(userId, conversationId, { role, text }) {
   if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
   if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
 
+  const importance = computeMessageImportance(text, role);
+
   const msg = await Message.create({
     conversationId: conv._id,
     userId: new mongoose.Types.ObjectId(userId),
     role,
     text,
+    importance,
     createdAt: new Date(),
     modelId: conv.selectedModelId, // ⭐ SNAPSHOT
   });

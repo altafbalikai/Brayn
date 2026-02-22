@@ -3,11 +3,22 @@ const { generateEmbedding } = require("./embeddings.service");
 const { QDRANT_URL, QDRANT_COLLECTION } = require("../config/qdrant");
 const { fetchWithDns } = require("../utils/fetchWithDns");
 
+// ─── Phase 2 Configuration ─────────────────────────────────────
+const RETRIEVAL_CANDIDATE_COUNT = 15; // fetch more candidates for re-ranking
+const RETRIEVAL_FINAL_COUNT = 5;      // number of memories to inject into prompt
+const DECAY_LAMBDA = 0.02;            // controls temporal decay speed
+const MAX_IMPORTANCE = 10;            // must match importance.utils.js
+
+/**
+ * Hybrid retrieval with re-ranking.
+ * Fetches 15 candidates by similarity, then applies weighted scoring:
+ * Final Score = (Sim * 0.7) + (Importance * 0.2) + (Temporal Decay * 0.1)
+ */
 async function readRelevantMemory({
     userId,
     conversationId,
     query,
-    limit = 5
+    limit = RETRIEVAL_FINAL_COUNT
 }) {
     try {
         // Guard: skip if Qdrant is not configured
@@ -29,9 +40,10 @@ async function readRelevantMemory({
             return [];
         }
 
+        // Phase 2: fetch more candidates (15) to allow re-ranking room
         const body = {
             vector,
-            limit,
+            limit: RETRIEVAL_CANDIDATE_COUNT,
             with_payload: true,
             filter: {
                 must: [
@@ -60,10 +72,53 @@ async function readRelevantMemory({
         }
 
         const data = await response.json();
-        const results = data.result || [];
+        const candidates = data.result || [];
 
-        console.log(`[VectorRead] Found ${results.length} relevant memory items`);
-        return results;
+        if (candidates.length === 0) return [];
+
+        // ─── Hybrid Re-ranking ──────────────────────────────────────
+        try {
+            const now = Date.now();
+            const reRanked = candidates.map(item => {
+                const payload = item.payload || {};
+
+                // 1. Similarity Score (Qdrant score is 0-1 cosine similarity)
+                let similarityScore = item.score;
+                // Clamp defensively
+                similarityScore = Math.max(0, Math.min(1, similarityScore));
+
+                // 2. Importance Score (Weight: 0.2)
+                const importance = Number(payload.importance) || 0;
+                const normalizedImportance = Math.max(0, Math.min(1, importance / MAX_IMPORTANCE));
+
+                // 3. Temporal Decay (Weight: 0.1)
+                let timeWeight = 1.0;
+                if (payload.createdAt) {
+                    const createdAt = new Date(payload.createdAt).getTime();
+                    if (!isNaN(createdAt)) {
+                        const ageInDays = (now - createdAt) / (1000 * 60 * 60 * 24);
+                        // exp(-lambda * days)
+                        timeWeight = Math.exp(-DECAY_LAMBDA * Math.max(0, ageInDays));
+                    }
+                }
+
+                const finalScore = (similarityScore * 0.7) + (normalizedImportance * 0.2) + (timeWeight * 0.1);
+
+                return { ...item, finalScore };
+            });
+
+            // Sort by finalScore descending
+            reRanked.sort((a, b) => b.finalScore - a.finalScore);
+
+            const finalResults = reRanked.slice(0, limit);
+            console.log(`[VectorRead] Re-ranked ${candidates.length} candidates → Top ${finalResults.length} selected`);
+            return finalResults;
+
+        } catch (reRankErr) {
+            console.warn('[VectorRead] Re-ranking failed, falling back to similarity order:', reRankErr.message);
+            return candidates.slice(0, limit);
+        }
+
     } catch (err) {
         console.warn("[VectorRead] Failed:", err.message);
         return [];

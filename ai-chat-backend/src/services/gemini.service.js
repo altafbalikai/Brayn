@@ -161,7 +161,7 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
       },
       ...buildMessagesPayload(normalized),
     ];
-
+    console.log("Payload:", payload);
     // 5️⃣ Send to LLM
     return {
       stream: await openrouter.chat.send({
