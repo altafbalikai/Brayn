@@ -115,6 +115,51 @@ async function getVectorMemorySafe({
   }
 }
 
+/**
+ * Retrieves and formats high-importance user memories for prompt injection.
+ * Enforces importance >= 7, confidence >= 0.5, max 5 items, and ~300 tokens.
+ */
+async function getInjectedUserMemory(userId) {
+  try {
+    const { getUserMemories, logMemoryInjection } = require("./userMemory.service");
+    const allMemories = await getUserMemories(userId);
+
+    // Step 2 & 3: Filter and Sort
+    let memories = allMemories
+      .filter(m => m.importance >= 7 && m.confidence >= 0.5)
+      .sort((a, b) => b.importance - a.importance || b.updatedAt - a.updatedAt);
+
+    // Step 4: Cap at 5
+    memories = memories.slice(0, 5);
+
+    if (memories.length === 0) return '';
+
+    // Step 5: Token guard (chars / 4 approximation)
+    const calculateTokens = (items) => {
+      const totalChars = items.reduce((sum, m) => sum + (m.key.length + m.value.length), 0);
+      return Math.ceil(totalChars / 4);
+    };
+
+    while (calculateTokens(memories) > 300 && memories.length > 0) {
+      memories.pop(); // Remove lowest-importance item
+    }
+
+    if (memories.length === 0) return '';
+
+    // Step 6: Fire-and-forget logging
+    memories.forEach(m => {
+      logMemoryInjection(m.userId || userId, m.key, m.value);
+    });
+
+    // Step 7: Format
+    return "[User Memory]\n" + memories.map(m => `- ${m.key}: ${m.value}`).join('\n');
+
+  } catch (err) {
+    console.warn('[promptAssembly] getInjectedUserMemory failed:', err);
+    return '';
+  }
+}
+
 /* ===========================
    STREAMING RESPONSE
    =========================== */
@@ -125,15 +170,30 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
 
     const MAX_CONTEXT = 4;
 
-    // 1️⃣ Load system prompt
+    // 1️⃣ Slot 1: Load system prompt + Conflict Rule
     let systemPrompt = await getSystemPrompt();
+    const conflictRule = "\n\nIf any recent conversation message explicitly contradicts a stored user memory, treat the conversation-level signal as authoritative for this session. Do not update stored memory based on this.";
+    systemPrompt += conflictRule;
 
-    // 2️⃣ Inject conversation summary (if exists)
-    if (summaryText) {
-      systemPrompt += `\n\nConversation Summary (prior context):\n${summaryText}`;
+    const payload = [
+      {
+        role: "system",
+        content: systemPrompt,
+      }
+    ];
+
+    // 2️⃣ Slot 2: User Long-Term Memory (separate slot)
+    const userMemoryText = await getInjectedUserMemory(userId);
+    if (userMemoryText) {
+      payload.push({ role: "system", content: userMemoryText });
     }
 
-    // 3️⃣ Trim + normalize conversation messages
+    // 3️⃣ Slot 3: Inject conversation summary (if exists) (separate slot)
+    if (summaryText) {
+      payload.push({ role: "system", content: `Conversation Summary (prior context):\n${summaryText}` });
+    }
+
+    // 4️⃣ Trim + normalize conversation messages
     const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
 
     const lastUserMessage =
@@ -147,21 +207,17 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
 
     console.log("Retrieved vector memory items:", retrievedMemory);
 
+    // 5️⃣ Slot 4: Inject Vector Memory (separate slot)
     if (retrievedMemory.length > 0) {
-      systemPrompt += `\n\nRelevant past context:\n${retrievedMemory
+      const vectorContextText = `Relevant past context:\n${retrievedMemory
         .map(m => `- ${m.payload.role}: ${m.payload.text || ""}`)
         .join("\n")}`;
+      payload.push({ role: "system", content: vectorContextText });
     }
 
-    // 4️⃣ Inject system prompt FIRST
-    const payload = [
-      {
-        role: "system",
-        content: systemPrompt,
-      },
-      ...buildMessagesPayload(normalized),
-    ];
-    console.log("Payload:", payload);
+    // 6️⃣ Slot 5: Messages
+    payload.push(...buildMessagesPayload(normalized));
+
     // 5️⃣ Send to LLM
     return {
       stream: await openrouter.chat.send({
@@ -287,4 +343,4 @@ async function askGeminiStream(
   }
 }
 
-module.exports = { askConversation, askConversationStream, askGemini, askGeminiStream };
+module.exports = { askConversation, askConversationStream, askGemini, askGeminiStream, getInjectedUserMemory };

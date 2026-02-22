@@ -96,6 +96,11 @@ async function addMessage(userId, conversationId, { role, text }) {
     modelId: conv.selectedModelId, // ⭐ SNAPSHOT
   });
 
+  // Phase 3.3: fire-and-forget memory store (NOT awaited)
+  const { processAndStoreMemory } = require('./userMemory.service');
+  processAndStoreMemory(text, role, userId, conversationId)
+    .catch(err => console.warn('[userMemory] fire-and-forget error:', err));
+
   // Side-effect: vector memory write (DO NOT await)
   writeMessageToMemory(msg);
 
