@@ -1,0 +1,105 @@
+# CodeRabbit Configuration for ai-chat-backend
+language: "en-US"
+tone_instructions: "Tone: precise and technical — this is a production backend, not a learning project. Do not suggest superficial style changes. Flag missing inline comments on non-obvious decisions like complex formulas, arbitrary thresholds, or fallback logic."
+
+reviews:
+  profile: "assertive"
+  request_reviews_from_completions: true
+  auto_review:
+    enabled: true
+    drafts: false
+  
+  # Tier 1 — Global baseline: applies to every file in every PR
+  path_instructions:
+    - path: "**/*.js"
+      instructions: |
+        ### Production Safety (Blocking)
+        - Flag any `catch` block that swallows an error without logging it via `logger` or `console.error`.
+        - Flag unhandled promises: `.then()` without `.catch()`, or `async` function calls without `try/catch` in service files.
+        - Flag any `throw` in a service or utility function that is not wrapped in a `try/catch`.
+        - Flag hardcoded connection strings, API keys, or secrets (e.g., `mongodb://`, `localhost:`, long alphanumeric strings).
+        - Flag synchronous file I/O (`fs.readFileSync`, `fs.writeFileSync`) in request paths or service files.
+        - Flag any magic number used more than once without a named constant.
+
+        ### Code Quality (Advisory)
+        - Flag any exported function missing a JSDoc comment.
+        - Flag any file missing a module-level comment explaining its responsibility.
+        - Flag `console.log` in non-script/non-debug files; suggest `logger.warn` or `logger.error` with context.
+        - Flag error handling patterns inconsistent with the project's standard (Async/Await + try/catch + global middleware).
+
+        ### Exclusions (Never Suggest)
+        - Do not suggest TypeScript migration.
+        - Do not suggest test framework adoption.
+        - Do not suggest alternative libraries or frameworks.
+        - Do not comment on self-explanatory single-line code.
+        - Do not suggest reformatting that doesn't affect correctness.
+
+    # Tier 2 — Phase 2 Path-Specific Rules
+    - path: "src/utils/importance.utils.js"
+      instructions: |
+        - BLOCKING: `role === 'assistant'` must return 0 before any other logic runs.
+        - BLOCKING: All phrase triggers must use case-insensitive matching.
+        - BLOCKING: "remember this" must match the exact phrase; "remember" alone must not trigger +5.
+        - BLOCKING: Decision words must use `/\b...\b/i` word boundary regex, not `String.includes()`.
+        - BLOCKING: Raw score must be capped with `Math.min(score, MAX_IMPORTANCE)` before returning.
+        - BLOCKING: `MAX_IMPORTANCE` must be a named constant, not the inline number 10.
+        - BLOCKING: Function must have no async code, side effects, or external dependencies.
+
+    - path: "src/models/Message.js"
+      instructions: |
+        - BLOCKING: `importance` field must be type `Number` with `default: 0`.
+        - BLOCKING: Ensure no other schema fields have been modified in this PR.
+
+    - path: "src/services/conversation.service.js"
+      instructions: |
+        - BLOCKING: `computeMessageImportance` must be called before the message object is constructed.
+        - BLOCKING: Returned score must be passed to both MongoDB and Qdrant write service.
+        - BLOCKING: No new async patterns, queues, or LLM calls should be introduced.
+
+    - path: "src/services/memoryWrite.service.js"
+      instructions: |
+        - BLOCKING: `importance` and `createdAt` must both be present in the Qdrant payload.
+        - BLOCKING: `createdAt` must be set as `new Date().toISOString()` explicitly.
+        - BLOCKING: Qdrant indexing strategy must be unchanged.
+
+    - path: "src/services/memoryRead.service.js"
+      instructions: |
+        - BLOCKING: `RETRIEVAL_CANDIDATE_COUNT`, `RETRIEVAL_FINAL_COUNT`, `DECAY_LAMBDA`, and `MAX_IMPORTANCE` must be named constants at the top of the file.
+        - BLOCKING: Qdrant query must use `RETRIEVAL_CANDIDATE_COUNT`, not an inline number.
+        - BLOCKING: `finalScore` weights must be exactly 0.7 / 0.2 / 0.1.
+        - BLOCKING: `normalizedImportance` must be clamped to [0, 1] defensively.
+        - BLOCKING: `ageInDays` computation must be guarded against NaN.
+        - BLOCKING: Re-ranking failure must be caught, logged with `console.warn`, and fall back to similarity order.
+        - BLOCKING: Exactly `RETRIEVAL_FINAL_COUNT` results must be returned.
+        - BLOCKING: Function must never throw to the caller.
+        - BLOCKING: Any import of an LLM client, agent framework, or task queue in this file is prohibited.
+
+# Path Filters — Exclusions
+path_filters:
+  - "!node_modules/**"
+  - "!package.json"
+  - "!package-lock.json"
+  - "!.env"
+  - "!.env.example"
+  - "!.gitignore"
+  - "!**/*.generated.js"
+  - "!**/*.seed.js"
+  - "!scripts/**" # Exclude migration scripts as identified in analysis
+
+# PR Summary Behavior
+chat:
+  auto_reply: true
+
+integrations:
+  github:
+    pr_reports:
+      summary:
+        enabled: true
+        outline: true
+        custom_instructions: |
+          Group changed files by: Phase 2 files / service files / models / utilities / config.
+          Clearly state whether any global blocking failures were triggered and identify affected files.
+          If Phase 2 files are present, verify and report:
+          1. Whether all four fallback cases in `readRelevantMemory()` are implemented.
+          2. Whether hybrid score weights sum exactly to 1.0.
+          3. Whether all inline literals have been replaced by named constants.
