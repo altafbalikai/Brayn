@@ -1,6 +1,6 @@
 // src/services/summary.service.js
 const logger = require('../config/logger');
-const { askGemini } = require('./gemini.service');
+const { askGemini } = require('./llm.service');
 const ConversationSummary = require('../models/ConversationSummary');
 const Message = require('../models/Message');
 
@@ -140,7 +140,7 @@ async function generateConversationSummary(conversationId) {
  * Fire-and-forget trigger called from addMessage().
  * Only triggers if messageCount hits the threshold.
  */
-function triggerSummaryIfNeeded(conversationId, messageCount) {
+async function triggerSummaryIfNeeded(conversationId, messageCount) {
   if (messageCount > 0 && messageCount % SUMMARY_THRESHOLD === 0) {
     logger.info(`[Summary] Threshold hit (${messageCount} messages), triggering for ${conversationId}`);
     // Fire-and-forget — DO NOT await

@@ -1,19 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { summarizeConversation } = require('../services/summary.service');
+const summaryController = require('../controllers/summary.controller');
 const auth = require('../middlewares/auth.middleware');
 
 router.use(auth);
 
 // POST /api/summary/:conversationId
-router.post('/:conversationId', async (req, res, next) => {
-  try {
-    const { conversationId } = req.params;
-    const summary = await summarizeConversation(conversationId);
-    res.json(summary);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/:conversationId', summaryController.summarizeConversation);
 
 module.exports = router;

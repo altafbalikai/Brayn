@@ -20,9 +20,9 @@ export const fetchConversations = createAsyncThunk(
 
 export const createConversation = createAsyncThunk(
     'conversation/createConversation',
-    async ({ agentId, title, modelId }, { rejectWithValue }) => {
+    async ({ agentId, title, modelId, personaId }, { rejectWithValue }) => {
         try {
-            const data = await conversationService.createConversation({ agentId, title, modelId });
+            const data = await conversationService.createConversation({ agentId, title, modelId, personaId });
             return data;
         } catch (error) {
             return rejectWithValue(

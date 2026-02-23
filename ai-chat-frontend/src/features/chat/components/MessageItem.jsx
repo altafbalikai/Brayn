@@ -1,4 +1,7 @@
 import React, { useState, useMemo } from "react";
+import { useSelector } from "react-redux";
+import { selectPersonas } from "../../../features/persona/personaSlice";
+import { getPersonaIcon } from "../../../utils/personaIcons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -98,7 +101,17 @@ function MessageItem({ msg, showTime }) {
   const displayText = msg.text || "";
   const isAssistant = msg.role === "assistant";
 
-  // Apply minimal fixes for streaming content
+  // 1. Hooks MUST be at top level
+  const personas = useSelector(selectPersonas);
+  
+  // 2. Computed values after hooks
+  const persona = useMemo(() => {
+    if (!isAssistant || !msg.personaId) return null;
+    return personas.find(p => p.id === msg.personaId);
+  }, [isAssistant, msg.personaId, personas]);
+
+  const PersonaIcon = persona ? getPersonaIcon(persona.slug) : null;
+
   const processedText = useMemo(() => {
     if (!displayText) return "";
     return isStreaming ? quickFixMarkdown(displayText) : displayText;
@@ -143,9 +156,21 @@ function MessageItem({ msg, showTime }) {
           {isLoading ? (
             // Initial loading state (no content yet)
             <LoadingIndicator />
-          ) : isAssistant ? (
-            // Assistant message with markdown rendering
-            <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
+          ) : (
+            <>
+              {isAssistant && persona && (
+                <div className="flex items-center gap-1.5 mb-1 px-0.5">
+                  {/* {PersonaIcon && (
+                    <PersonaIcon className="w-3.5 h-3.5 text-theme-accent opacity-80" />
+                  )}
+                  <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider">
+                    {persona.name}
+                  </span> */}
+                </div>
+              )}
+              {isAssistant ? (
+                // Assistant message with markdown rendering
+                <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
               <div className="relative">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -228,7 +253,9 @@ function MessageItem({ msg, showTime }) {
               {displayText}
             </div>
           )}
-        </div>
+          </>
+        )}
+      </div>
       </div>
     </div>
   );

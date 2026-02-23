@@ -228,6 +228,21 @@ async function editUserMemory(userId, key, newValue) {
     }
 }
 
+/**
+ * Retrieves retrieval log for user memory actions.
+ */
+async function getMemoryAuditLog(userId) {
+    try {
+        return await UserMemoryAuditLog.find({ userId })
+            .sort({ timestamp: -1 })
+            .limit(100)
+            .lean();
+    } catch (err) {
+        console.error('[userMemory] getMemoryAuditLog error:', err);
+        throw err;
+    }
+}
+
 module.exports = {
     processAndStoreMemory,
     getUserMemories,
@@ -235,5 +250,6 @@ module.exports = {
     wipeUserMemory,
     logMemoryInjection,
     toggleUserMemory,
-    editUserMemory
+    editUserMemory,
+    getMemoryAuditLog
 };

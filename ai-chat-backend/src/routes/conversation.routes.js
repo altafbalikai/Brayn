@@ -29,5 +29,7 @@ router.patch(
   updateConversationModelValidation, handleValidationErrors, convController.updateConversationModel
 );
 
+router.post('/:cid/switch-persona', handleValidationErrors, convController.switchPersona);
+
 
 module.exports = router;

@@ -14,7 +14,12 @@ const MessageSchema = new mongoose.Schema({
     requestId: String,
     latencyMs: Number,
     costUSD: Number
-  }
+  },
+  personaId: {
+    type: String,
+    index: true,
+    default: null // Track which persona generated this
+  },
 }, { timestamps: true });
 
 MessageSchema.index({ conversationId: 1, createdAt: -1 });

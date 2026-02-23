@@ -1,9 +1,18 @@
 const logger = require("../config/logger");
 const Conversation = require("../models/Conversation");
 const LLMModel = require("../models/LLMModel");
+const Message = require('../models/Message');
+const ConversationService = require('../services/conversation.service');
 const { getSystemPrompt } = require("../utils/systemPromptCache");
 const { readRelevantMemory } = require("../services/memoryRead.service");
 const { assemblePrompt } = require("../utils/promptAssembler");
+const { getLatestSummary, triggerSummaryIfNeeded } = require('../services/summary.service');
+const { writeMessageToMemory } = require('../services/memoryWrite.service');
+const Persona = require("../models/Persona");
+const userMemoryService = require('../services/userMemory.service');
+const { processAndStoreMemory } = userMemoryService;
+const { safeFireAndForget } = require('../utils/async.utils');
+
 let openRouterClient = null;
 
 /**
@@ -100,14 +109,16 @@ async function resolveConversationModel(conversationId) {
 async function getVectorMemorySafe({
   userId,
   conversationId,
-  userMessage
+  userMessage,
+  excludeIds = []
 }) {
   try {
     return await readRelevantMemory({
       userId,
       conversationId,
       query: userMessage,
-      limit: 5
+      limit: 5,
+      excludeIds
     });
   } catch (err) {
     logger.warn("Vector memory unavailable", { error: err.message });
@@ -121,8 +132,7 @@ async function getVectorMemorySafe({
  */
 async function getInjectedUserMemory(userId) {
   try {
-    const { getUserMemories, logMemoryInjection } = require("./userMemory.service");
-    const allMemories = await getUserMemories(userId);
+    const allMemories = await userMemoryService.getUserMemories(userId);
 
     // Step 2 & 3: Filter and Sort
     let memories = allMemories
@@ -148,7 +158,7 @@ async function getInjectedUserMemory(userId) {
 
     // Step 6: Fire-and-forget logging
     memories.forEach(m => {
-      logMemoryInjection(m.userId || userId, m.key, m.value);
+      userMemoryService.logMemoryInjection(m.userId || userId, m.key, m.value);
     });
 
     // Step 7: Format
@@ -160,20 +170,61 @@ async function getInjectedUserMemory(userId) {
   }
 }
 
+/**
+ * Assemble complete system prompt with persona + memory + context
+ */
+async function assembleSystemPrompt(userId, conversationId) {
+  try {
+    // ========== SLOT 1: PERSONA SYSTEM PROMPT ==========
+    let systemPrompt = '';
+
+    // Fetch conversation to get current persona
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      throw new Error('Conversation not found');
+    }
+
+    // Fetch persona by currentPersonaId
+    const persona = await Persona.findOne({
+      id: conversation.currentPersonaId
+    });
+
+    // Load global system prompt + Conflict Rule
+    let baseSystemPrompt = await getSystemPrompt();
+    const conflictRule = "\n\nIf any recent conversation message explicitly contradicts a stored user memory, treat the conversation-level signal as authoritative for this session. Do not update stored memory based on this.";
+    baseSystemPrompt += conflictRule;
+
+    // Use persona.systemPrompt if available and active
+    if (persona && persona.isActive) {
+      systemPrompt += `[Persona: ${persona.name}]\n${persona.systemPrompt}\n\n`;
+      systemPrompt += `[Core Instructions]\n${baseSystemPrompt}`;
+      console.log(`✅ Using persona: ${persona.name}`);
+    } else {
+      // Fallback: Use global static prompt
+      systemPrompt += baseSystemPrompt;
+      console.warn(`⚠️ Persona not found or inactive (${conversation.currentPersonaId}). Using global prompt.`);
+    }
+
+    return systemPrompt;
+  } catch (error) {
+    console.error('❌ Error assembling system prompt:', error);
+    // Fallback: Return global prompt
+    return await getSystemPrompt();
+  }
+}
+
 /* ===========================
    STREAMING RESPONSE
    =========================== */
-async function askConversationStream(conversationId, messages, userId, summaryText = null) {
+async function askConversationStream(conversationId, messages, userId, summaryText = null, excludeMessageIds = []) {
   try {
     const openrouter = await getOpenRouter();
     const model = await resolveConversationModel(conversationId);
 
     const MAX_CONTEXT = 4;
 
-    // 1️⃣ Slot 1: Load system prompt + Conflict Rule
-    let systemPrompt = await getSystemPrompt();
-    const conflictRule = "\n\nIf any recent conversation message explicitly contradicts a stored user memory, treat the conversation-level signal as authoritative for this session. Do not update stored memory based on this.";
-    systemPrompt += conflictRule;
+    // 1️⃣ Slot 1: Load system prompt (Persona + Global)
+    const systemPrompt = await assembleSystemPrompt(userId, conversationId);
 
     const payload = [
       {
@@ -196,16 +247,23 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
     // 4️⃣ Trim + normalize conversation messages
     const normalized = normalizeMessages(messages.slice(-MAX_CONTEXT));
 
+    // Collect all IDs from the context window plus explicit excludes to prevent self-retrieval
+    const contextIds = [...excludeMessageIds];
+    messages.forEach(m => {
+      if (m._id) contextIds.push(m._id);
+    });
+
     const lastUserMessage =
       [...normalized].reverse().find(m => m.role === "user")?.text || "";
 
     const retrievedMemory = await getVectorMemorySafe({
       userId,
       conversationId,
-      userMessage: lastUserMessage
+      userMessage: lastUserMessage,
+      excludeIds: contextIds
     });
 
-    console.log("Retrieved vector memory items:", retrievedMemory);
+    console.log("Retrieved vector memory items (filtered):", retrievedMemory.length);
 
     // 5️⃣ Slot 4: Inject Vector Memory (separate slot)
     if (retrievedMemory.length > 0) {
@@ -217,6 +275,8 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
 
     // 6️⃣ Slot 5: Messages
     payload.push(...buildMessagesPayload(normalized));
+
+    console.log("Payload:", payload);
 
     // 5️⃣ Send to LLM
     return {
@@ -343,4 +403,82 @@ async function askGeminiStream(
   }
 }
 
-module.exports = { askConversation, askConversationStream, askGemini, askGeminiStream, getInjectedUserMemory };
+/**
+ * Orchestrates the "ask" flow preparation:
+ * - Persists user message
+ * - Loads context
+ * - Loads summary
+ */
+async function prepareAskContext(userId, conversationId, messageText) {
+  // 1. Save user message
+  const userMsg = await ConversationService.addMessage(userId, conversationId, {
+    role: "user",
+    text: messageText,
+  });
+
+  // 2. Load recent context window (last 4 messages)
+  const MAX_CONTEXT = 4;
+  const recentMessages = await Message.find({ conversationId })
+    .sort({ createdAt: -1 })
+    .limit(MAX_CONTEXT)
+    .lean();
+  const ordered = recentMessages.reverse();
+
+  // Safety: ensure user message is present in context
+  if (!ordered.length || ordered[ordered.length - 1]._id?.toString() !== userMsg._id?.toString()) {
+    ordered.push({
+      role: userMsg.role,
+      text: userMsg.text,
+      _id: userMsg._id
+    });
+  }
+
+  // 3. Load summary
+  const latestSummary = await getLatestSummary(conversationId);
+  const summaryText = latestSummary?.summaryText || null;
+
+  // 4. Return all needed for streaming
+  const { stream, modelId } = await askConversationStream(
+    conversationId,
+    ordered,
+    userId,
+    summaryText,
+    [userMsg._id]
+  );
+
+  return { stream, modelId, userMsg };
+}
+
+/**
+ * Orchestrates post-streaming tasks:
+ * - Persists assistant message
+ * - Fire-and-forget background tasks
+ */
+async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg) {
+  // 1. Save assistant message
+  const assistantMsg = await ConversationService.addMessage(userId, conversationId, {
+    role: "assistant",
+    text: fullReply,
+  });
+
+  // 2. Fire-and-forget side effects
+  safeFireAndForget(() => writeMessageToMemory(userMsg));
+  safeFireAndForget(() => writeMessageToMemory(assistantMsg));
+
+  safeFireAndForget(() => processAndStoreMemory(userMsg.text, userMsg.role, userId, conversationId));
+  safeFireAndForget(() => processAndStoreMemory(assistantMsg.text, assistantMsg.role, userId, conversationId));
+
+  safeFireAndForget(() => triggerSummaryIfNeeded(conversationId));
+
+  return assistantMsg;
+}
+
+module.exports = {
+  askConversation,
+  askConversationStream,
+  askGemini,
+  askGeminiStream,
+  getInjectedUserMemory,
+  prepareAskContext,
+  handlePostStreamTasks
+};

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { TiArrowUp } from "react-icons/ti";
 import ConversationModelSelector from "./ConversationModelSelector";
+import { PersonaSwitcher } from "../../persona/PersonaSwitcher";
 import { useSelector } from "react-redux";
 import { FaRegCircleStop } from "react-icons/fa6";
 
@@ -167,8 +168,9 @@ function Composer({
             </button> */}
           </div>
 
-          {/* Column 2 — Model selector */}
-          <div className="flex justify-end">
+          {/* Column 2 — Model selector & Persona Switcher */}
+          <div className="flex items-center justify-end gap-2">
+            <PersonaSwitcher conversationId={currentConversationId} />
             <ConversationModelSelector
               llmmodels={llmmodels}
               selectedModelId={selectedModelId}

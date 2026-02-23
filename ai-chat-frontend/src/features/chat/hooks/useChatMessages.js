@@ -5,6 +5,7 @@ import {
     fetchConversations,
     fetchMessages,
 } from '../../conversations/conversationSlice';
+import { initializePersonaForConversation } from '../../persona/personaSlice';
 import { groupMessagesByTime } from '../../../utils/messageGrouping';
 
 export const useChatMessages = (conversationId) => {
@@ -83,6 +84,15 @@ export const useChatMessages = (conversationId) => {
             })
         );
     }, [conversationId, dispatch]);
+
+    // Sync persona ID on conversation change
+    useEffect(() => {
+        if (currentConversation && !currentConversation.isDraft) {
+            dispatch(initializePersonaForConversation(currentConversation.currentPersonaId));
+        } else if (currentConversation?.isDraft) {
+            dispatch(initializePersonaForConversation(null));
+        }
+    }, [conversationId, currentConversation?.currentPersonaId, dispatch]);
 
     // Cache messages
     useEffect(() => {

@@ -153,7 +153,7 @@ function Conversationllmmodelselector({
         className={`
           ${
             (!currentConversation || currentConversation.isDraft) && !open
-              ? "moving-border"
+              ? "moving-border" 
               : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
           }
           flex items-center gap-1
@@ -162,11 +162,11 @@ function Conversationllmmodelselector({
           text-theme-text
         `}
       >
-        <span className="truncate max-w-[160px]">
+        <span className="truncate max-w-[120px]">
           {selectedModel.displayName}
         </span>
         <span className="pt-1">
-          <FaAngleDown size={14} />
+          <FaAngleDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}/>
         </span>
       </button>
 

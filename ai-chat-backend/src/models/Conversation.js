@@ -13,6 +13,11 @@ const ConversationSchema = new mongoose.Schema({
   isArchived: { type: Boolean, default: false, index: true },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   messageCount: { type: Number, default: 0 },
+  currentPersonaId: {
+    type: String,
+    index: true,
+    default: null // Will be set to a default persona on creation
+  },
 }, { timestamps: true });
 
 // Sort by most-recent updates for user dashboards

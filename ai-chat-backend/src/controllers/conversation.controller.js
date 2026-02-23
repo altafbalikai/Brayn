@@ -1,15 +1,13 @@
 // src/controllers/conversation.controller.js
-const { askGemini } = require('../services/gemini.service');
+const { askGemini } = require('../services/llm.service');
 const ConversationService = require('../services/conversation.service');
 const Message = require('../models/Message');
 
 async function createConversation(req, res, next) {
   try {
     const userId = req.user?.id;
-    const { agentId } = req.body;
-    const { title } = req.body;
-    const { modelId } = req.body;
-    const conv = await ConversationService.createConversation(userId, agentId, title, modelId);
+    const { agentId, title, modelId, currentPersonaId } = req.body;
+    const conv = await ConversationService.createConversation(userId, agentId, title, modelId, currentPersonaId);
     res.status(201).json(conv);
   } catch (err) {
     next(err);
@@ -102,4 +100,26 @@ async function updateConversationModel(req, res, next) {
   }
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel };
+async function switchPersona(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+    const { personaId } = req.body;
+
+    const conv = await ConversationService.switchPersona(userId, cid, personaId);
+    res.json(conv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  createConversation,
+  listConversations,
+  addMessage,
+  getMessages,
+  renameConversation,
+  deleteConversation,
+  updateConversationModel,
+  switchPersona
+};

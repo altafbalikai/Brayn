@@ -1,7 +1,4 @@
-const { askConversationStream } = require('../services/gemini.service');
-const ConversationService = require('../services/conversation.service');
-const Message = require('../models/Message');
-const { getLatestSummary } = require('../services/summary.service');
+const llmService = require('../services/llm.service');
 
 async function ask(req, res, next) {
   try {
@@ -21,69 +18,35 @@ async function ask(req, res, next) {
       return res.status(400).json({ error: "conversationId and message are required" });
     }
 
-    // START STREAM
+    console.log(`🔵 POST /api/llm/${conversationId}/ask | Message: ${message.substring(0, 50)}...`);
+
+    // Prepare context and start LLM stream via Service Orchestrator
+    const { stream, userMsg } = await llmService.prepareAskContext(userId, conversationId, message);
+
+    // START SSE RESPONSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
 
-    // 1) Save user message
-    const userMsg = await ConversationService.addMessage(userId, conversationId, {
-      role: "user",
-      text: message,
-    });
-
-    // 2) Load last N messages (reduced from 8 → 4; summary carries long-range context)
-    const MAX_CONTEXT = 4;
-    const recentMessages = await Message.find({ conversationId })
-      .sort({ createdAt: -1 })
-      .limit(MAX_CONTEXT)
-      .lean();
-    const ordered = recentMessages.reverse();
-
-    // Safety: ensure user message is present
-    if (!ordered.length || ordered[ordered.length - 1]._id?.toString() !== userMsg._id?.toString()) {
-      ordered.push({
-        role: userMsg.role,
-        text: userMsg.text,
-      });
-    }
-
-    // 3) Load conversation summary (safe — returns null on failure)
-    const latestSummary = await getLatestSummary(conversationId);
-    const summaryText = latestSummary?.summaryText || null;
-
-    // 4) Ask LLM STREAMING (summary + vector memory injected inside gemini.service)
-    const { stream, modelId } = await askConversationStream(
-      conversationId,
-      ordered,
-      userId,
-      summaryText
-    );
-
     let fullReply = "";
 
+    // Consume stream and send to client
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
         fullReply += content;
-
-        // Send chunk to frontend immediately
         res.write(content);
       }
     }
 
-    // 5) Save final assistant message
-    await ConversationService.addMessage(userId, conversationId, {
-      role: "assistant",
-      text: fullReply,
-    });
+    // Finalize persistence and side effects via Service Orchestrator
+    await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg);
 
-    res.end(); // close SSE
+    res.end();
 
   } catch (err) {
     console.error("Streaming error:", err);
-    // Inject a styled div with specific data attributes for the frontend to target
     res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable or free models are temporarily rate-limited upstream. Please retry shortly or switch to a different model to continue.`);
     res.end();
   }

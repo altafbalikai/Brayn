@@ -13,7 +13,7 @@ import { logout } from "../../../features/auth/authSlice";
  * Sidebar footer showing user avatar
  * @param {{user: {email?: string, name?: string, _id?: string}, onLogout: function}} props
  */
-function SidebarFooter({ user, onLogout }) {
+function SidebarFooter({ user, onLogout, conversationId }) {
   const [activeMenuOption, setActiveMenuOption] = useState(null);
   const [open, setOpen] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
@@ -201,7 +201,7 @@ function SidebarFooter({ user, onLogout }) {
 
       {/* User Profile Modal */}
       {activeMenuOption === "settings" && (
-        <Settings onClose={() => setActiveMenuOption(null)} />
+        <Settings onClose={() => setActiveMenuOption(null)} conversationId={conversationId} />
       )}
       {/* User Settings Modal */}
       {activeMenuOption === "about" && (

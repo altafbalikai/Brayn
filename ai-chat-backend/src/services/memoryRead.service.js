@@ -2,6 +2,7 @@
 const { generateEmbedding } = require("./embeddings.service");
 const { QDRANT_URL, QDRANT_COLLECTION } = require("../config/qdrant");
 const { fetchWithDns } = require("../utils/fetchWithDns");
+const { objectIdToUuid } = require("../utils/uuid.utils");
 
 // ─── Phase 2 Configuration ─────────────────────────────────────
 const RETRIEVAL_CANDIDATE_COUNT = 15; // fetch more candidates for re-ranking
@@ -18,7 +19,8 @@ async function readRelevantMemory({
     userId,
     conversationId,
     query,
-    limit = RETRIEVAL_FINAL_COUNT
+    limit = RETRIEVAL_FINAL_COUNT,
+    excludeIds = []
 }) {
     try {
         // Guard: skip if Qdrant is not configured
@@ -40,6 +42,9 @@ async function readRelevantMemory({
             return [];
         }
 
+        // Map excludeIds to UUIDs
+        const mustNotIds = (excludeIds || []).map(id => objectIdToUuid(id)).filter(Boolean);
+
         // Phase 2: fetch more candidates (15) to allow re-ranking room
         const body = {
             vector,
@@ -49,7 +54,12 @@ async function readRelevantMemory({
                 must: [
                     { key: "userId", match: { value: userId.toString() } },
                     { key: "conversationId", match: { value: conversationId.toString() } }
-                ]
+                ],
+                ...(mustNotIds.length > 0 && {
+                    must_not: [
+                        { has_id: mustNotIds }
+                    ]
+                })
             }
         };
 

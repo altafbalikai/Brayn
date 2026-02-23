@@ -47,7 +47,7 @@ export default function Sidebar({
         containerRef={containerRef}
         onScroll={onScroll}
       />
-      <SidebarFooter user={user} onLogout={onLogout} />
+      <SidebarFooter user={user} onLogout={onLogout} conversationId={currentConversationId} />
     </div>
   );
 }

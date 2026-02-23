@@ -50,24 +50,9 @@ function auditLog(event, meta = {}) {
    ------------------------- */
 async function signup(req, res, next) {
   try {
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return badRequest(res, 'Request body is required');
-    }
-
     let { email, password, name } = req.body;
-    email = normalizeEmail(email);
+    // Normalized in signupValidation middleware with .normalizeEmail()
     name = (name || '').toString().trim();
-
-    const problems = [];
-    if (!email) problems.push({ field: 'email', message: 'Email is required' });
-    else if (!validator.isEmail(email)) problems.push({ field: 'email', message: 'Invalid email format' });
-
-    if (!password) problems.push({ field: 'password', message: 'Password is required' });
-    else if (typeof password !== 'string' || password.length < 8) problems.push({ field: 'password', message: 'Password must be at least 8 characters long' });
-
-    if (name && name.length > 100) problems.push({ field: 'name', message: 'Name is too long (max 100 chars)' });
-
-    if (problems.length) return badRequest(res, 'Invalid signup payload', problems);
 
     // anti-abuse hook (optional): check rate-limiter or captcha
     // if (req.rateLimit && req.rateLimit.remaining === 0) return res.status(429).json({ error: 'Too many requests' });
@@ -103,9 +88,6 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email and password required' });
-    }
 
     // call service and wait for tokens + user
     const result = await authService.login({ email, password });

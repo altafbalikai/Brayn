@@ -1,14 +1,13 @@
 // src/services/conversation.service.js
 const Conversation = require('../models/Conversation');
+const Persona = require('../models/Persona');  // Added Persona model
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
 const LLMModel = require("../models/LLMModel");
 const ConversationSummary = require('../models/ConversationSummary');
-const { writeMessageToMemory } = require('../services/memoryWrite.service');
-const { triggerSummaryIfNeeded } = require('../services/summary.service');
 const { computeMessageImportance } = require('../utils/importance.utils');
 
-async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c') {
+async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c', personaId = null) {
   if (!mongoose.isValidObjectId(userId)) {
     throw Object.assign(new Error('Invalid userId'), { status: 400 });
   }
@@ -17,14 +16,39 @@ async function createConversation(userId, agentId, title, selectedModelId = '695
     throw Object.assign(new Error("Invalid modelId"), { status: 400 });
   }
 
-  // You can pass the string userId directly; Mongoose will cast it.
-  const conv = await Conversation.create(
-    {
-      userId: new mongoose.Types.ObjectId(userId),
-      agentId: agentId,
-      title: title || 'New Conversation',
-      selectedModelId,
+  // ✅ NEW: Decide persona
+  let activePersonaId = personaId;
+
+  if (!activePersonaId || !mongoose.isValidObjectId(activePersonaId)) {
+    // Fetch default persona
+    let defaultPersona = await Persona.findOne({
+      slug: 'general-assistant',
+      isActive: true
     });
+
+    // Fallback: If no general-assistant, try any active persona
+    if (!defaultPersona) {
+      defaultPersona = await Persona.findOne({ isActive: true });
+    }
+
+    if (!defaultPersona) {
+      throw Object.assign(new Error('No active personas found to initialize conversation'), { status: 500 });
+    }
+
+    activePersonaId = defaultPersona.id;
+  }
+
+  const conv = await Conversation.create({
+    userId: new mongoose.Types.ObjectId(userId),
+    agentId: agentId || 'default',
+    title: title || 'New Conversation',
+    selectedModelId: selectedModelId,
+    currentPersonaId: activePersonaId, // Now correctly assigned
+  });
+
+  // Removed the console.log that referenced defaultPersona.name as it might not be defined
+  // if a personaId was explicitly passed.
+
   return conv.toObject();
 }
 
@@ -71,7 +95,7 @@ async function listConversations(userId, agentId, page = 1, limit = 50) {
 }
 
 
-async function addMessage(userId, conversationId, { role, text }) {
+async function addMessage(userId, conversationId, { role, text, personaId: providedPersonaId }) {
   if (!mongoose.isValidObjectId(userId)) {
     throw Object.assign(new Error('Invalid userId'), { status: 400 });
   }
@@ -86,6 +110,18 @@ async function addMessage(userId, conversationId, { role, text }) {
 
   const importance = computeMessageImportance(text, role);
 
+  // Atomic increment messageCount + update timestamp
+  await Conversation.findByIdAndUpdate(
+    conv._id,
+    { $inc: { messageCount: 1 }, $set: { updatedAt: new Date() } }
+  );
+
+  // ✅ FIX: Use provided personaId or fetch from conversation for assistant messages
+  let personaId = providedPersonaId;
+  if (!personaId && role === 'assistant') {
+    personaId = conv.currentPersonaId;
+  }
+
   const msg = await Message.create({
     conversationId: conv._id,
     userId: new mongoose.Types.ObjectId(userId),
@@ -94,25 +130,10 @@ async function addMessage(userId, conversationId, { role, text }) {
     importance,
     createdAt: new Date(),
     modelId: conv.selectedModelId, // ⭐ SNAPSHOT
+    personaId: role === 'assistant' ? (personaId || conv.currentPersonaId) : null,
   });
 
-  // Phase 3.3: fire-and-forget memory store (NOT awaited)
-  const { processAndStoreMemory } = require('./userMemory.service');
-  processAndStoreMemory(text, role, userId, conversationId)
-    .catch(err => console.warn('[userMemory] fire-and-forget error:', err));
-
-  // Side-effect: vector memory write (DO NOT await)
-  writeMessageToMemory(msg);
-
-  // Atomic increment messageCount + update timestamp
-  const updated = await Conversation.findByIdAndUpdate(
-    conv._id,
-    { $inc: { messageCount: 1 }, $set: { updatedAt: new Date() } },
-    { new: true }
-  );
-
-  // Side-effect: summary generation trigger (DO NOT await)
-  triggerSummaryIfNeeded(conv._id, updated.messageCount);
+  console.log(`✅ Message saved | Role: ${role} | PersonaId: ${msg.personaId || 'user'}`);
 
   return msg.toObject();
 }
@@ -135,7 +156,17 @@ async function getMessages(userId, conversationId, { page = 1, limit = 50 }) {
     Message.countDocuments({ conversationId: new mongoose.Types.ObjectId(conversationId) })
   ]);
 
-  return { items, total, page, limit };
+  // Enrich items with persona metadata
+  const personaIds = [...new Set(items.map(m => m.personaId).filter(Boolean))];
+  const personas = await Persona.find({ id: { $in: personaIds } }).lean();
+  const personaMap = personas.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+
+  const enrichedItems = items.map(m => ({
+    ...m,
+    persona: m.personaId ? personaMap[m.personaId] : null
+  }));
+
+  return { items: enrichedItems, total, page, limit };
 }
 
 async function renameConversation(userId, conversationId, title) {
@@ -206,4 +237,25 @@ async function updateConversationModel(userId, conversationId, modelId) {
 }
 
 
-module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel, };
+// switchPersona logic
+
+async function switchPersona(userId, conversationId, personaId) {
+  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+
+  // Validate persona exists
+  const persona = await Persona.findOne({ id: personaId });
+  if (!persona) throw Object.assign(new Error('Persona not found'), { status: 404 });
+  if (!persona.isActive) throw Object.assign(new Error('Persona is not active'), { status: 400 });
+
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+
+  conv.currentPersonaId = personaId;
+  await conv.save();
+
+  return conv.toObject();
+}
+
+module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel, switchPersona };

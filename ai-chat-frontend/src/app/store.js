@@ -4,6 +4,7 @@ import conversationReducer from '../features/conversations/conversationSlice';
 import llmModelsReducer from '../features/LLM-Models/llm-modelsSlice'
 import promptSettingsReducer from '../features/LLM-Models/promptSettingsSlice'
 import memoryReducer from '../features/memory/memorySlice';
+import personaReducer from '../features/persona/personaSlice';
 
 export const store = configureStore({
     reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
         conversation: conversationReducer,
         llmModels: llmModelsReducer,
         promptSettings: promptSettingsReducer,
-        memory: memoryReducer
+        memory: memoryReducer,
+        persona: personaReducer
     },
 });

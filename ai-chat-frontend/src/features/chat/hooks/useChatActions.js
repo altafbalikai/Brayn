@@ -11,6 +11,7 @@ import {
     clearMessages,
     clearCurrentConversation
 } from '../../conversations/conversationSlice';
+import { selectCurrentPersonaId } from '../../persona/personaSlice';
 
 export const useChatActions = (currentConversation, selectedModelId) => {
     const dispatch = useDispatch();
@@ -24,6 +25,7 @@ export const useChatActions = (currentConversation, selectedModelId) => {
         (state) =>
             state.conversation.assistantTyping?.[currentConversation?._id] ?? false
     );
+    const selectedPersonaId = useSelector(selectCurrentPersonaId);
 
     const handleSelectConversation = useCallback(
         (conv) => {
@@ -92,6 +94,7 @@ export const useChatActions = (currentConversation, selectedModelId) => {
                         agentId: currentConversation.agentId,
                         title,
                         modelId: selectedModelId,
+                        personaId: selectedPersonaId, // Optional: backend will use default if missing
                     })
                 );
 

@@ -1,11 +1,12 @@
 import api from '../axios';
 
 export const conversationService = {
-    createConversation: async ({ agentId, title, modelId }) => {
+    createConversation: async ({ agentId, title, modelId, personaId }) => {
         const response = await api.post("/conversations", {
             agentId,
             title,
             modelId, // optional
+            currentPersonaId: personaId, // optional
         });
         return response.data;
     },

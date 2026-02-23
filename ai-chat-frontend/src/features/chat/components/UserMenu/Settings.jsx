@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import ModalPortal from "../../../../components/ui/ModalPortal";
 import { ThemeSelector } from "../../../../components/ThemeSelector";
 import MemoryPanel from "../../../../features/memory/MemoryPanel";
+import { PersonaPanel } from "../../../persona/PersonaPanel";
 
 /**
  * Settings modal with theme selector and future customization options.
  * @param {{onClose: function}} props
  */
-function Settings({ onClose }) {
+function Settings({ onClose, conversationId }) {
   const [activeTab, setActiveTab] = useState('general');
 
   return (
@@ -60,21 +61,33 @@ function Settings({ onClose }) {
               onClick={() => setActiveTab('general')}
               className={`py-3 mr-6 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 ${
                 activeTab === 'general'
-                  ? 'border-blue-500 text-theme-text'
+                  ? 'border-[var(--theme-focus-ring)] text-theme-text'
                   : 'border-transparent text-theme-muted'
               }`}
             >
               General
             </button>
+            
             <button
-              onClick={() => setActiveTab('personalize')}
-              className={`py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 ${
-                activeTab === 'personalize'
-                  ? 'border-blue-500 text-theme-text'
+              onClick={() => setActiveTab('personas')}
+              className={`py-3 mr-6 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 ${
+                activeTab === 'personas'
+                  ? 'border-[var(--theme-focus-ring)] text-theme-text'
                   : 'border-transparent text-theme-muted'
               }`}
             >
-              Personalize
+              Personas
+            </button>
+
+            <button
+              onClick={() => setActiveTab('personalize')}
+              className={`py-3 mr-6 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 ${
+                activeTab === 'personalize'
+                  ? 'border-[var(--theme-focus-ring)] text-theme-text'
+                  : 'border-transparent text-theme-muted'
+              }`}
+            >
+              Memory
             </button>
           </div>
 
@@ -116,10 +129,16 @@ function Settings({ onClose }) {
                   Memory
                 </h3>
                 <p className="text-xs text-theme-muted mb-4">
-                  The AI remembers facts about you across conversations.
+                  Brayn AI remembers facts about you across conversations.
                   View, edit, or remove what it knows below.
                 </p>
                 <MemoryPanel />
+              </div>
+            )}
+            
+            {activeTab === 'personas' && (
+              <div className="p-0">
+                <PersonaPanel conversationId={conversationId} />
               </div>
             )}
           </div>

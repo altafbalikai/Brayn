@@ -13,6 +13,7 @@ const summaryRoutes = require('./routes/summary.routes');
 const llmmodelRoutes = require('./routes/llmmodel.routes');
 const promptSettingsRoutes = require('./routes/promptSettings.routes')
 const userMemoryRoutes = require('./routes/userMemory.routes');
+const personaRoutes = require('./routes/persona.routes');
 
 const app = express();
 
@@ -170,6 +171,7 @@ app.use('/api/summary', summaryRoutes);
 app.use('/api/llm-models', llmmodelRoutes); // new LLM model routes
 app.use('/api/prompt-settings', promptSettingsRoutes);
 app.use('/api/user/memory', userMemoryRoutes);
+app.use('/api/personas', personaRoutes);
 
 // API Documentation
 if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
