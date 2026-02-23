@@ -46,6 +46,10 @@ const UserMemorySchema = new Schema({
     updatedAt: {
         type: Date,
         default: Date.now
+    },
+    enabled: {
+        type: Boolean,
+        default: true
     }
 });
 

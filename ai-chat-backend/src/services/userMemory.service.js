@@ -163,10 +163,77 @@ function logMemoryInjection(userId, key, value) {
     });
 }
 
+/**
+ * Toggles a memory's enabled status and logs the action.
+ */
+async function toggleUserMemory(userId, key, enabled) {
+    try {
+        const doc = await UserMemory.findOne({ userId, key });
+        if (!doc) return { toggled: false, reason: 'NOT_FOUND' };
+
+        const previousEnabled = doc.enabled;
+
+        doc.enabled = enabled;
+        doc.updatedAt = new Date();
+        await doc.save();
+
+        await UserMemoryAuditLog.create({
+            userId,
+            action: enabled ? 'ENABLED' : 'DISABLED',
+            key,
+            previousValue: String(previousEnabled),
+            newValue: String(enabled),
+            sourceConversationId: null
+        });
+
+        return { toggled: true, key, enabled };
+    } catch (err) {
+        console.error('[userMemory] toggleUserMemory error:', err);
+        return { toggled: false, reason: 'INTERNAL_ERROR' };
+    }
+}
+
+/**
+ * Edits a memory's value and logs the action.
+ */
+async function editUserMemory(userId, key, newValue) {
+    try {
+        const trimmed = newValue.trim();
+        if (trimmed.length < 2 || trimmed.length > 50) {
+            return { edited: false, reason: 'VALIDATION_VALUE_LENGTH' };
+        }
+
+        const doc = await UserMemory.findOne({ userId, key });
+        if (!doc) return { edited: false, reason: 'NOT_FOUND' };
+
+        const previousValue = doc.value;
+
+        doc.value = trimmed;
+        doc.updatedAt = new Date();
+        await doc.save();
+
+        await UserMemoryAuditLog.create({
+            userId,
+            action: 'OVERWRITE',
+            key,
+            previousValue,
+            newValue: trimmed,
+            sourceConversationId: null
+        });
+
+        return { edited: true, key, value: trimmed };
+    } catch (err) {
+        console.error('[userMemory] editUserMemory error:', err);
+        return { edited: false, reason: 'INTERNAL_ERROR' };
+    }
+}
+
 module.exports = {
     processAndStoreMemory,
     getUserMemories,
     deleteUserMemory,
     wipeUserMemory,
-    logMemoryInjection
+    logMemoryInjection,
+    toggleUserMemory,
+    editUserMemory
 };

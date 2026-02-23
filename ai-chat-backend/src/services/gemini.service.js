@@ -126,7 +126,7 @@ async function getInjectedUserMemory(userId) {
 
     // Step 2 & 3: Filter and Sort
     let memories = allMemories
-      .filter(m => m.importance >= 7 && m.confidence >= 0.5)
+      .filter(m => m.importance >= 7 && m.confidence >= 0.5 && m.enabled === true)
       .sort((a, b) => b.importance - a.importance || b.updatedAt - a.updatedAt);
 
     // Step 4: Cap at 5

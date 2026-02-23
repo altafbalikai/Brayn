@@ -9,7 +9,7 @@ const UserMemoryAuditLogSchema = new Schema({
     },
     action: {
         type: String,
-        enum: ['WRITE', 'OVERWRITE', 'DELETE', 'WIPE', 'INJECTED'],
+        enum: ['WRITE', 'OVERWRITE', 'DELETE', 'WIPE', 'INJECTED', 'DISABLED', 'ENABLED'],
         required: true
     },
     key: {
