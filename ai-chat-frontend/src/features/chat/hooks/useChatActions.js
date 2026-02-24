@@ -120,7 +120,7 @@ export const useChatActions = (currentConversation, selectedModelId) => {
                 })
             );
         },
-        [dispatch, currentConversation, selectedModelId, navigate]
+        [dispatch, currentConversation, selectedModelId, navigate, selectedPersonaId]
     );
 
     const handlePromptClick = useCallback(

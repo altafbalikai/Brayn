@@ -19,7 +19,7 @@ async function createConversation(userId, agentId, title, selectedModelId = '695
   // ✅ NEW: Decide persona
   let activePersonaId = personaId;
 
-  if (!activePersonaId || !mongoose.isValidObjectId(activePersonaId)) {
+  if (!activePersonaId) {
     // Fetch default persona
     let defaultPersona = await Persona.findOne({
       slug: 'general-assistant',

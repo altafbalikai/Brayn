@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ModalPortal from "../../../components/ui/ModalPortal";
+import SpiningLoader from "../../../components/ui/SpiningLoader";
 
 function DeleteConfirmationModal({ onConfirm, onClose, title }) {
   const [loading, setLoading] = useState(false);
@@ -88,7 +89,7 @@ function DeleteConfirmationModal({ onConfirm, onClose, title }) {
                     transition-colors
                     "
               >
-                {loading ? "Deleting..." : "Delete"}
+                {loading ? <SpiningLoader /> : "Delete"}
               </button>
             </div>
           </div>

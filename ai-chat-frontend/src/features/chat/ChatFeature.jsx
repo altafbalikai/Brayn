@@ -171,7 +171,7 @@ export default function ChatFeature() {
                     Composer={(props) => (
                       <Composer
                         {...props}
-                        onSend={handlePromptClick}
+                        onSend={handleSendMessage}
                         disabled={sending || assistantTyping}
                         position="center"
                         currentConversation={currentConversation}
