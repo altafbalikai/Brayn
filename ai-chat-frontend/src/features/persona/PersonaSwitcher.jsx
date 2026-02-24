@@ -132,7 +132,7 @@ export const PersonaSwitcher = ({ conversationId }) => {
             >
                 {(() => {
                     const Icon = getPersonaIcon(currentPersona?.slug);
-                    return <Icon className="w-4 h-4 text-theme-text" />;
+                    return <Icon className="w-5 h-5 text-theme-text" />;
                 })()}
                 <span className="hidden lg:inline truncate max-w-[120px]">
                     {currentPersona?.name || 'Assign Identity'}
