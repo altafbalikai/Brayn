@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { forgotPassword, clearError } from "../features/auth/authSlice";
 import { GiBrain } from "react-icons/gi";
 import RewindBackground from "../components/ui/RewindBackground.jsx";
+import SpiningLoader from "../components/ui/SpiningLoader.jsx";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -75,7 +76,7 @@ export default function ForgotPassword() {
               disabled={loading}
               className="w-full py-3 bg-theme-secondary text-theme-text rounded-lg disabled:opacity-50"
             >
-              {loading ? "Sending..." : "Send Reset Link"}
+              {loading ? <SpiningLoader /> : "Send Reset Link"}
             </button>
           </form>
 

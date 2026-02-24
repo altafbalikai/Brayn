@@ -11,6 +11,7 @@ import {
   selectMemoryError,
   selectCardErrors
 } from './memorySlice';
+import SpiningLoader from '../../components/ui/SpiningLoader';
 
 /**
  * MemoryPanel component for managing user facts.
@@ -78,9 +79,7 @@ function MemoryPanel() {
 
   if (loading) {
     return (
-      <div className="flex justify-center my-8">
-        <div className="w-6 h-6 rounded-full border-2 border-theme-muted border-t-transparent animate-spin" />
-      </div>
+      <SpiningLoader />
     );
   }
 

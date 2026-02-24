@@ -6,6 +6,7 @@ import { authService } from "../../../../api/services/authService";
 import ModalPortal from "../../../../components/ui/ModalPortal";
 import { clearCurrentConversation } from "../../../../features/conversations/conversationSlice";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import SpiningLoader from "../../../../components/ui/SpiningLoader";
 
 function UserProfile({ user, onClose }) {
   const dispatch = useDispatch();
@@ -413,7 +414,7 @@ function UserProfile({ user, onClose }) {
           disabled:cursor-not-allowed
         "
                     >
-                      {loading ? "Saving..." : "Update Password"}
+                      {loading ? <SpiningLoader /> : "Update Password"}
                     </button>
 
                     <button

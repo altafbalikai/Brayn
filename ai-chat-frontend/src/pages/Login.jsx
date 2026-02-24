@@ -5,6 +5,7 @@ import { login, clearError } from "../features/auth/authSlice";
 import { GiBrain } from "react-icons/gi";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import RewindBackground from "../components/ui/RewindBackground.jsx";
+import SpiningLoader from "../components/ui/SpiningLoader.jsx";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -123,7 +124,7 @@ export default function Login() {
               disabled={loading || !isPasswordValid}
               className="w-full py-3 bg-theme-secondary text-theme-text font-semibold rounded-lg hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? <SpiningLoader /> : "Sign In"}
             </button>
           </form>
 

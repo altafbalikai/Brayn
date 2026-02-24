@@ -134,7 +134,7 @@ async function refresh(req, res, next) {
     // prefer cookie, fallback to body
     const incomingRefresh = req.cookies?.[REFRESH_COOKIE_NAME] || req.body?.refreshToken;
     if (!incomingRefresh) {
-      return badRequest(res, 'refreshToken required');
+      return unauthorized(res, 'Unauthorized');
     }
 
     // call service to rotate / validate

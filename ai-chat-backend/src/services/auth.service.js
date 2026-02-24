@@ -174,7 +174,7 @@ async function createRefreshTokenForUser(user, session = null) {
 async function refreshTokens(refreshTokenStr) {
   // refreshTokenStr may be provided from request body or cookie at controller level
   if (!refreshTokenStr) {
-    const e = new HttpError('refreshToken required', 400, 'MISSING_REFRESH_TOKEN');
+    const e = new HttpError('Unauthorized', 401, 'MISSING_REFRESH_TOKEN');
     throw e;
   }
 

@@ -5,6 +5,7 @@ import { signup, clearError } from "../features/auth/authSlice";
 import { GiBrain } from "react-icons/gi";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import RewindBackground from "../components/ui/RewindBackground.jsx";
+import SpiningLoader from "../components/ui/SpiningLoader.jsx";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -264,7 +265,7 @@ export default function Signup() {
               shadow-lg
             "
             >
-              {loading ? "Creating account..." : "Sign Up"}
+              {loading ? <SpiningLoader /> : "Sign Up"}
             </button>
           </form>
 
