@@ -89,7 +89,7 @@ function Composer({
         className="
           relative
           flex flex-col
-          rounded-3xl
+          rounded-2xl
           px-2 md:px-2
           py-2
 
@@ -188,7 +188,7 @@ function Composer({
               className="
             shrink-0
             h-9 w-9
-            rounded-2xl
+            rounded-xl
 
             bg-theme-muted
             text-theme-text
@@ -218,8 +218,8 @@ function Composer({
         <div
           className="
             pointer-events-none
-            absolute inset-0 rounded-3xl
-            ring-1 ring-white/20
+            absolute inset-0 rounded-2xl
+            ring-1 ring-theme-secondary
           "
         />
       </div>
