@@ -115,12 +115,14 @@ export const PersonaSwitcher = ({ conversationId }) => {
                 //     text-sm text-theme-text transition-colors
                 //     ${!conversationId || conversationId === 'draft' ? 'moving-border' : ''}
                 // `}
+
+                // ${
+                //         (!conversationId || conversationId === 'draft') && !isOpen
+                //         ? "moving-border" 
+                //         : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
+                //     }
                 className={`
-                    ${
-                        (!conversationId || conversationId === 'draft') && !isOpen
-                        ? "moving-border" 
-                        : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
-                    }
+                    rounded-lg border border-theme-dark hover:bg-theme-secondary
                     flex items-center gap-1
                     px-2 py-1
                     text-sm
@@ -130,10 +132,10 @@ export const PersonaSwitcher = ({ conversationId }) => {
             >
                 {(() => {
                     const Icon = getPersonaIcon(currentPersona?.slug);
-                    return <Icon className="w-3 h-3 text-theme-text" />;
+                    return <Icon className="w-4 h-4 text-theme-text" />;
                 })()}
                 <span className="hidden lg:inline truncate max-w-[120px]">
-                    {currentPersona?.name || 'Select Persona'}
+                    {currentPersona?.name || 'Assign Identity'}
                 </span>
                 <span className="pt-0.5">
                     <FaAngleDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />

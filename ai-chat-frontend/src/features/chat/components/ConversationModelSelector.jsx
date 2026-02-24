@@ -110,7 +110,7 @@ function Conversationllmmodelselector({
                       (!currentConversation || currentConversation.isDraft) &&
                       !open
                         ? "moving-border"
-                        : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
+                        : "rounded-lg border border-theme-dark hover:bg-theme-secondary"
                     }
                     flex items-center justify-center
                     px-2
@@ -154,7 +154,7 @@ function Conversationllmmodelselector({
           ${
             (!currentConversation || currentConversation.isDraft) && !open
               ? "moving-border" 
-              : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
+              : "rounded-lg border border-theme-dark hover:bg-theme-secondary"
           }
           flex items-center gap-1
           px-2 py-1

@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
-import { TiArrowUp } from "react-icons/ti";
 import ConversationModelSelector from "./ConversationModelSelector";
 import { PersonaSwitcher } from "../../persona/PersonaSwitcher";
 import { useSelector } from "react-redux";
-import { FaRegCircleStop } from "react-icons/fa6";
+import { GoArrowUpRight } from "react-icons/go";
+import { IoIosSquare } from "react-icons/io";
 
 /**
  * Composer - floating glass input with multi-line support
@@ -187,8 +187,8 @@ function Composer({
               disabled={!text.trim() || disabled}
               className="
             shrink-0
-            h-11 w-11
-            rounded-full
+            h-9 w-9
+            rounded-2xl
 
             bg-theme-muted
             text-theme-text
@@ -206,9 +206,9 @@ function Composer({
           "
             >
               {isStreaming ? (
-                <FaRegCircleStop className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+                <IoIosSquare className="w-6 h-6 md:w-5 md:h-5 text-theme-dark block" />
               ) : (
-                <TiArrowUp className="w-8 h-8 md:w-7 md:h-7 text-theme-accent" />
+                <GoArrowUpRight className="w-6 h-6 md:w-5 md:h-5 text-theme-dark" />
               )}
             </button>
           </div>
