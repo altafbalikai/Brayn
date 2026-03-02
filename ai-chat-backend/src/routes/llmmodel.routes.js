@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth.middleware');
+const { authorize } = require('../middlewares/auth.middleware');
 const { handleValidationErrors } = require('../middlewares/validation.middleware');
 const {
     createLLMModel,
-    getLLMModels,
+    getAllModels,
+    getActiveModels,
     getLLMModel,
     updateLLMModel,
     deleteLLMModel,
 } = require('../controllers/llmmodel.controller');
-const convController = require('../controllers/conversation.controller');
 const {
     createLLMModelValidation,
     updateLLMModelValidation,
@@ -17,13 +18,30 @@ const {
     llmModelIdValidation,
 } = require('../validators/llmmodel.validator');
 
-// require JWT auth for AI interaction
+// require JWT auth for all model operations
 router.use(auth);
 
-router.post("/", createLLMModelValidation, handleValidationErrors, createLLMModel);
-router.get("/", getLLMModelsValidation, handleValidationErrors, getLLMModels);
-router.get("/:id", llmModelIdValidation, handleValidationErrors, getLLMModel);
-router.patch("/:id", llmModelIdValidation, updateLLMModelValidation, handleValidationErrors, updateLLMModel);
-router.delete("/:id", llmModelIdValidation, handleValidationErrors, deleteLLMModel);
+/**
+ * COMPOSER / PUBLIC ROUTES
+ */
+// GET /api/llm-models/active -> Only active models
+router.get("/llm-models/active", getLLMModelsValidation, handleValidationErrors, getActiveModels);
+
+// GET /api/llm-models/ -> Backward compatibility (returns active models)
+router.get("/llm-models", getLLMModelsValidation, handleValidationErrors, getActiveModels);
+
+/**
+ * ADMIN ROUTES
+ */
+// GET /api/admin/llm-models -> All models
+router.get("/admin/llm-models", authorize("admin"), getLLMModelsValidation, handleValidationErrors, getAllModels);
+
+// POST /api/llm-models -> Create model (Admin only)
+router.post("/llm-models", authorize("admin"), createLLMModelValidation, handleValidationErrors, createLLMModel);
+
+// Single model operations
+router.get("/llm-models/:id", llmModelIdValidation, handleValidationErrors, getLLMModel);
+router.patch("/llm-models/:id", authorize("admin"), llmModelIdValidation, updateLLMModelValidation, handleValidationErrors, updateLLMModel);
+router.delete("/llm-models/:id", authorize("admin"), llmModelIdValidation, handleValidationErrors, deleteLLMModel);
 
 module.exports = router;

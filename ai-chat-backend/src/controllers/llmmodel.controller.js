@@ -1,10 +1,4 @@
-const {
-    addLLMModel,
-    getAllLLMModels,
-    getLLMModelById,
-    updateLLMModelById,
-    deprecateLLMModel,
-} = require('../services/llmmodel.service');
+const llmModelService = require('../services/llmmodel.service');
 
 /**
  * POST /api/llm-models
@@ -12,7 +6,7 @@ const {
  */
 async function createLLMModel(req, res, next) {
     try {
-        const model = await addLLMModel(req.body);
+        const model = await llmModelService.addLLMModel(req.body);
         res.status(201).json(model);
     } catch (err) {
         next(err);
@@ -20,13 +14,28 @@ async function createLLMModel(req, res, next) {
 }
 
 /**
- * GET /api/llm-models
- * List LLM models (for UI)
- * Query params: status, provider, capability, costTier
+ * GET /api/admin/llm-models
+ * List ALL LLM models (for admin)
  */
-async function getLLMModels(req, res, next) {
+async function getAllModels(req, res, next) {
     try {
-        const models = await getAllLLMModels(req.query);
+        const models = await llmModelService.getLLMModels(req.query);
+        res.json(models);
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * GET /api/llm-models/active
+ * List ONLY active LLM models (for composer)
+ */
+async function getActiveModels(req, res, next) {
+    try {
+        const models = await llmModelService.getLLMModels({
+            ...req.query,
+            status: "active"
+        });
         res.json(models);
     } catch (err) {
         next(err);
@@ -39,7 +48,7 @@ async function getLLMModels(req, res, next) {
  */
 async function getLLMModel(req, res, next) {
     try {
-        const model = await getLLMModelById(req.params.id);
+        const model = await llmModelService.getLLMModelById(req.params.id);
         res.json(model);
     } catch (err) {
         next(err);
@@ -52,7 +61,7 @@ async function getLLMModel(req, res, next) {
  */
 async function updateLLMModel(req, res, next) {
     try {
-        const model = await updateLLMModelById(
+        const model = await llmModelService.updateLLMModelById(
             req.params.id,
             req.body
         );
@@ -68,7 +77,7 @@ async function updateLLMModel(req, res, next) {
  */
 async function deleteLLMModel(req, res, next) {
     try {
-        const model = await deprecateLLMModel(req.params.id);
+        const model = await llmModelService.deprecateLLMModel(req.params.id);
         res.json({
             message: "Model deprecated successfully",
             model,
@@ -80,7 +89,8 @@ async function deleteLLMModel(req, res, next) {
 
 module.exports = {
     createLLMModel,
-    getLLMModels,
+    getAllModels,
+    getActiveModels,
     getLLMModel,
     updateLLMModel,
     deleteLLMModel,

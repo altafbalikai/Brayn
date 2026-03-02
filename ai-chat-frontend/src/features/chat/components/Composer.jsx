@@ -3,7 +3,7 @@ import ConversationModelSelector from "./ConversationModelSelector";
 import { PersonaSwitcher } from "../../persona/PersonaSwitcher";
 import { useSelector } from "react-redux";
 import { GoArrowUpRight } from "react-icons/go";
-import { IoIosSquare } from "react-icons/io";
+import { TbSquareRoundedFilled } from "react-icons/tb";
 
 /**
  * Composer - floating glass input with multi-line support
@@ -206,7 +206,7 @@ function Composer({
           "
             >
               {isStreaming ? (
-                <IoIosSquare className="w-6 h-6 md:w-5 md:h-5 text-theme-dark block" />
+                <TbSquareRoundedFilled className="w-6 h-6 md:w-5 md:h-5 text-theme-dark block" />
               ) : (
                 <GoArrowUpRight className="w-6 h-6 md:w-5 md:h-5 text-theme-dark" />
               )}

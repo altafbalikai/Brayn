@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getLLMModels,
+  getAdminLLMModels,
   addLLMModel,
   editLLMModel,
   removeLLMModel,
@@ -58,7 +58,7 @@ export default function AdminPanel() {
      Load models
      ===================== */
   useEffect(() => {
-    dispatch(getLLMModels());
+    dispatch(getAdminLLMModels());
   }, [dispatch]);
 
   /* =====================

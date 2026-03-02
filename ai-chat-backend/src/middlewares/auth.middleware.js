@@ -6,7 +6,7 @@ module.exports = async function auth(req, res, next) {
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
-  
+
   try {
     const h = req.headers.authorization;
     if (!h) return res.status(401).json({ error: 'Missing Authorization' });
@@ -35,4 +35,18 @@ module.exports = async function auth(req, res, next) {
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+};
+
+/**
+ * Role-based authorization middleware
+ */
+module.exports.authorize = function (...roles) {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: `Forbidden: required roles - [${roles.join(', ')}]`,
+      });
+    }
+    next();
+  };
 };

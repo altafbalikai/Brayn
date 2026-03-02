@@ -38,7 +38,7 @@ const LLMModelSchema = new mongoose.Schema(
         provider: {
             type: String,
             required: true,
-            enum: ["meta", "openai", "google", "nvidia", "qwen", "mistral", "other"],
+            enum: ["meta", "openai", "google", "nvidia", "qwen", "mistral", "arcee-ai", "stepfun", "other"],
             index: true,
         },
 

@@ -12,7 +12,7 @@ const MODEL_CAPABILITIES = [
     "json_mode",
 ];
 
-const PROVIDERS = ["meta", "openai", "google", "nvidia", "qwen", "mistral", "other"];
+const PROVIDERS = ["meta", "openai", "google", "nvidia", "qwen", "mistral", "arcee-ai", "stepfun", "other"];
 const COST_TIERS = ["free", "paid"];
 const STATUS_VALUES = ["active", "deprecated", "experimental"];
 const LATENCY_CLASSES = ["fast", "medium", "slow"];

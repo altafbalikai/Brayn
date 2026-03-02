@@ -69,22 +69,26 @@ async function addLLMModel(modelData) {
 }
 
 /**
- * READ – list (for UI)
+ * Helper to build query from filters
  */
-async function getAllLLMModels(filters = {}) {
-    const {
-        status = "active",
-        capability,
-        provider,
-        costTier,
-    } = filters;
+function _buildModelQuery(filters = {}) {
+    const { capability, provider, costTier, status } = filters;
 
     const query = {};
 
-    if (status) query.status = status;
     if (provider) query.provider = provider;
     if (costTier) query.costTier = costTier;
     if (capability) query.capabilities = capability;
+    if (status) query.status = status;
+
+    return query;
+}
+
+/**
+ * READ – list (flexible)
+ */
+async function getLLMModels(filters = {}) {
+    const query = _buildModelQuery(filters);
 
     const models = await LLMModel.find(query)
         .select("-__v")
@@ -173,7 +177,7 @@ async function deprecateLLMModel(modelId) {
 
 module.exports = {
     addLLMModel,
-    getAllLLMModels,
+    getLLMModels,
     getLLMModelById,
     updateLLMModelById,
     deprecateLLMModel,

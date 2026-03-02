@@ -168,7 +168,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);
 app.use('/api/summary', summaryRoutes);
-app.use('/api/llm-models', llmmodelRoutes); // new LLM model routes
+app.use('/api', llmmodelRoutes); // Using /api to support /admin and /llm-models namespaces
 app.use('/api/prompt-settings', promptSettingsRoutes);
 app.use('/api/user/memory', userMemoryRoutes);
 app.use('/api/personas', personaRoutes);

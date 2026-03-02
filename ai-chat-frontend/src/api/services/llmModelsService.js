@@ -10,10 +10,12 @@ if (!API_BASE_URL) {
 /**
  * Shared fetch wrapper
  */
-async function fetchClient(url, options = {}) {
+async function fetchClient(endpoint, options = {}) {
     const token = localStorage.getItem("accessToken");
     const retry = options.retry !== false; // default true
-    const res = await fetch(`${API_BASE_URL}/llm-models${url}`, {
+
+    // endpoint should start with /llm-models or /admin/llm-models
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         credentials: "include",
         headers: {
@@ -67,55 +69,68 @@ async function fetchClient(url, options = {}) {
 }
 
 /**
- * POST /
+ * POST /api/llm-models
  * Create LLM model
  */
 export function createLLMModel(payload) {
-    return fetchClient("/", {
+    return fetchClient("/llm-models", {
         method: "POST",
         body: JSON.stringify(payload),
     });
 }
 
 /**
- * GET /
- * Fetch LLM models (for UI)
+ * GET /api/llm-models/active
+ * Fetch ONLY active LLM models (for composer)
  */
-export function fetchLLMModels(params = {}) {
+export function fetchActiveLLMModels(params = {}) {
     const query = new URLSearchParams(params).toString();
-    return fetchClient(query ? `?${query}` : "");
+    return fetchClient(`/llm-models/active${query ? `?${query}` : ""}`);
 }
 
 /**
- * GET /:id
+ * GET /api/admin/llm-models
+ * Fetch ALL LLM models (for admin panel)
+ */
+export function fetchAdminLLMModels(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return fetchClient(`/admin/llm-models${query ? `?${query}` : ""}`);
+}
+
+/**
+ * GET /api/llm-models/:id
  * Fetch single LLM model
  */
 export function fetchLLMModelById(id) {
     if (!id) throw new Error("Model ID is required");
-    return fetchClient(`/${id}`);
+    return fetchClient(`/llm-models/${id}`);
 }
 
 /**
- * PATCH /:id
+ * PATCH /api/llm-models/:id
  * Update LLM model
  */
 export function updateLLMModel(id, payload) {
     if (!id) throw new Error("Model ID is required");
 
-    return fetchClient(`/${id}`, {
+    return fetchClient(`/llm-models/${id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
     });
 }
 
 /**
- * DELETE /:id
+ * DELETE /api/llm-models/:id
  * Soft delete (deprecate)
  */
 export function deleteLLMModel(id) {
     if (!id) throw new Error("Model ID is required");
 
-    return fetchClient(`/${id}`, {
+    return fetchClient(`/llm-models/${id}`, {
         method: "DELETE",
     });
+}
+// Keep for backward compatibility if needed by other components
+export function fetchLLMModels(params = {}) {
+    return fetchActiveLLMModels(params);
 }

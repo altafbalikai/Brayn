@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-    fetchLLMModels,
+    fetchActiveLLMModels,
+    fetchAdminLLMModels,
     fetchLLMModelById,
     createLLMModel,
     updateLLMModel,
@@ -12,13 +13,29 @@ import {
    =========================== */
 
 /**
- * GET /llm-models
+ * GET /llm-models/active
+ * Used by composer
  */
 export const getLLMModels = createAsyncThunk(
-    "llmModels/getAll",
+    "llmModels/getAllActive",
     async (filters = {}, { rejectWithValue }) => {
         try {
-            return await fetchLLMModels(filters);
+            return await fetchActiveLLMModels(filters);
+        } catch (err) {
+            return rejectWithValue(err.message);
+        }
+    }
+);
+
+/**
+ * GET /admin/llm-models
+ * Used by admin panel
+ */
+export const getAdminLLMModels = createAsyncThunk(
+    "llmModels/getAllAdmin",
+    async (filters = {}, { rejectWithValue }) => {
+        try {
+            return await fetchAdminLLMModels(filters);
         } catch (err) {
             return rejectWithValue(err.message);
         }
@@ -125,6 +142,20 @@ const llmModelsSlice = createSlice({
                 }
             })
             .addCase(getLLMModels.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            /* ---- GET ADMIN ALL ---- */
+            .addCase(getAdminLLMModels.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(getAdminLLMModels.fulfilled, (state, action) => {
+                state.loading = false;
+                state.llmmodels = action.payload;
+            })
+            .addCase(getAdminLLMModels.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
