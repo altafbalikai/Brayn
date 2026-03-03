@@ -1,0 +1,118 @@
+﻿  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.test -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (30) from .env -- tip: ≡ƒöæ add access controls to secrets: https://dotenvx.com/ops
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.info
+    [MAIL] Using SMTP transport (smtp.gmail.com:587)
+
+      at Object.info (src/utils/mailer.js:84:11)
+
+2026-03-02 19:44:44 [32minfo[39m: [32mSwagger UI available at /api-docs[39m
+node.exe : (node:9512) [MONGOOSE] Warning: Duplicate schema index on {"id":1} 
+found. This is often due to declaring an index using both "index: true" and 
+"schema.index()". Please remove the duplicate index definition.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:9512) [MO...dex definition 
+   .:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9512) [MONGOOSE] Warning: Duplicate schema index on {"slug":1} found. 
+This is often due to declaring an index using both "index: true" and 
+"schema.index()". Please remove the duplicate index definition.
+FAIL src/api/messages/__tests__/retryController.test.js (7.411 s)
+  Retry Controller Integration Tests
+    POST /api/conversations/:cid/messages/:mid/retry
+      ΓêÜ should trigger regeneration and create a new version (316 ms)
+      ├ù should return 403 if user does not own the conversation (142 ms)
+    PATCH /api/messages/:messageId/version
+      ├ù should switch the active version of a message (93 ms)
+      ├ù should return 400 for invalid version number (44 ms)
+
+  ΓùÅ Retry Controller Integration Tests ΓÇ║ POST 
+/api/conversations/:cid/messages/:mid/retry ΓÇ║ should return 403 if user 
+does not own the conversation
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 403
+    Received: 401
+
+    [0m [90m 126 |[39m                 
+[33m.[39m[36mset[39m([32m'Authorization'[39m[33m,[39m 
+otherUserToken)[33m;[39m
+     [90m 127 |[39m
+    [31m[1m>[22m[39m[90m 128 |[39m             
+expect(res[33m.[39mstatus)[33m.[39mtoBe([35m403[39m)[33m;[39m
+     [90m     |[39m                                [31m[1m^[22m[39m
+     [90m 129 |[39m         })[33m;[39m
+     [90m 130 |[39m     })[33m;[39m
+     [90m 131 |[39m[0m
+
+      at Object.toBe 
+(src/api/messages/__tests__/retryController.test.js:128:32)
+
+  ΓùÅ Retry Controller Integration Tests ΓÇ║ PATCH 
+/api/messages/:messageId/version ΓÇ║ should switch the active version of a 
+message
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Second version."
+    Received: undefined
+
+    [0m [90m 154 |[39m             
+expect(res[33m.[39mstatus)[33m.[39mtoBe([35m200[39m)[33m;[39m
+     [90m 155 |[39m             expect(res[33m.[39mbody[33m.[39mmessage
+[33m.[39mversion)[33m.[39mtoBe([35m2[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 156 |[39m             expect(res[33m.[39mbody
+[33m.[39mmessage[33m.[39mtext)[33m.[39mtoBe([32m'Second 
+version.'[39m)[33m;[39m
+     [90m     |[39m                                           
+[31m[1m^[22m[39m
+     [90m 157 |[39m
+     [90m 158 |[39m             [90m// Verify in DB[39m
+     [90m 159 |[39m             [36mconst[39m updatedV2 [33m=[39m 
+[36mawait[39m 
+[33mMessageVersion[39m[33m.[39mfindById(v2[33m.[39m_id)[33m;[39m[0m
+
+      at Object.toBe 
+(src/api/messages/__tests__/retryController.test.js:156:43)
+
+  ΓùÅ Retry Controller Integration Tests ΓÇ║ PATCH 
+/api/messages/:messageId/version ΓÇ║ should return 400 for invalid version 
+number
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 404
+
+    [0m [90m 172 |[39m                 })[33m;[39m
+     [90m 173 |[39m
+    [31m[1m>[22m[39m[90m 174 |[39m             
+expect(res[33m.[39mstatus)[33m.[39mtoBe([35m400[39m)[33m;[39m
+     [90m     |[39m                                [31m[1m^[22m[39m
+     [90m 175 |[39m             
+expect(res[33m.[39mbody[33m.[39merror)[33m.[39mtoMatch([35m/version 
+not found/i[39m)[33m;[39m
+     [90m 176 |[39m         })[33m;[39m
+     [90m 177 |[39m     })[33m;[39m[0m
+
+      at Object.toBe 
+(src/api/messages/__tests__/retryController.test.js:174:32)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 1 passed, 4 total
+Snapshots:   0 total
+Time:        7.547 s
+Ran all test suites matching 
+src/api/messages/__tests__/retryController.test.js.

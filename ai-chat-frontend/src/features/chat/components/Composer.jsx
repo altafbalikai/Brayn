@@ -206,7 +206,7 @@ function Composer({
           "
             >
               {isStreaming ? (
-                <TbSquareRoundedFilled className="w-6 h-6 md:w-5 md:h-5 text-theme-dark block" />
+                <TbSquareRoundedFilled className="w-5 h-5 md:w-4 md:h-4 text-theme-dark block" />
               ) : (
                 <GoArrowUpRight className="w-6 h-6 md:w-5 md:h-5 text-theme-dark" />
               )}

@@ -9,6 +9,8 @@ import rehypeHighlight from "rehype-highlight";
 import remarkBreaks from "remark-breaks";
 import { FaCheck } from "react-icons/fa6";
 import LoadingIndicator from "./LoadingIndicator";
+import { MessageActions } from "./MessageActions";
+import { MessageVersions } from "./MessageVersions";
 
 /**
  * Fixes incomplete markdown during streaming
@@ -95,10 +97,21 @@ function CodeBlock({ node, inline, className, children, ...props }) {
   );
 }
 
-function MessageItem({ msg, showTime }) {
+function MessageItem({ msg, showTime, conversationId }) {
   const isStreaming = msg.status === "streaming";
-  const isLoading = isStreaming && !msg.text;
-  const displayText = msg.text || "";
+  
+  // 🔄 Single Source of Truth for Versions (Phase 12)
+  const totalVersions = msg.versions?.length || 0;
+  const currentVersionIdx = msg.currentVersion ? msg.currentVersion - 1 : 0;
+  
+  // Derive display text: 
+  // 1. If versions exist, use the content of the CURRENT active version
+  // 2. Fallback to top-level msg.text (for initial non-versioned messages)
+  const displayText = (totalVersions > 0 && msg.versions[currentVersionIdx])
+    ? msg.versions[currentVersionIdx].content
+    : (msg.text || "");
+
+  const isLoading = isStreaming && !displayText;
   const isAssistant = msg.role === "assistant";
 
   // 1. Hooks MUST be at top level
@@ -120,7 +133,7 @@ function MessageItem({ msg, showTime }) {
   // console.log("MessageItem repainting");
   return (
     <div
-      className={`flex w-full min-w-0 ${
+      className={`group flex w-full min-w-0 ${
         msg.role === "user" ? "justify-end" : "justify-start"
       } px-2 md:px-4 mb-1`}
     >
@@ -171,91 +184,112 @@ function MessageItem({ msg, showTime }) {
               {isAssistant ? (
                 // Assistant message with markdown rendering
                 <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
-              <div className="relative">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
-                  components={{
-                    code: CodeBlock,
+                  <div className="relative">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkBreaks]}
+                      rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
+                      components={{
+                        code: CodeBlock,
 
-                    p: ({ children }) => (
-                      <p className="mb-2 leading-[1.6] text-theme-chat-text">
-                        {children}
-                      </p>
-                    ),
+                        p: ({ children }) => (
+                          <p className="mb-2 leading-[1.6] text-theme-chat-text">
+                            {children}
+                          </p>
+                        ),
 
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-theme-text">
-                        {children}
-                      </strong>
-                    ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-theme-text">
+                            {children}
+                          </strong>
+                        ),
 
-                    em: ({ children }) => (
-                      <em className="italic opacity-90">{children}</em>
-                    ),
+                        em: ({ children }) => (
+                          <em className="italic opacity-90">{children}</em>
+                        ),
 
-                    ul: ({ children }) => (
-                      <ul className="list-disc pl-5 mb-2 space-y-1">
-                        {children}
-                      </ul>
-                    ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-5 mb-2 space-y-1">
+                            {children}
+                          </ul>
+                        ),
 
-                    ol: ({ children }) => (
-                      <ol className="list-decimal pl-5 mb-2 space-y-1">
-                        {children}
-                      </ol>
-                    ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-5 mb-2 space-y-1">
+                            {children}
+                          </ol>
+                        ),
 
-                    h1: ({ children }) => (
-                      <h1 className="text-xl font-semibold mt-4 mb-2 text-theme-text">
-                        {children}
-                      </h1>
-                    ),
+                        h1: ({ children }) => (
+                          <h1 className="text-xl font-semibold mt-4 mb-2 text-theme-text">
+                            {children}
+                          </h1>
+                        ),
 
-                    h2: ({ children }) => (
-                      <h2 className="text-lg font-semibold mt-3 mb-2 text-theme-text">
-                        {children}
-                      </h2>
-                    ),
+                        h2: ({ children }) => (
+                          <h2 className="text-lg font-semibold mt-3 mb-2 text-theme-text">
+                            {children}
+                          </h2>
+                        ),
 
-                    h3: ({ children }) => (
-                      <h3 className="text-base font-semibold mt-2 mb-1 text-theme-text">
-                        {children}
-                      </h3>
-                    ),
+                        h3: ({ children }) => (
+                          <h3 className="text-base font-semibold mt-2 mb-1 text-theme-text">
+                            {children}
+                          </h3>
+                        ),
 
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-3 rounded-lg border border-theme-secondary">
-                        <table className="w-full text-sm">{children}</table>
+                        table: ({ children }) => (
+                          <div className="overflow-x-auto my-3 rounded-lg border border-theme-secondary">
+                            <table className="w-full text-sm">{children}</table>
+                          </div>
+                        ),
+
+                        th: ({ children }) => (
+                          <th className="px-3 py-2 text-left bg-theme-accent text-theme-text border-b border-theme-secondary">
+                            {children}
+                          </th>
+                        ),
+
+                        td: ({ children }) => (
+                          <td className="px-3 py-2 border-b border-theme-secondary">
+                            {children}
+                          </td>
+                        ),
+                      }}
+                    >
+                      {processedText}
+                    </ReactMarkdown>
+
+                    {/* Show "Generating..." while isStreaming AND text is empty */}
+                    {isStreaming && !displayText && (
+                      <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs animate-pulse">
+                        <LoadingIndicator />
+                        <span>Generating new response...</span>
                       </div>
-                    ),
+                    )}
 
-                    th: ({ children }) => (
-                      <th className="px-3 py-2 text-left bg-theme-accent text-theme-text border-b border-theme-secondary">
-                        {children}
-                      </th>
-                    ),
-
-                    td: ({ children }) => (
-                      <td className="px-3 py-2 border-b border-theme-secondary">
-                        {children}
-                      </td>
-                    ),
-                  }}
-                >
-                  {processedText}
-                </ReactMarkdown>
-              </div>
-            </div>
-          ) : (
-            // User message (plain text)
-            <div className="whitespace-pre-wrap break-words min-w-0">
-              {displayText}
-            </div>
+                    {/* Show actions and versions ONLY when NOT streaming */}
+                    {!isStreaming && (
+                      <MessageActions
+                        messageId={msg._id}
+                        conversationId={conversationId || msg.conversationId}
+                        content={displayText}
+                        isAssistant={isAssistant}
+                        isLoading={false}
+                        totalVersions={totalVersions || 1}
+                        currentVersion={msg.currentVersion || 1}
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                // User message (plain text)
+                <div className="whitespace-pre-wrap break-words min-w-0">
+                  {displayText}
+                </div>
+              )}
+            </>
           )}
-          </>
-        )}
-      </div>
+        </div>
       </div>
     </div>
   );

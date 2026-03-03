@@ -188,6 +188,7 @@ export default function ChatFeature() {
               <>
                 <VirtualizedMessageList
                   messages={currentMessages}
+                  conversationId={conversationId}
                   messagesEndRef={messagesEndRef}
                   containerRef={messagesContainerRef}
                   onScroll={handleMessagesScroll}

@@ -10,10 +10,15 @@ export default defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true,
         secure: false,
-        // Ensure cookies are forwarded
         cookieDomainRewrite: '',
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.js',
+    css: true,
   }
 })
 

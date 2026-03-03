@@ -4,6 +4,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const logger = require('./config/logger');
 
 const authRoutes = require('./routes/auth.routes');
@@ -14,6 +15,7 @@ const llmmodelRoutes = require('./routes/llmmodel.routes');
 const promptSettingsRoutes = require('./routes/promptSettings.routes')
 const userMemoryRoutes = require('./routes/userMemory.routes');
 const personaRoutes = require('./routes/persona.routes');
+const messageRoutes = require('./routes/messages.routes');
 
 const app = express();
 
@@ -76,48 +78,42 @@ app.use(
 
 // ✅ Handle preflight requests explicitly
 app.options(/.*/, cors());
-
 // Rate limiting (global)
-const limiter = rateLimit({
-  windowMs:
-    parseInt(process.env.RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
-
-  max:
-    process.env.NODE_ENV === 'production'
+const limiter = process.env.NODE_ENV === 'test'
+  ? null
+  : rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
+    max: process.env.NODE_ENV === 'production'
       ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)
       : parseInt(process.env.RATE_LIMIT_DEV_MAX || '1000', 10),
+    skip: (req) =>
+      req.path === '/api/auth/refresh' ||
+      req.path === '/api/auth/me' ||
+      req.path === '/api/health' ||
+      req.path === '/metrics',
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: ipKeyGenerator,
+    message: 'Too many requests, please try again later.',
+  });
 
-  skip: (req) =>
-    req.path === '/api/auth/refresh' ||
-    req.path === '/api/auth/me' ||
-    req.path === '/api/health' ||
-    req.path === '/metrics',
-
-  standardHeaders: true,
-  legacyHeaders: false,
-
-  keyGenerator: (req) => {
-    return req.ip; // ✅ safe after trust proxy
-  },
-
-  message: 'Too many requests, please try again later.',
-});
-
-// Apply rate limiting to all requests
-app.use(limiter);
+if (limiter) {
+  app.use(limiter);
+}
 
 // Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10),
+const authLimiter = process.env.NODE_ENV === 'test'
+  ? null
+  : rateLimit({
+    windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000,
+    max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: ipKeyGenerator,
+    message: 'Too many authentication attempts, please try again later.',
+  });
 
-  standardHeaders: true,
-  legacyHeaders: false,
-
-  keyGenerator: (req) => req.ip,
-
-  message: 'Too many authentication attempts, please try again later.',
-});
+const authLimitMiddleware = authLimiter ? authLimiter : (req, res, next) => next();
 
 // enable JSON body parsing with size limit
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '10mb' }));
@@ -163,7 +159,10 @@ app.use(
 );
 
 // define routes
-// app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth/login', authLimitMiddleware);
+app.use('/api/auth/signup', authLimitMiddleware);
+app.use('/api/auth/reset-password', authLimitMiddleware);
+app.use('/api/auth/forgot-password', authLimitMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);
@@ -172,6 +171,7 @@ app.use('/api', llmmodelRoutes); // Using /api to support /admin and /llm-models
 app.use('/api/prompt-settings', promptSettingsRoutes);
 app.use('/api/user/memory', userMemoryRoutes);
 app.use('/api/personas', personaRoutes);
+app.use('/api/messages', messageRoutes);
 
 // API Documentation
 if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {

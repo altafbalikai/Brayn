@@ -9,6 +9,7 @@ import MessageListSkeleton from "../../../components/PageSkeletonLoaders/Message
  */
 function VirtualizedMessageList({
   messages,
+  conversationId,
   messagesEndRef,
   containerRef,
   onScroll,
@@ -108,6 +109,7 @@ function VirtualizedMessageList({
                 <MessageGroup
                   key={group.id}
                   group={group}
+                  conversationId={conversationId}
                   isFirst={idx === 0}
                 />
               ))
@@ -119,6 +121,7 @@ function VirtualizedMessageList({
                     `${msg.role}-${msg.createdAt || Date.now()}`
                   }
                   msg={msg}
+                  conversationId={conversationId}
                   showTime={false}
                 />
               ))}
@@ -153,7 +156,7 @@ function VirtualizedMessageList({
           return (
             <div style={style} className="flex justify-center">
               <div className="w-full max-w-3xl px-4 min-w-0">
-                <MessageItem msg={msg} />
+                 <MessageItem msg={msg} conversationId={conversationId} />
                 {isLast && <div ref={messagesEndRef} />}
               </div>
             </div>

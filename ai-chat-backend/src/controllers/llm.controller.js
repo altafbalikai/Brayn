@@ -18,16 +18,20 @@ async function ask(req, res, next) {
       return res.status(400).json({ error: "conversationId and message are required" });
     }
 
-    console.log(`🔵 POST /api/llm/${conversationId}/ask | Message: ${message.substring(0, 50)}...`);
+    console.log(`🔵 POST /api/llm/${conversationId}/ask | INFO: ENTERED CONTROLLER`);
 
     // Prepare context and start LLM stream via Service Orchestrator
-    const { stream, userMsg } = await llmService.prepareAskContext(userId, conversationId, message);
+    const { stream, userMsg, assistantMsg } = await llmService.prepareAskContext(userId, conversationId, message);
 
     // START SSE RESPONSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
+
+    // 1. Send Metadata Event FIRST
+    res.write(`event: metadata\n`);
+    res.write(`data: ${JSON.stringify({ messageId: assistantMsg._id })}\n\n`);
 
     let fullReply = "";
 
@@ -36,17 +40,26 @@ async function ask(req, res, next) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
         fullReply += content;
-        res.write(content);
+        // 2. Stream JSON-Safe Chunk Events
+        res.write(`event: chunk\n`);
+        res.write(`data: ${JSON.stringify(content)}\n\n`);
       }
     }
 
     // Finalize persistence and side effects via Service Orchestrator
-    await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg);
+    await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
 
     res.end();
 
   } catch (err) {
     console.error("Streaming error:", err);
+
+    if (!res.headersSent) {
+      // If streaming hasn't started, return standard JSON error
+      return res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
+    }
+
+    // If streaming has started, push the error directly to the active stream
     res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable or free models are temporarily rate-limited upstream. Please retry shortly or switch to a different model to continue.`);
     res.end();
   }

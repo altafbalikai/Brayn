@@ -1,0 +1,17 @@
+﻿
+>       ├ù should work without authentication (anonymous stats) (46 ms)
+  
+    ΓùÅ Feedback Controller Integration Tests ΓÇ║ GET 
+> /api/messages/:messageId/feedback ΓÇ║ should work without authentication 
+  (anonymous stats)
+  
+      expect(received).toBe(expected) // Object.is equality
+  
+      Expected: 200
+      Received: 401
+  
+      [0m [90m 179 |[39m                 
+  [33m.[39m[36mget[39m(getUrl(testMessage[33m.[39m_id))[33m;[39m
+       [90m 180 |[39m
+
+

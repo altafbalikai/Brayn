@@ -150,6 +150,7 @@ async function getMessages(userId, conversationId, { page = 1, limit = 50 }) {
   const [items, total] = await Promise.all([
     Message.find({ conversationId: new mongoose.Types.ObjectId(conversationId) })
       .sort({ createdAt: 1 })
+      .populate('versions')
       .skip(skip)
       .limit(limit)
       .lean(),

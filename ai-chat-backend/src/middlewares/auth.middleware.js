@@ -1,7 +1,10 @@
 const { verifyAccessToken } = require('../utils/jwt');
 const User = require('../models/User');
 
-module.exports = async function auth(req, res, next) {
+/**
+ * Mandatory Authentication Middleware
+ */
+async function authenticate(req, res, next) {
   // 🔥 Allow CORS preflight requests
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -35,12 +38,46 @@ module.exports = async function auth(req, res, next) {
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
-};
+}
+
+/**
+ * Optional Authentication Middleware
+ * Populates req.user if a valid token is present, but doesn't fail if missing.
+ */
+async function optionalAuth(req, res, next) {
+  try {
+    const h = req.headers.authorization;
+    if (!h) return next();
+
+    const parts = h.split(' ');
+    if (parts.length !== 2) return next();
+    const token = parts[1];
+
+    const payload = verifyAccessToken(token);
+    const user = await User.findById(payload.id);
+    if (!user) return next();
+
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      return next();
+    }
+
+    req.user = {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
+    next();
+  } catch (err) {
+    // If token is invalid/expired, we just treat them as anonymous
+    next();
+  }
+}
 
 /**
  * Role-based authorization middleware
  */
-module.exports.authorize = function (...roles) {
+function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({
@@ -49,4 +86,10 @@ module.exports.authorize = function (...roles) {
     }
     next();
   };
-};
+}
+
+module.exports = authenticate;
+module.exports.authenticate = authenticate;
+module.exports.optionalAuth = optionalAuth;
+module.exports.authorize = authorize;
+

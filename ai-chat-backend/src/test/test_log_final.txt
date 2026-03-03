@@ -1,0 +1,123 @@
+﻿  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.test -- tip: ΓÜÖ∩╕Å  enable debug logging with { debug: true }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (30) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.info
+    [MAIL] Using SMTP transport (smtp.gmail.com:587)
+
+      at Object.info (src/utils/mailer.js:84:11)
+
+2026-03-02 19:43:18 [32minfo[39m: [32mSwagger UI available at /api-docs[39m
+node.exe : (node:22476) [MONGOOSE] Warning: Duplicate schema index on 
+{"id":1} found. This is often due to declaring an index using both "index: 
+true" and "schema.index()". Please remove the duplicate index definition.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:22476) [M...dex definition 
+   .:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22476) [MONGOOSE] Warning: Duplicate schema index on {"slug":1} found. 
+This is often due to declaring an index using both "index: true" and 
+"schema.index()". Please remove the duplicate index definition.
+2026-03-02 19:43:19 [33mwarn[39m: [33mValidation errors:[39m
+FAIL src/api/feedback/__tests__/feedbackController.test.js (7.572 s)
+  Feedback Controller Integration Tests
+    POST /api/messages/:messageId/feedback
+      ├ù should save positive feedback and update message stats (211 ms)
+      ├ù should allow changing feedback from positive to negative (173 ms)
+      ΓêÜ should return 400 for invalid feedbackType (29 ms)
+      ΓêÜ should return 404 if message not found (26 ms)
+      ΓêÜ should return 401 if not authenticated (15 ms)
+    GET /api/messages/:messageId/feedback
+      ΓêÜ should return feedback stats and currentUser feedback (46 ms)
+      ├ù should work without authentication (anonymous stats) (17 ms)
+
+  ΓùÅ Feedback Controller Integration Tests ΓÇ║ POST 
+/api/messages/:messageId/feedback ΓÇ║ should save positive feedback and 
+update message stats
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "positive"
+    Received: undefined
+
+    [0m [90m 71 |[39m             expect([[35m200[39m[33m,[39m 
+[35m201[39m])[33m.[39mtoContain(res[33m.[39mstatus)[33m;[39m
+     [90m 72 |[39m             expect(res[33m.[39mbody[33m.[39msuccess)
+[33m.[39mtoBe([36mtrue[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m             expect(res[33m.[39mbody
+[33m.[39muserFeedback)[33m.[39mtoBe([32m'positive'[39m)[33m;[39m
+     [90m    |[39m                                           
+[31m[1m^[22m[39m
+     [90m 74 |[39m             expect(res[33m.[39mbody[33m.[39mstats[33
+m.[39mpositive)[33m.[39mtoBe([35m1[39m)[33m;[39m
+     [90m 75 |[39m
+     [90m 76 |[39m             [90m// Verify DB models[39m[0m
+
+      at Object.toBe 
+(src/api/feedback/__tests__/feedbackController.test.js:73:43)
+
+  ΓùÅ Feedback Controller Integration Tests ΓÇ║ POST 
+/api/messages/:messageId/feedback ΓÇ║ should allow changing feedback from 
+positive to negative
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "negative"
+    Received: undefined
+
+    [0m [90m 103 |[39m
+     [90m 104 |[39m             
+expect(res[33m.[39mstatus)[33m.[39mtoBe([35m200[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 105 |[39m             expect(res[33m.[39mbody
+[33m.[39muserFeedback)[33m.[39mtoBe([32m'negative'[39m)[33m;[39m
+     [90m     |[39m                                           
+[31m[1m^[22m[39m
+     [90m 106 |[39m             expect(res[33m.[39mbody[33m.[39mstats[3
+3m.[39mpositive)[33m.[39mtoBe([35m0[39m)[33m;[39m
+     [90m 107 |[39m             expect(res[33m.[39mbody[33m.[39mstats[3
+3m.[39mnegative)[33m.[39mtoBe([35m1[39m)[33m;[39m
+     [90m 108 |[39m         })[33m;[39m[0m
+
+      at Object.toBe 
+(src/api/feedback/__tests__/feedbackController.test.js:105:43)
+
+  ΓùÅ Feedback Controller Integration Tests ΓÇ║ GET 
+/api/messages/:messageId/feedback ΓÇ║ should work without authentication 
+(anonymous stats)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 401
+
+    [0m [90m 179 |[39m                 
+[33m.[39m[36mget[39m(getUrl(testMessage[33m.[39m_id))[33m;[39m
+     [90m 180 |[39m
+    [31m[1m>[22m[39m[90m 181 |[39m             
+expect(res[33m.[39mstatus)[33m.[39mtoBe([35m200[39m)[33m;[39m
+     [90m     |[39m                                [31m[1m^[22m[39m
+     [90m 182 |[39m             expect(res[33m.[39mbody[33m.[39mstats[3
+3m.[39mpositive)[33m.[39mtoBe([35m1[39m)[33m;[39m
+     [90m 183 |[39m             expect(res[33m.[39mbody[33m.[39muserFeed
+back)[33m.[39mtoBeNull()[33m;[39m
+     [90m 184 |[39m         })[33m;[39m[0m
+
+      at Object.toBe 
+(src/api/feedback/__tests__/feedbackController.test.js:181:32)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 4 passed, 7 total
+Snapshots:   0 total
+Time:        7.748 s
+Ran all test suites matching 
+src/api/feedback/__tests__/feedbackController.test.js.

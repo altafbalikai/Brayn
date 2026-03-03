@@ -114,7 +114,7 @@ export const llmService = {
         const controller = new AbortController();
         const signal = controller.signal;
 
-        async function start(onChunk, onComplete, retry = true) {
+        async function start(onMetadata, onChunk, onComplete, retry = true) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
             const token = localStorage.getItem("accessToken");
 
@@ -148,6 +148,7 @@ export const llmService = {
                     const newToken = await refreshAccessToken();
 
                     return start(
+                        onMetadata,
                         onChunk,
                         onComplete,
                         false // ❗ retry only once
@@ -168,7 +169,11 @@ export const llmService = {
 
             const reader = res.body.getReader();
             const decoder = new TextDecoder("utf-8");
+
             let fullText = "";
+            let buffer = "";
+            let realMessageId = null;
+            let pendingChunks = [];
 
             try {
                 while (true) {
@@ -176,15 +181,53 @@ export const llmService = {
                     if (done) break;
 
                     if (value) {
-                        const chunk = decoder.decode(value, { stream: true });
-                        if (chunk) {
-                            fullText += chunk;
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
 
-                            if (onChunk) {
+                        for (const evt of events) {
+                            if (evt.includes('event: metadata')) {
                                 try {
-                                    onChunk(chunk);
-                                } catch (err) {
-                                    console.error("onChunk handler error", err);
+                                    const dataParts = evt.split('data: ');
+                                    if (dataParts.length > 1) {
+                                        const data = JSON.parse(dataParts[1]);
+                                        realMessageId = data.messageId;
+
+                                        if (onMetadata) {
+                                            try { onMetadata(realMessageId); } catch (err) { console.error("onMetadata error", err); }
+                                        }
+
+                                        // Flush any early chunks
+                                        pendingChunks.forEach(chunk => {
+                                            fullText += chunk;
+                                            if (onChunk) {
+                                                try { onChunk(chunk); } catch (err) { console.error("onChunk error", err); }
+                                            }
+                                        });
+                                        pendingChunks = [];
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing metadata:", e);
+                                }
+                            }
+
+                            if (evt.includes('event: chunk')) {
+                                try {
+                                    const dataParts = evt.split('data: ');
+                                    if (dataParts.length > 1) {
+                                        const content = JSON.parse(dataParts[1]);
+
+                                        if (!realMessageId) {
+                                            pendingChunks.push(content);
+                                        } else {
+                                            fullText += content;
+                                            if (onChunk) {
+                                                try { onChunk(content); } catch (err) { console.error("onChunk error", err); }
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing chunk JSON:", e);
                                 }
                             }
                         }

@@ -1,0 +1,185 @@
+﻿  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.test -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.test -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (30) from .env -- tip: ≡ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (30) from .env -- tip: ≡ƒùé∩╕Å backup and recover secrets: https://dotenvx.com/ops
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.info
+    [MAIL] Using SMTP transport (smtp.gmail.com:587)
+
+      at Object.info (src/utils/mailer.js:84:11)
+
+  console.info
+    [MAIL] Using SMTP transport (smtp.gmail.com:587)
+
+      at Object.info (src/utils/mailer.js:84:11)
+
+  console.error
+    ValidationError: Custom keyGenerator appears to use request IP without calling the ipKeyGenerator helper function for IPv6 addresses. This could allow IPv6 users to bypass limits. See https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/ for more information.
+        at Object.keyGeneratorIpFallback (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:595:13)
+        at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:638:22)
+        at parseOptions (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:707:16)
+        at rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:788:18)
+        at Object.rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\app.js:83:17)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at Runtime.requireModuleOrMock (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:964:21)
+        at Object.require (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\api\messages\__tests__\retryController.test.js:4:13)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at jestAdapter (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-circus\build\runner.js:95:13)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at runTestInternal (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:275:16)
+        at runTest (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:343:7)
+        at Object.worker (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:497:12) {
+      code: 'ERR_ERL_KEY_GEN_IPV6',
+      help: 'https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/'
+    }
+
+    [0m [90m 81 |[39m
+     [90m 82 |[39m [90m// Rate limiting (global)[39m
+    [31m[1m>[22m[39m[90m 83 |[39m [36mconst[39m limiter [33m=[39m rateLimit({
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 84 |[39m   windowMs[33m:[39m
+     [90m 85 |[39m     parseInt(process[33m.[39menv[33m.[39m[33mRATE_LIMIT_WINDOW_MS[39m [33m||[39m [32m'15'[39m[33m,[39m [35m10[39m) [33m*[39m [35m60[39m [33m*[39m [35m1000[39m[33m,[39m
+     [90m 86 |[39m[0m
+
+      at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (node_modules/express-rate-limit/dist/index.cjs:644:24)
+      at parseOptions (node_modules/express-rate-limit/dist/index.cjs:707:16)
+      at rateLimit (node_modules/express-rate-limit/dist/index.cjs:788:18)
+      at Object.rateLimit (src/app.js:83:17)
+      at Object.require (src/api/messages/__tests__/retryController.test.js:4:13)
+
+  console.error
+    ValidationError: Custom keyGenerator appears to use request IP without calling the ipKeyGenerator helper function for IPv6 addresses. This could allow IPv6 users to bypass limits. See https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/ for more information.
+        at Object.keyGeneratorIpFallback (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:595:13)
+        at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:638:22)
+        at parseOptions (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:707:16)
+        at rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:788:18)
+        at Object.rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\app.js:114:21)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at Runtime.requireModuleOrMock (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:964:21)
+        at Object.require (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\api\messages\__tests__\retryController.test.js:4:13)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at jestAdapter (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-circus\build\runner.js:95:13)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at runTestInternal (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:275:16)
+        at runTest (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:343:7)
+        at Object.worker (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:497:12) {
+      code: 'ERR_ERL_KEY_GEN_IPV6',
+      help: 'https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/'
+    }
+
+    [0m [90m 112 |[39m
+     [90m 113 |[39m [90m// Stricter rate limiting for auth endpoints[39m
+    [31m[1m>[22m[39m[90m 114 |[39m [36mconst[39m authLimiter [33m=[39m rateLimit({
+     [90m     |[39m                     [31m[1m^[22m[39m
+     [90m 115 |[39m   windowMs[33m:[39m parseInt(process[33m.[39menv[33m.[39m[33mAUTH_RATE_LIMIT_WINDOW_MS[39m [33m||[39m [32m'15'[39m[33m,[39m [35m10[39m) [33m*[39m [35m60[39m [33m*[39m [35m1000[39m[33m,[39m
+     [90m 116 |[39m   max[33m:[39m parseInt(process[33m.[39menv[33m.[39m[33mAUTH_RATE_LIMIT_MAX[39m [33m||[39m [32m'5'[39m[33m,[39m [35m10[39m)[33m,[39m
+     [90m 117 |[39m[0m
+
+      at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (node_modules/express-rate-limit/dist/index.cjs:644:24)
+      at parseOptions (node_modules/express-rate-limit/dist/index.cjs:707:16)
+      at rateLimit (node_modules/express-rate-limit/dist/index.cjs:788:18)
+      at Object.rateLimit (src/app.js:114:21)
+      at Object.require (src/api/messages/__tests__/retryController.test.js:4:13)
+
+  console.error
+    ValidationError: Custom keyGenerator appears to use request IP without calling the ipKeyGenerator helper function for IPv6 addresses. This could allow IPv6 users to bypass limits. See https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/ for more information.
+        at Object.keyGeneratorIpFallback (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:595:13)
+        at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:638:22)
+        at parseOptions (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:707:16)
+        at rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:788:18)
+        at Object.rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\app.js:83:17)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at Runtime.requireModuleOrMock (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:964:21)
+        at Object.require (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\api\feedback\__tests__\feedbackController.test.js:4:13)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at jestAdapter (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-circus\build\runner.js:95:13)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at runTestInternal (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:275:16)
+        at runTest (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:343:7)
+        at Object.worker (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:497:12) {
+      code: 'ERR_ERL_KEY_GEN_IPV6',
+      help: 'https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/'
+    }
+
+    [0m [90m 81 |[39m
+     [90m 82 |[39m [90m// Rate limiting (global)[39m
+    [31m[1m>[22m[39m[90m 83 |[39m [36mconst[39m limiter [33m=[39m rateLimit({
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 84 |[39m   windowMs[33m:[39m
+     [90m 85 |[39m     parseInt(process[33m.[39menv[33m.[39m[33mRATE_LIMIT_WINDOW_MS[39m [33m||[39m [32m'15'[39m[33m,[39m [35m10[39m) [33m*[39m [35m60[39m [33m*[39m [35m1000[39m[33m,[39m
+     [90m 86 |[39m[0m
+
+      at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (node_modules/express-rate-limit/dist/index.cjs:644:24)
+      at parseOptions (node_modules/express-rate-limit/dist/index.cjs:707:16)
+      at rateLimit (node_modules/express-rate-limit/dist/index.cjs:788:18)
+      at Object.rateLimit (src/app.js:83:17)
+      at Object.require (src/api/feedback/__tests__/feedbackController.test.js:4:13)
+
+  console.error
+    ValidationError: Custom keyGenerator appears to use request IP without calling the ipKeyGenerator helper function for IPv6 addresses. This could allow IPv6 users to bypass limits. See https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/ for more information.
+        at Object.keyGeneratorIpFallback (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:595:13)
+        at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:638:22)
+        at parseOptions (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:707:16)
+        at rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\express-rate-limit\dist\index.cjs:788:18)
+        at Object.rateLimit (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\app.js:114:21)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at Runtime.requireModuleOrMock (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:964:21)
+        at Object.require (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\src\api\feedback\__tests__\feedbackController.test.js:4:13)
+        at Runtime._execModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:1268:24)
+        at Runtime._loadModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:944:12)
+        at Runtime.requireModule (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runtime\build\index.js:832:12)
+        at jestAdapter (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-circus\build\runner.js:95:13)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at runTestInternal (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:275:16)
+        at runTest (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:343:7)
+        at Object.worker (C:\Users\hussa\Projects_ai\ai-chat\ai-chat-backend\node_modules\jest-runner\build\testWorker.js:497:12) {
+      code: 'ERR_ERL_KEY_GEN_IPV6',
+      help: 'https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/'
+    }
+
+    [0m [90m 112 |[39m
+     [90m 113 |[39m [90m// Stricter rate limiting for auth endpoints[39m
+    [31m[1m>[22m[39m[90m 114 |[39m [36mconst[39m authLimiter [33m=[39m rateLimit({
+     [90m     |[39m                     [31m[1m^[22m[39m
+     [90m 115 |[39m   windowMs[33m:[39m parseInt(process[33m.[39menv[33m.[39m[33mAUTH_RATE_LIMIT_WINDOW_MS[39m [33m||[39m [32m'15'[39m[33m,[39m [35m10[39m) [33m*[39m [35m60[39m [33m*[39m [35m1000[39m[33m,[39m
+     [90m 116 |[39m   max[33m:[39m parseInt(process[33m.[39menv[33m.[39m[33mAUTH_RATE_LIMIT_MAX[39m [33m||[39m [32m'5'[39m[33m,[39m [35m10[39m)[33m,[39m
+     [90m 117 |[39m[0m
+
+      at Object.wrappedValidations.<computed> [as keyGeneratorIpFallback] (node_modules/express-rate-limit/dist/index.cjs:644:24)
+      at parseOptions (node_modules/express-rate-limit/dist/index.cjs:707:16)
+      at rateLimit (node_modules/express-rate-limit/dist/index.cjs:788:18)
+      at Object.rateLimit (src/app.js:114:21)
+      at Object.require (src/api/feedback/__tests__/feedbackController.test.js:4:13)
+
+2026-03-02 19:38:53 [32minfo[39m: [32mSwagger UI available at /api-docs[39m
+2026-03-02 19:38:53 [32minfo[39m: [32mSwagger UI available at /api-docs[39m
+2026-03-02 19:38:55 [33mwarn[39m: [33mValidation errors:[39m

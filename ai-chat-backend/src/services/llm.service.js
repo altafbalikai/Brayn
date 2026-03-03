@@ -406,6 +406,7 @@ async function askGeminiStream(
 /**
  * Orchestrates the "ask" flow preparation:
  * - Persists user message
+ * - Creates empty assistant message placeholder
  * - Loads context
  * - Loads summary
  */
@@ -416,13 +417,25 @@ async function prepareAskContext(userId, conversationId, messageText) {
     text: messageText,
   });
 
+  // 1b. Create Assistant Message Placeholder BEFORE Streaming
+  const conversation = await Conversation.findById(conversationId);
+  const assistantMsg = await Message.create({
+    conversationId,
+    role: 'assistant',
+    text: '',
+    userId,
+    personaId: conversation ? conversation.currentPersonaId : null,
+    versions: [],
+    isRetried: false
+  });
+
   // 2. Load recent context window (last 4 messages)
   const MAX_CONTEXT = 4;
   const recentMessages = await Message.find({ conversationId })
     .sort({ createdAt: -1 })
     .limit(MAX_CONTEXT)
     .lean();
-  const ordered = recentMessages.reverse();
+  let ordered = recentMessages.reverse();
 
   // Safety: ensure user message is present in context
   if (!ordered.length || ordered[ordered.length - 1]._id?.toString() !== userMsg._id?.toString()) {
@@ -432,6 +445,9 @@ async function prepareAskContext(userId, conversationId, messageText) {
       _id: userMsg._id
     });
   }
+
+  // EXCLUDE PLACEHOLDER FROM LLM CONTEXT
+  ordered = ordered.filter(m => !(m.role === 'assistant' && m.text === ''));
 
   // 3. Load summary
   const latestSummary = await getLatestSummary(conversationId);
@@ -443,10 +459,10 @@ async function prepareAskContext(userId, conversationId, messageText) {
     ordered,
     userId,
     summaryText,
-    [userMsg._id]
+    [userMsg._id, assistantMsg._id] // Exclude both from vector memory retrieval context
   );
 
-  return { stream, modelId, userMsg };
+  return { stream, modelId, userMsg, assistantMsg };
 }
 
 /**
@@ -454,12 +470,10 @@ async function prepareAskContext(userId, conversationId, messageText) {
  * - Persists assistant message
  * - Fire-and-forget background tasks
  */
-async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg) {
-  // 1. Save assistant message
-  const assistantMsg = await ConversationService.addMessage(userId, conversationId, {
-    role: "assistant",
-    text: fullReply,
-  });
+async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg) {
+  // 1. Save assistant message (update the placeholder)
+  assistantMsg.text = fullReply;
+  await assistantMsg.save();
 
   // 2. Fire-and-forget side effects
   safeFireAndForget(() => writeMessageToMemory(userMsg));

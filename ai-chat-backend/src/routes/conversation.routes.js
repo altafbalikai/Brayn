@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const convController = require('../controllers/conversation.controller');
+const retryController = require('../controllers/retry.controller');
 const auth = require('../middlewares/auth.middleware');
 const { handleValidationErrors } = require('../middlewares/validation.middleware');
 const { cacheMiddleware } = require('../middlewares/cache.middleware');
@@ -14,9 +15,23 @@ const {
   deleteConversationValidation,
   updateConversationModelValidation,
 } = require('../validators/conversation.validator');
+const { retryMessageValidation } = require('../validators/retry.validator');
+
+// ─── Shared: ObjectId param validator for consistency ──────────────────────────
+const cidParam = (name) => [...retryMessageValidation]; // We'll use the existing validator
 
 // ensure auth middleware is required before protected routes
 router.use(auth);
+
+/**
+ * POST /api/conversations/:conversationId/messages/:messageId/retry
+ */
+router.post(
+  '/:conversationId/messages/:messageId/retry',
+  retryMessageValidation,
+  handleValidationErrors,
+  retryController.retryMessage
+);
 
 router.post('/', createConversationValidation, handleValidationErrors, convController.createConversation);
 router.get('/my', listConversationsValidation, handleValidationErrors, cacheMiddleware(60000), convController.listConversations); // Cache for 1 minute

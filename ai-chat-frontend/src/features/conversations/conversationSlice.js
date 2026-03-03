@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { conversationService } from '../../api/services/conversationService';
 import { llmService } from '../../api/services/llmService';
 import { logout } from '../auth/authSlice';
+import { switchVersion, retryMessage } from '../messages/messageInteractionsSlice';
 
 // Async thunks
 export const fetchConversations = createAsyncThunk(
@@ -66,45 +67,55 @@ export const sendMessage = createAsyncThunk(
             };
             dispatch(addMessageToConversation({ conversationId, message: userMsg }));
 
-            // Use streaming API
-            const stream = llmService.askStream({ message, conversationId });
-            const tempId = tempAssistantId || `temp-assistant-${Date.now()}`;
-
-            // Add placeholder for assistant message
-            const placeholderMsg = {
-                _id: tempId,
-                role: 'assistant',
-                text: '',
-                createdAt: new Date().toISOString(),
-                status: 'streaming'
-            };
-            dispatch(addAssistantPlaceholder({ conversationId, message: placeholderMsg }));
             dispatch(setAssistantTyping({ conversationId, value: true }));
 
+            // Use streaming API
+            const stream = llmService.askStream({ message, conversationId });
+            let realMessageId = null;
             let accumulated = '';
 
-            // Stream chunks in real-time
-            const full = await stream.start((chunk) => {
+            const onMetadata = (messageId) => {
+                realMessageId = messageId;
+                // Add placeholder for assistant message using REAL MongoDB _id
+                const placeholderMsg = {
+                    _id: realMessageId,
+                    role: 'assistant',
+                    text: '',
+                    createdAt: new Date().toISOString(),
+                    status: 'streaming'
+                };
+                dispatch(addAssistantPlaceholder({ conversationId, message: placeholderMsg }));
+            };
+
+            const onChunk = (chunk) => {
                 accumulated += chunk;
+                if (!realMessageId) return; // Wait until metadata arrives
+
                 // Update text with accumulated content
                 dispatch(updateAssistantText({
                     conversationId,
-                    tempId,
+                    tempId: realMessageId, // Param named tempId for legacy compat, but holds real _id
                     text: accumulated,
                     status: 'streaming'
                 }));
-            });
+            };
 
-            // Finalize message when streaming completes
-            dispatch(finalizeAssistantMessage({
-                conversationId,
-                tempId,
-                text: full,
-                status: 'sent'
-            }));
+            // Stream chunks in real-time
+            const full = await stream.start(onMetadata, onChunk);
+
+            if (realMessageId) {
+                // Finalize message when streaming completes
+                dispatch(finalizeAssistantMessage({
+                    conversationId,
+                    tempId: realMessageId,
+                    text: full,
+                    status: 'sent'
+                }));
+            }
+
             dispatch(setAssistantTyping({ conversationId, value: false }));
 
-            return { conversationId, aiMessage: { _id: tempId, text: full } };
+            return { conversationId, aiMessage: { _id: realMessageId, text: full } };
         } catch (error) {
             const errMsg = error.message || 'Failed to stream message';
             dispatch(setAssistantTyping({ conversationId, value: false }));
@@ -191,20 +202,86 @@ const conversationSlice = createSlice({
             }
             state.messages[conversationId].push(message);
         },
-        // CRITICAL: Immutable update for real-time streaming
+        // RESTORED: Required by initial sendMessage streaming flow
         updateAssistantText: (state, action) => {
             const { conversationId, tempId, text, status } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            const idx = messages.findIndex(m => m._id === tempId);
+            if (idx !== -1) {
+                messages[idx].text = text;
+                messages[idx].status = status || 'streaming';
+            }
+        },
+        // 🔄 Correct Real-Time Version Synchronization (Phase 12)
+        startRetry: (state, action) => {
+            const { conversationId, messageId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            const idx = messages.findIndex(m => m._id === messageId);
+            if (idx === -1) return;
+
+            const msg = messages[idx];
+
+            // 1. Migrate legacy text to versions if empty
+            if (!msg.versions || msg.versions.length === 0) {
+                msg.versions = [{
+                    _id: msg.currentVersionId || `v1-${Date.now()}`,
+                    content: msg.text,
+                    version: 1
+                }];
+            }
+
+            // 2. Push new placeholder version
+            msg.versions.push({
+                _id: `temp-v${msg.versions.length + 1}-${Date.now()}`,
+                content: '',
+                version: msg.versions.length + 1
+            });
+
+            // 3. Update active version index IMMEDIATELY
+            msg.currentVersion = msg.versions.length;
+            msg.text = ''; // Clear main text for streaming UI compatibility
+            msg.status = 'streaming';
+        },
+        // APPEND chunk into ONLY the latest version
+        appendMessageChunk: (state, action) => {
+            const { conversationId, messageId, chunk } = action.payload;
             const list = state.messages[conversationId];
             if (!list) return;
 
-            const idx = list.findIndex(m => m._id === tempId);
+            const idx = list.findIndex(m => m._id === messageId);
             if (idx !== -1) {
-                // Create new message object to trigger React re-render
-                list[idx] = {
-                    ...list[idx],
-                    text,
-                    status: status || 'streaming'
-                };
+                const msg = list[idx];
+                const currentIdx = msg.currentVersion ? msg.currentVersion - 1 : 0;
+
+                if (msg.versions && msg.versions[currentIdx]) {
+                    msg.versions[currentIdx].content += chunk;
+                }
+
+                // Still update main text for now to maintain compatibility with Markdown component
+                // until we refactor MessageItem fully
+                msg.text = (msg.text || '') + chunk;
+                msg.status = 'streaming';
+            }
+        },
+        // INSTANT UI SYNC for version switching
+        switchMessageVersion: (state, action) => {
+            const { conversationId, messageId, versionNumber } = action.payload;
+            const list = state.messages[conversationId];
+            if (!list) return;
+
+            const idx = list.findIndex(m => m._id === messageId);
+            if (idx !== -1) {
+                const msg = list[idx];
+                msg.currentVersion = versionNumber;
+
+                // Keep msg.text in sync if applicable, though MessageItem handles this now
+                if (msg.versions && msg.versions[versionNumber - 1]) {
+                    msg.text = msg.versions[versionNumber - 1].content;
+                }
             }
         },
         finalizeAssistantMessage: (state, action) => {
@@ -214,12 +291,16 @@ const conversationSlice = createSlice({
 
             const idx = list.findIndex(m => m._id === tempId);
             if (idx !== -1) {
-                list[idx] = {
-                    ...list[idx],
-                    text,
-                    status: status || 'sent',
-                    createdAt: new Date().toISOString()
-                };
+                const msg = list[idx];
+                msg.status = status || 'sent';
+                msg.createdAt = new Date().toISOString();
+
+                // If we have versions, ensure the last version matches the full text
+                if (msg.versions && msg.currentVersion) {
+                    msg.versions[msg.currentVersion - 1].content = text;
+                    msg.currentVersion = msg.versions.length;
+                }
+                msg.text = text;
             }
         },
         setConversationTitle: (state, action) => {
@@ -254,6 +335,20 @@ const conversationSlice = createSlice({
         },
         clearError: (state) => {
             state.error = null;
+        },
+        clearMessageText: (state, action) => {
+            const { conversationId, messageId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (messages) {
+                const idx = messages.findIndex(m => m._id === messageId);
+                if (idx !== -1) {
+                    messages[idx] = {
+                        ...messages[idx],
+                        text: '',
+                        status: 'streaming'
+                    };
+                }
+            }
         },
     },
     extraReducers: (builder) => {
@@ -324,15 +419,21 @@ const conversationSlice = createSlice({
                 state.loading = false;
                 state.messagesLoadingMore[conversationId] = false;
 
+                // Initialize currentVersion for messages with multiple versions
+                const processedItems = (items || []).map(item => ({
+                    ...item,
+                    // Default to latest version if versions exist, otherwise default to 1
+                    currentVersion: item.currentVersion || (item.versions?.length || 1)
+                }));
+
                 const existing = state.messages[conversationId] || [];
                 if (append) {
                     // Prepend older messages for infinite scroll (scrolling up)
-                    state.messages[conversationId] = [...items, ...existing];
+                    state.messages[conversationId] = [...processedItems, ...existing];
                 } else {
                     // Replace for initial load
-                    // state.messages[conversationId] = items || [];
                     if (existing.length === 0) {
-                        state.messages[conversationId] = items || [];
+                        state.messages[conversationId] = processedItems;
                     }
                 }
 
@@ -418,6 +519,41 @@ const conversationSlice = createSlice({
             .addCase(updateConversationModel.rejected, (state, action) => {
                 state.error = action.payload;
             })
+            // Update message text when version is switched
+            .addCase(switchVersion.fulfilled, (state, action) => {
+                const { messageId, conversationId, message } = action.payload;
+                const messages = state.messages[conversationId];
+                if (messages) {
+                    const idx = messages.findIndex(m => m._id === messageId);
+                    if (idx !== -1) {
+                        messages[idx] = {
+                            ...messages[idx],
+                            text: message.content,
+                            version: message.version,
+                            currentVersionId: message._id
+                        };
+                    }
+                }
+            })
+            // Update message list when retried (re-fetch or update)
+            .addCase(retryMessage.fulfilled, (state, action) => {
+                const { messageId, conversationId, message } = action.payload;
+                const messages = state.messages[conversationId];
+                if (messages) {
+                    const idx = messages.findIndex(m => m._id === messageId);
+                    if (idx !== -1) {
+                        // The backend 'retry' likely returns the updated parent message or the new version
+                        // Assuming it returns the updated parent message structure with new content
+                        messages[idx] = {
+                            ...messages[idx],
+                            text: message.content,
+                            version: message.version,
+                            currentVersionId: message._id,
+                            versions: message.versions // Update versions array
+                        };
+                    }
+                }
+            })
             // RESET STATE ON LOGOUT
             .addCase(logout.fulfilled, () => {
                 return initialState;
@@ -437,5 +573,9 @@ export const {
     setConversationTitle,
     clearMessages,
     clearError,
+    clearMessageText,
+    appendMessageChunk,
+    startRetry,
+    switchMessageVersion,
 } = conversationSlice.actions;
 export default conversationSlice.reducer;
