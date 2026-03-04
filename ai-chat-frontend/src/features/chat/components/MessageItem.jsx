@@ -38,7 +38,7 @@ function CodeBlock({ node, inline, className, children, ...props }) {
   const code = Array.isArray(children)
     ? children
         .map((child) =>
-          typeof child === "string" ? child : child.props?.children ?? ""
+          typeof child === "string" ? child : (child.props?.children ?? ""),
         )
         .join("")
     : String(children);
@@ -98,37 +98,45 @@ function CodeBlock({ node, inline, className, children, ...props }) {
 }
 
 function MessageItem({ msg, showTime, conversationId }) {
-  const isStreaming = msg.status === "streaming";
-  
+  // Check if message is in any processing state (streaming, retrying, pending, initializing)
+  const isProcessing = [
+    "streaming",
+    "retrying",
+    "pending",
+    "initializing",
+  ].includes(msg.status);
+
   // 🔄 Single Source of Truth for Versions (Phase 12)
   const totalVersions = msg.versions?.length || 0;
   const currentVersionIdx = msg.currentVersion ? msg.currentVersion - 1 : 0;
-  
-  // Derive display text: 
+
+  // Derive display text:
   // 1. If versions exist, use the content of the CURRENT active version
   // 2. Fallback to top-level msg.text (for initial non-versioned messages)
-  const displayText = (totalVersions > 0 && msg.versions[currentVersionIdx])
-    ? msg.versions[currentVersionIdx].content
-    : (msg.text || "");
+  const displayText =
+    totalVersions > 0 && msg.versions[currentVersionIdx]
+      ? msg.versions[currentVersionIdx].content
+      : msg.text || "";
 
-  const isLoading = isStreaming && !displayText;
+  // Show loading when message is being processed but has no content yet
+  const isLoading = isProcessing && !displayText;
   const isAssistant = msg.role === "assistant";
 
   // 1. Hooks MUST be at top level
   const personas = useSelector(selectPersonas);
-  
+
   // 2. Computed values after hooks
   const persona = useMemo(() => {
     if (!isAssistant || !msg.personaId) return null;
-    return personas.find(p => p.id === msg.personaId);
+    return personas.find((p) => p.id === msg.personaId);
   }, [isAssistant, msg.personaId, personas]);
 
   const PersonaIcon = persona ? getPersonaIcon(persona.slug) : null;
 
   const processedText = useMemo(() => {
     if (!displayText) return "";
-    return isStreaming ? quickFixMarkdown(displayText) : displayText;
-  }, [displayText, isStreaming]);
+    return isProcessing ? quickFixMarkdown(displayText) : displayText;
+  }, [displayText, isProcessing]);
 
   // console.log("MessageItem repainting");
   return (
@@ -187,7 +195,7 @@ function MessageItem({ msg, showTime, conversationId }) {
                   <div className="relative">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm, remarkBreaks]}
-                      rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
+                      rehypePlugins={isLoading ? [] : [rehypeHighlight]}
                       components={{
                         code: CodeBlock,
 
@@ -259,16 +267,16 @@ function MessageItem({ msg, showTime, conversationId }) {
                       {processedText}
                     </ReactMarkdown>
 
-                    {/* Show "Generating..." while isStreaming AND text is empty */}
-                    {isStreaming && !displayText && (
+                    {/* Show "Generating..." while isProcessing AND text is empty */}
+                    {isProcessing && !displayText && (
                       <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs animate-pulse">
                         <LoadingIndicator />
                         <span>Generating new response...</span>
                       </div>
                     )}
 
-                    {/* Show actions and versions ONLY when NOT streaming */}
-                    {!isStreaming && (
+                    {/* Show actions and versions ONLY when NOT processing */}
+                    {!isProcessing && (
                       <MessageActions
                         messageId={msg._id}
                         conversationId={conversationId || msg.conversationId}

@@ -29,6 +29,7 @@ describe('messageInteractionsSlice', () => {
         feedback: { byMessageId: {} },
         versions: { byMessageId: {} },
         retry: { byMessageId: {} },
+        modelFailover: { byMessageId: {} },
         clipboard: { lastCopiedId: null, copiedAt: null }
     };
 
@@ -61,6 +62,7 @@ describe('messageInteractionsSlice', () => {
             const state = reducer(populatedState, resetMessage('msg1'));
             expect(state.feedback.byMessageId['msg1']).toBeUndefined();
             expect(state.versions.byMessageId['msg1']).toBeUndefined();
+            expect(state.modelFailover.byMessageId['msg1']).toBeUndefined();
         });
     });
 

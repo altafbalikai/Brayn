@@ -13,10 +13,15 @@ import {
 import {
   submitFeedback,
   retryMessage,
+  manualRetry,
   markMessageCopied,
   selectUserFeedback,
   selectFeedbackSubmitting,
-  selectIsRetrying,
+   selectIsRetrying,
+  selectRetryAttempt,
+  selectMaxRetries,
+  selectIsFatalError,
+  selectModelFailover,
 } from "../../messages/messageInteractionsSlice";
 
 /**
@@ -73,6 +78,19 @@ export const MessageActions = ({
     selectFeedbackSubmitting(state, messageId),
   );
   const isRetrying = useSelector((state) => selectIsRetrying(state, messageId));
+  const retryAttempt = useSelector((state) =>
+    selectRetryAttempt(state, messageId),
+  );
+  const maxRetries = useSelector((state) => selectMaxRetries(state, messageId));
+   const isFatalError = useSelector((state) =>
+    selectIsFatalError(state, messageId),
+  );
+  const isModelSwitching = useSelector(
+    (state) => state.messageInteractions?.modelFailover?.byMessageId?.[messageId]?.isSwitching ?? false
+  );
+  const failoverModelName = useSelector(
+    (state) => state.messageInteractions?.modelFailover?.byMessageId?.[messageId]?.currentModelName ?? ""
+  );
 
   // Don't show for user messages or while initial loading
   if (!isAssistant || isLoading || !messageId) return null;
@@ -96,6 +114,11 @@ export const MessageActions = ({
   const handleRetry = () => {
     if (isRetrying) return;
     dispatch(retryMessage({ conversationId, messageId }));
+  };
+
+  const handleManualRetry = () => {
+    if (isRetrying) return;
+    dispatch(manualRetry({ conversationId, messageId }));
   };
 
   const buttonClass =
@@ -154,16 +177,28 @@ export const MessageActions = ({
       </button>
 
       {/* 4. Retry Button */}
-      <button
-        onClick={handleRetry}
-        className={buttonClass}
-        // className={`${buttonClass} ${isRetrying ? "animate-spin" : ""}`}
-        disabled={isRetrying}
-        title="Regenerate response"
-        type="button"
-      >
-        <FaRotateRight size={14} />
-      </button>
+      {!isFatalError ? (
+        <button
+          onClick={handleRetry}
+          className={buttonClass}
+          disabled={isRetrying}
+          title="Regenerate response"
+          type="button"
+        >
+          <FaRotateRight size={14} />
+        </button>
+      ) : (
+        /* Manual Retry Button (only shown on fatal errors) */
+        <button
+          onClick={handleManualRetry}
+          className={`${buttonClass} text-red-400 hover:text-red-300`}
+          disabled={isRetrying}
+          title="Retry after error"
+          type="button"
+        >
+          <FaRotateRight size={14} />
+        </button>
+      )}
 
       {/* 5. Version Switcher (Conditional) */}
       {totalVersions > 1 && (
@@ -175,9 +210,13 @@ export const MessageActions = ({
         />
       )}
 
-      {(isSubmittingFeedback || isRetrying) && (
+       {(isSubmittingFeedback || isRetrying || isModelSwitching) && (
         <span className="text-[10px] text-theme-muted animate-pulse ml-1 whitespace-nowrap">
-          {isRetrying ? "Regenerating..." : "Saving feedback..."}
+          {isModelSwitching
+            ? `Trying ${failoverModelName}...`
+            : isRetrying
+              ? `Retrying ${retryAttempt}/${maxRetries}...`
+              : "Saving feedback..."}
         </span>
       )}
     </div>

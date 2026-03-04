@@ -20,7 +20,11 @@ vi.mock('../../../messages/messageInteractionsSlice', async () => {
         markMessageCopied: vi.fn(),
         selectUserFeedback: vi.fn(),
         selectFeedbackSubmitting: vi.fn(),
-        selectIsRetrying: vi.fn()
+        selectIsRetrying: vi.fn(),
+        selectRetryAttempt: vi.fn(),
+        selectMaxRetries: vi.fn(),
+        selectIsFatalError: vi.fn(),
+        selectModelFailover: vi.fn()
     };
 });
 
@@ -38,13 +42,25 @@ describe('MessageActions Component', () => {
         vi.clearAllMocks();
         useDispatch.mockReturnValue(dispatch);
         
-        // Mock useSelector to execute the selector function with a dummy state
-        useSelector.mockImplementation((selectorFn) => selectorFn({}));
+        // Mock useSelector to execute the selector function with a safe dummy state
+        const defaultState = {
+            messageInteractions: {
+                feedback: { byMessageId: {} },
+                versions: { byMessageId: {} },
+                retry: { byMessageId: {} },
+                modelFailover: { byMessageId: {} }
+            }
+        };
+        useSelector.mockImplementation((selectorFn) => selectorFn(defaultState));
         
         // Default selector returns
         vi.mocked(interactionSlice.selectUserFeedback).mockReturnValue(null);
         vi.mocked(interactionSlice.selectFeedbackSubmitting).mockReturnValue(false);
         vi.mocked(interactionSlice.selectIsRetrying).mockReturnValue(false);
+        vi.mocked(interactionSlice.selectRetryAttempt).mockReturnValue(0);
+        vi.mocked(interactionSlice.selectMaxRetries).mockReturnValue(5);
+        vi.mocked(interactionSlice.selectIsFatalError).mockReturnValue(false);
+        vi.mocked(interactionSlice.selectModelFailover).mockReturnValue({ isSwitching: false });
 
         // Mock clipboard
         Object.assign(navigator, {
@@ -111,7 +127,7 @@ describe('MessageActions Component', () => {
         vi.mocked(interactionSlice.selectIsRetrying).mockReturnValue(true);
 
         render(<MessageActions {...mockProps} />);
-        expect(screen.getByText(/Regenerating.../i)).toBeInTheDocument();
+        expect(screen.getByText(/Retrying/i)).toBeInTheDocument();
         expect(screen.getByTitle(/Regenerate response/i)).toBeDisabled();
     });
 });

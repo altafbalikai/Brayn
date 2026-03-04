@@ -40,7 +40,7 @@ const MessageVersionSchema = new Schema({
     // The actual response text for this version
     content: {
         type: String,
-        required: [true, 'content is required']
+        default: '' // Allow empty string for snapshots of empty messages
     },
 
     // Which persona generated this version

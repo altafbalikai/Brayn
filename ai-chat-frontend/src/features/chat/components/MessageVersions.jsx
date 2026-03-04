@@ -113,7 +113,7 @@ export const MessageVersions = ({
       </button>
 
       {isLoading && (
-        <div className="ml-1 w-2.5 h-2.5 border border-theme-accent border-t-transparent rounded-full animate-spin"></div>
+        <div className="ml-1 w-2.5 h-2.5 border border-theme-muted border-t-transparent rounded-full animate-spin"></div>
       )}
     </div>
   );

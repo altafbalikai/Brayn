@@ -94,10 +94,11 @@ async function resolveConversationModel(conversationId) {
 
   const model = await LLMModel.findById(conv.selectedModelId);
   if (!model || model.status !== "active") {
-    throw Object.assign(
-      new Error("Selected LLM model is unavailable"),
-      { status: 400 }
-    );
+    const error = new Error('Selected LLM model is unavailable');
+    error.status = 400;
+    error.code = 'MODEL_UNAVAILABLE';
+    error.retriable = true;
+    throw error;
   }
 
   return model;
@@ -216,10 +217,23 @@ async function assembleSystemPrompt(userId, conversationId) {
 /* ===========================
    STREAMING RESPONSE
    =========================== */
-async function askConversationStream(conversationId, messages, userId, summaryText = null, excludeMessageIds = []) {
+async function askConversationStream(conversationId, messages, userId, summaryText = null, excludeMessageIds = [], overrideModelId = null) {
   try {
     const openrouter = await getOpenRouter();
-    const model = await resolveConversationModel(conversationId);
+
+    // ✅ NEW: Support model failover via overrideModelId
+    let model;
+    if (overrideModelId) {
+      model = await LLMModel.findById(overrideModelId);
+      if (!model || model.status !== "active") {
+        throw Object.assign(new Error("Selected LLM model is unavailable"), {
+          status: 400,
+          code: "MODEL_UNAVAILABLE"
+        });
+      }
+    } else {
+      model = await resolveConversationModel(conversationId);
+    }
 
     const MAX_CONTEXT = 4;
 
@@ -410,7 +424,7 @@ async function askGeminiStream(
  * - Loads context
  * - Loads summary
  */
-async function prepareAskContext(userId, conversationId, messageText) {
+async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null) {
   // 1. Save user message
   const userMsg = await ConversationService.addMessage(userId, conversationId, {
     role: "user",
@@ -454,12 +468,14 @@ async function prepareAskContext(userId, conversationId, messageText) {
   const summaryText = latestSummary?.summaryText || null;
 
   // 4. Return all needed for streaming
+  // ✅ NEW: Pass overrideModelId to streaming service
   const { stream, modelId } = await askConversationStream(
     conversationId,
     ordered,
     userId,
     summaryText,
-    [userMsg._id, assistantMsg._id] // Exclude both from vector memory retrieval context
+    [userMsg._id, assistantMsg._id], // Exclude both from vector memory retrieval context
+    overrideModelId // ✅ NEW: Support model failover
   );
 
   return { stream, modelId, userMsg, assistantMsg };

@@ -5,6 +5,7 @@ const MessageVersion = require('../models/MessageVersion');
 const Conversation = require('../models/Conversation');
 const llmService = require('../services/llm.service');
 const logger = require('../config/logger');
+const { idempotencyCache } = require('../config/idempotencyCache');
 
 // ─── Retry Message (Regenerate AI Response) ────────────────────────────────────
 
@@ -27,6 +28,49 @@ async function retryMessage(req, res, next) {
         // Support both short (cid/mid from legacy/compact routes) and long (conversationId/messageId from standard routes)
         const conversationId = req.params.conversationId || req.params.cid;
         const messageId = req.params.messageId || req.params.mid;
+        const { overrideModelId } = req.body || {};  // ✅ NEW: Support model failover
+
+        // ================================================================================
+        // NEW: Get idempotency key from header
+        // ================================================================================
+        const requestKey = req.headers['x-request-idempotency-key'];
+        if (!requestKey) {
+            return res.status(400).json({
+                error: 'X-Request-Idempotency-Key header required'
+            });
+        }
+
+        // ================================================================================
+        // NEW: Check idempotency cache BEFORE processing
+        // ================================================================================
+        const cached = idempotencyCache.get(requestKey);
+        if (cached) {
+            if (cached.status === 'pending') {
+                // Request already in flight
+                return res.status(409).json({
+                    error: 'Duplicate request in progress'
+                });
+            }
+            if (cached.status === 'completed') {
+                // Return cached result
+                return res.json({
+                    versionId: cached.result.versionId,
+                    cached: true
+                });
+            }
+            if (cached.status === 'failed') {
+                // Return cached error
+                return res.status(500).json({
+                    error: cached.error.message,
+                    cached: true
+                });
+            }
+        }
+
+        // ================================================================================
+        // NEW: Mark request as in-flight
+        // ================================================================================
+        idempotencyCache.set(requestKey, 'pending');
 
         // ── 1. Verify conversation ownership ───────────────────────────────────
         const conversation = await Conversation.findById(conversationId);
@@ -59,40 +103,35 @@ async function retryMessage(req, res, next) {
 
         // ── 4. Snapshot version 1 if it doesn't exist yet ────────────────────────
         //    On the very first retry, we need to capture the original message
-        if (highestVersion === 0 && originalMessage.text && originalMessage.text.trim()) {
-            try {
-                const v1 = await MessageVersion.create({
-                    messageId: originalMessage._id,
-                    conversationId,
-                    version: 1,
-                    content: originalMessage.text,
-                    personaId: originalMessage.personaId,
-                    modelId: originalMessage.llmMetadata?.model || null,
-                    generatedAt: originalMessage.createdAt,
-                    isActive: false // will be superseded by the new version
-                });
-
-                originalMessage.versions.push(v1._id);
-                logger.info('Created version 1 snapshot', { messageId, v1Id: v1._id });
-            } catch (err) {
-                // Handle race condition: another request may have created v1 simultaneously
-                if (err.code === 11000 && err.message.includes('version_1')) {
-                    logger.warn('Version 1 already exists (race condition handled)', { messageId });
-                    // Refresh to get the latest version number
-                    const latestVersions = await MessageVersion.find({ messageId: originalMessage._id })
-                        .sort({ version: -1 })
-                        .limit(1)
-                        .lean();
-                    if (latestVersions.length > 0) {
-                        // Update highestVersion for the subsequent operations
-                        // We'll need to recalculate nextVersion below
+        if (highestVersion === 0) {
+            const v1 = await MessageVersion.findOneAndUpdate(
+                { messageId: originalMessage._id, version: 1 },
+                {
+                    $setOnInsert: {
+                        messageId: originalMessage._id,
+                        conversationId,
+                        version: 1,
+                        content: originalMessage.text || '', // Always allow Version 1 — empty content is valid
+                        personaId: originalMessage.personaId ?? null,
+                        modelId: originalMessage.llmMetadata?.model || null,
+                        temperature: originalMessage.temperature ?? null,
+                        tokens: originalMessage.tokens || { prompt: 0, completion: 0, total: 0 },
+                        isActive: false,
+                        generatedAt: originalMessage.createdAt || new Date()
                     }
-                } else {
-                    throw err;
+                },
+                { upsert: true, new: false }
+            );
+
+            if (!v1) {
+                const inserted = await MessageVersion.findOne({ messageId: originalMessage._id, version: 1 }, { _id: 1 });
+                if (inserted) {
+                    originalMessage.versions.push(inserted._id);
                 }
+                logger.info('Created version 1 snapshot (atomic)', { messageId });
+            } else {
+                logger.warn('Version 1 already exists (race condition handled)', { messageId });
             }
-        } else if (highestVersion === 0) {
-            logger.warn('Original message has empty text, skipping version snapshot', { messageId });
         }
 
         // ── 4. Find the user message that prompted this response (Deterministic) ───────────────
@@ -134,102 +173,177 @@ async function retryMessage(req, res, next) {
             ordered.push({ role: userMessage.role, text: userMessage.text, _id: userMessage._id });
         }
 
-        const { stream, modelId } = await llmService.askConversationStream(
-            conversationId,
-            ordered,
-            userId,
-            null, // summaryText — not needed for retry
-            [originalMessage._id, userMessage._id]
-        );
-
-        // ── 6. Start SSE response and collect the full reply ───────────────────
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders?.();
-
-        let fullReply = '';
+        // ================================================================================
+        // NEW: Wrap entire operation in timeout
+        // ================================================================================
+        const STREAM_TIMEOUT = 120000; // 2 minutes
+        const timeoutHandle = setTimeout(() => {
+            if (!res.headersSent) {
+                // Pre-stream timeout → retriable
+                idempotencyCache.set(requestKey, 'failed', null, {
+                    message: 'Stream timeout (pre-start)'
+                });
+                return res.status(504).json({ error: 'Stream timeout (pre-start)' });
+            }
+            // Already streaming → close connection
+            res.write('\n\n⚠️ Stream timeout: LLM response took too long');
+            res.end();
+        }, STREAM_TIMEOUT);
 
         try {
-            for await (const chunk of stream) {
-                const content = chunk.choices[0]?.delta?.content;
-                if (content) {
-                    fullReply += content;
-                    res.write(content);
+            // ✅ NEW: Pass overrideModelId for model failover support
+            const { stream, modelId } = await llmService.askConversationStream(
+                conversationId,
+                ordered,
+                userId,
+                null, // summaryText — not needed for retry
+                [originalMessage._id, userMessage._id],
+                overrideModelId // ✅ NEW: Support model failover
+            );
+
+            // ── 6. Start SSE response and collect the full reply ───────────────────
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+
+            let fullReply = '';
+
+            // ================================================================================
+            // STREAMING LOOP - Errors here are NOT retriable
+            // ================================================================================
+            try {
+                for await (const chunk of stream) {
+                    const content = chunk.choices[0]?.delta?.content;
+                    if (content) {
+                        fullReply += content;
+                        res.write(content);
+                    }
                 }
-            }
-        } catch (streamErr) {
-            logger.error('Stream iteration error:', { message: streamErr.message, stack: streamErr.stack });
-            fullReply = '';
-        }
+            } catch (streamErr) {
+                // Stream interrupted mid-transfer (NOT retriable)
+                logger.error('Stream iteration error (non-retriable):', {
+                    requestKey,
+                    message: streamErr.message,
+                    messageId
+                });
 
-        // ── 7. Validate that we received content ────────────────────────────────
-        if (!fullReply || !fullReply.trim()) {
-            const errorMsg = 'LLM returned empty response';
-            logger.error(errorMsg, { conversationId, messageId, fullReply: fullReply.length });
+                if (res.writable) {
+                    res.write(`\n\n⚠️ Connection interrupted. Response was not saved.`);
+                }
+                res.end();
 
-            if (res.headersSent) {
-                res.write(`\n\n⚠️ ${errorMsg}`);
+                // Cache the error (don't auto-retry stream failures)
+                idempotencyCache.set(requestKey, 'failed', null, {
+                    message: 'Stream interrupted'
+                });
+                return;
             }
+
+            // ── 7. Validate that we received content ────────────────────────────────
+            if (!fullReply || !fullReply.trim()) {
+                const errorMsg = 'LLM returned empty response';
+                logger.error(errorMsg, { conversationId, messageId, fullReply: fullReply.length });
+
+                if (res.headersSent) {
+                    res.write(`\n\n⚠️ ${errorMsg}`);
+                }
+                res.end();
+
+                // Cache this error for duplicate prevention
+                idempotencyCache.set(requestKey, 'failed', null, {
+                    message: errorMsg
+                });
+                return;
+            }
+
+            // ── 8. Save the new version ────────────────────────────────────────────
+            // Recalculate highest version right before creating to handle race conditions
+            const finalVersionCheck = await MessageVersion.find({ messageId: originalMessage._id })
+                .sort({ version: -1 })
+                .limit(1)
+                .lean();
+
+            const nextVersion = (finalVersionCheck.length > 0 ? finalVersionCheck[0].version : 0) + 1;
+            logger.info('Creating version', { messageId, nextVersion });
+
+            const newVersion = await MessageVersion.create({
+                messageId: originalMessage._id,
+                conversationId,
+                parentMessageId: originalMessage._id,
+                version: nextVersion,
+                content: fullReply,
+                personaId: conversation.currentPersonaId,
+                modelId: modelId?.toString() || null,
+                isActive: true
+            });
+
+            logger.info('Created new version', { messageId, version: nextVersion, contentLength: fullReply.length });
+
+            // Deactivate all other versions
+            await MessageVersion.updateMany(
+                { messageId: originalMessage._id, _id: { $ne: newVersion._id } },
+                { $set: { isActive: false } }
+            );
+
+            // ── 9. Update the parent Message ───────────────────────────────────────
+            originalMessage.versions.push(newVersion._id);
+            originalMessage.currentVersionId = newVersion._id;
+            originalMessage.text = fullReply; // update displayed text
+            originalMessage.isRetried = true;
+
+            const savedMessage = await originalMessage.save();
+            logger.info('Message saved after retry', {
+                messageId: savedMessage._id,
+                versions: savedMessage.versions.length,
+                currentVersionId: savedMessage.currentVersionId
+            });
+
+            // Update conversation timestamp
+            conversation.updatedAt = new Date();
+            await conversation.save();
+
+            // ================================================================================
+            // SUCCESS: Cache the result
+            // ================================================================================
+            idempotencyCache.set(requestKey, 'completed', {
+                versionId: newVersion._id
+            });
+
             res.end();
-            return;
+
+        } finally {
+            clearTimeout(timeoutHandle); // ✅ Always clear timeout
         }
 
-        // ── 8. Save the new version ────────────────────────────────────────────
-        // Recalculate highest version right before creating to handle race conditions
-        const finalVersionCheck = await MessageVersion.find({ messageId: originalMessage._id })
-            .sort({ version: -1 })
-            .limit(1)
-            .lean();
-        
-        const nextVersion = (finalVersionCheck.length > 0 ? finalVersionCheck[0].version : 0) + 1;
-        logger.info('Creating version', { messageId, nextVersion });
-
-        const newVersion = await MessageVersion.create({
-            messageId: originalMessage._id,
-            conversationId,
-            parentMessageId: originalMessage._id,
-            version: nextVersion,
-            content: fullReply,
-            personaId: conversation.currentPersonaId,
-            modelId: modelId?.toString() || null,
-            isActive: true
-        });
-
-        logger.info('Created new version', { messageId, version: nextVersion, contentLength: fullReply.length });
-
-        // Deactivate all other versions
-        await MessageVersion.updateMany(
-            { messageId: originalMessage._id, _id: { $ne: newVersion._id } },
-            { $set: { isActive: false } }
-        );
-
-        // ── 9. Update the parent Message ───────────────────────────────────────
-        originalMessage.versions.push(newVersion._id);
-        originalMessage.currentVersionId = newVersion._id;
-        originalMessage.text = fullReply; // update displayed text
-        originalMessage.isRetried = true;
-
-        const savedMessage = await originalMessage.save();
-        logger.info('Message saved after retry', {
-            messageId: savedMessage._id,
-            versions: savedMessage.versions.length,
-            currentVersionId: savedMessage.currentVersionId
-        });
-
-        // Update conversation timestamp
-        conversation.updatedAt = new Date();
-        await conversation.save();
-
-        res.end();
     } catch (err) {
-        logger.error('Retry error:', { message: err.message, stack: err.stack });
+        // ================================================================================
+        // Pre-stream or persistence errors (retriable)
+        // ================================================================================
+        const requestKey = req.headers['x-request-idempotency-key'];
+
+        logger.error('Retry prep error (retriable):', {
+            requestKey,
+            message: err.message,
+            status: err.status || 500
+        });
+
+        if (requestKey) {
+            idempotencyCache.set(requestKey, 'failed', null, {
+                message: err.message,
+                status: err.status || 500
+            });
+        }
+
         // If headers already sent (SSE started), write error into stream
         if (res.headersSent) {
-            res.write(`\n\n⚠️ Retry failed. Please try again shortly.`);
+            res.write(`\n\n⚠️ ${err.message}`);
             res.end();
         } else {
-            next(err);
+            res.status(err.status || 500).json({
+                error: err.message || 'Retry failed',
+                retriable: true
+            });
         }
     }
 }

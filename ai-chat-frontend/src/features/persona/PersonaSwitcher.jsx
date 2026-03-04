@@ -82,7 +82,7 @@ export const PersonaSwitcher = ({ conversationId }) => {
     }, [isOpen]);
 
     const handleSwitch = (personaId) => {
-        console.log("Clicked persona switch", personaId)
+        // console.log("Clicked persona switch", personaId)
         
         if (!conversationId || conversationId === 'draft') {
             // Local switch for draft chats

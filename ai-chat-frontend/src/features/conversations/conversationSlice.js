@@ -2,7 +2,19 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { conversationService } from '../../api/services/conversationService';
 import { llmService } from '../../api/services/llmService';
 import { logout } from '../auth/authSlice';
-import { switchVersion, retryMessage } from '../messages/messageInteractionsSlice';
+import { switchVersion, retryMessage, updateModelFailover, clearModelFailover } from '../messages/messageInteractionsSlice';
+import { generateUuid } from '../../api/utils/retryWithBackoff';
+import { classifyError } from '../../api/utils/modelFailover';
+
+// Helper to calculate exponential backoff delay
+function calculateBackoff(attempt) {
+    const baseDelay = 500;
+    const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+    const jitter = exponentialDelay * 0.1 * Math.random();
+    return Math.min(exponentialDelay + jitter, 30000);
+}
+
+const abortControllers = {};
 
 // Async thunks
 export const fetchConversations = createAsyncThunk(
@@ -55,7 +67,30 @@ export const fetchMessages = createAsyncThunk(
 
 export const sendMessage = createAsyncThunk(
     'conversation/sendMessage',
-    async ({ message, conversationId, tempAssistantId }, { dispatch, rejectWithValue }) => {
+    async ({ message, conversationId, tempAssistantId }, { dispatch, getState, rejectWithValue }) => {
+        const state = getState();
+        const currentConv = state.conversation.currentConversation;
+        const selectedModelId = currentConv?.selectedModelId;
+        const allModels = state.llmModels.llmmodels.filter(m => m.status === 'active');
+        const selectedModel = allModels.find(m => m._id === selectedModelId);
+        const otherModels = allModels.filter(m => m._id !== selectedModelId);
+        const orderedModels = selectedModel
+            ? [selectedModel, ...otherModels]
+            : allModels;
+        const maxAttempts = 5;
+
+        // Abort any existing stream for this conversation
+        if (abortControllers[conversationId]) {
+            abortControllers[conversationId].abort();
+            delete abortControllers[conversationId];
+        }
+        abortControllers[conversationId] = new AbortController();
+        const signal = abortControllers[conversationId].signal;
+
+        let requestKey = generateUuid();
+        let streamSucceeded = false;
+        let lastError = null;
+
         try {
             // Add user message immediately
             const userMsg = {
@@ -67,59 +102,128 @@ export const sendMessage = createAsyncThunk(
             };
             dispatch(addMessageToConversation({ conversationId, message: userMsg }));
 
+            // Add pending placeholder assistant message immediately
+            const placeholderMsg = {
+                _id: tempAssistantId,
+                role: 'assistant',
+                text: '',
+                createdAt: new Date().toISOString(),
+                status: 'pending',
+                versions: [],
+                currentVersion: 1
+            };
+            dispatch(addAssistantPlaceholder({ conversationId, message: placeholderMsg }));
+
             dispatch(setAssistantTyping({ conversationId, value: true }));
 
-            // Use streaming API
-            const stream = llmService.askStream({ message, conversationId });
-            let realMessageId = null;
-            let accumulated = '';
+            for (let modelIndex = 0; modelIndex < orderedModels.length; modelIndex++) {
+                const model = orderedModels[modelIndex];
+                const isModelSwitch = model._id !== selectedModelId;
 
-            const onMetadata = (messageId) => {
-                realMessageId = messageId;
-                // Add placeholder for assistant message using REAL MongoDB _id
-                const placeholderMsg = {
-                    _id: realMessageId,
-                    role: 'assistant',
-                    text: '',
-                    createdAt: new Date().toISOString(),
-                    status: 'streaming'
-                };
-                dispatch(addAssistantPlaceholder({ conversationId, message: placeholderMsg }));
-            };
+                if (modelIndex > 0) {
+                    requestKey = generateUuid();
+                    dispatch(updateModelFailover({
+                        messageId: conversationId,
+                        modelName: model.displayName || model.name || model.modelId,
+                        isSwitching: true
+                    }));
+                }
 
-            const onChunk = (chunk) => {
-                accumulated += chunk;
-                if (!realMessageId) return; // Wait until metadata arrives
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        const stream = llmService.askStream({
+                            message,
+                            conversationId,
+                            overrideModelId: model._id,
+                            requestKey,
+                            signal
+                        });
 
-                // Update text with accumulated content
-                dispatch(updateAssistantText({
-                    conversationId,
-                    tempId: realMessageId, // Param named tempId for legacy compat, but holds real _id
-                    text: accumulated,
-                    status: 'streaming'
-                }));
-            };
+                        let realMessageId = null;
+                        let accumulated = '';
 
-            // Stream chunks in real-time
-            const full = await stream.start(onMetadata, onChunk);
+                        const onMetadata = (messageId) => {
+                            realMessageId = messageId;
+                            dispatch(updatePendingPlaceholderWithRealId({
+                                conversationId,
+                                tempId: tempAssistantId,
+                                realId: realMessageId
+                            }));
+                        };
 
-            if (realMessageId) {
-                // Finalize message when streaming completes
-                dispatch(finalizeAssistantMessage({
-                    conversationId,
-                    tempId: realMessageId,
-                    text: full,
-                    status: 'sent'
-                }));
+                        const onChunk = (chunk) => {
+                            accumulated += chunk;
+                            if (!realMessageId) return;
+                            dispatch(updateAssistantText({
+                                conversationId,
+                                tempId: realMessageId,
+                                text: accumulated,
+                                status: 'streaming'
+                            }));
+                        };
+
+                        const full = await stream.start(onMetadata, onChunk);
+
+                        if (realMessageId) {
+                            dispatch(finalizeAssistantMessage({
+                                conversationId,
+                                tempId: realMessageId,
+                                text: full,
+                                status: 'sent'
+                            }));
+                        }
+
+                        // SUCCESS
+                        if (isModelSwitch) {
+                            try {
+                                await dispatch(updateConversationModel({
+                                    conversationId,
+                                    modelId: model._id
+                                })).unwrap();
+                            } catch (persistErr) {
+                                console.error('Model persistence failed — model switch not saved:', persistErr);
+                                window.alert(
+                                    `Message sent using ${model.displayName || model.name}, ` +
+                                    `but could not save it as your default model. ` +
+                                    `Your next message may use the previous model.`
+                                );
+                            }
+                        }
+
+                        dispatch(clearModelFailover(conversationId));
+                        dispatch(setAssistantTyping({ conversationId, value: false }));
+                        streamSucceeded = true;
+                        return { conversationId, aiMessage: { _id: realMessageId, text: full } };
+
+                    } catch (err) {
+                        const { isUnavailable, isRetriable } = classifyError(err);
+                        lastError = err;
+
+                        if (isUnavailable) break;
+
+                        if (isRetriable && attempt < maxAttempts) {
+                            const delay = calculateBackoff(attempt);
+                            await new Promise(r => setTimeout(r, delay));
+                            continue;
+                        }
+
+                        if (modelIndex < orderedModels.length - 1) break;
+                        throw err;
+                    }
+                }
             }
 
-            dispatch(setAssistantTyping({ conversationId, value: false }));
+            if (!streamSucceeded) {
+                throw new Error('Selected LLM model is unavailable. Please try again later.');
+            }
 
-            return { conversationId, aiMessage: { _id: realMessageId, text: full } };
         } catch (error) {
             const errMsg = error.message || 'Failed to stream message';
             dispatch(setAssistantTyping({ conversationId, value: false }));
+            dispatch(clearModelFailover(conversationId));
             return rejectWithValue(errMsg);
+        } finally {
+            delete abortControllers[conversationId];
         }
     }
 );
@@ -202,6 +306,20 @@ const conversationSlice = createSlice({
             }
             state.messages[conversationId].push(message);
         },
+        // Replace temporary pending placeholder with real message ID when metadata arrives
+        updatePendingPlaceholderWithRealId: (state, action) => {
+            const { conversationId, tempId, realId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            // Find the temporary pending message (usually the last one)
+            const tempIndex = messages.findIndex(m => m._id === tempId && m.status === 'pending');
+            if (tempIndex !== -1) {
+                // Update the message with real ID and status
+                messages[tempIndex]._id = realId;
+                messages[tempIndex].status = 'streaming';
+            }
+        },
         // RESTORED: Required by initial sendMessage streaming flow
         updateAssistantText: (state, action) => {
             const { conversationId, tempId, text, status } = action.payload;
@@ -212,6 +330,14 @@ const conversationSlice = createSlice({
             if (idx !== -1) {
                 messages[idx].text = text;
                 messages[idx].status = status || 'streaming';
+
+                // Update versions array during streaming
+                if (messages[idx].versions && messages[idx].versions.length > 0) {
+                    const currentIdx = messages[idx].currentVersion - 1;
+                    if (currentIdx >= 0 && currentIdx < messages[idx].versions.length) {
+                        messages[idx].versions[currentIdx].content = text;
+                    }
+                }
             }
         },
         // 🔄 Correct Real-Time Version Synchronization (Phase 12)
@@ -293,14 +419,22 @@ const conversationSlice = createSlice({
             if (idx !== -1) {
                 const msg = list[idx];
                 msg.status = status || 'sent';
+                msg.text = text;
                 msg.createdAt = new Date().toISOString();
 
-                // If we have versions, ensure the last version matches the full text
-                if (msg.versions && msg.currentVersion) {
+                // Initialize or update versions array properly
+                if (!msg.versions || msg.versions.length === 0) {
+                    // Create first version if it doesn't exist
+                    msg.versions = [{
+                        content: text,
+                        version: 1,
+                        isActive: true
+                    }];
+                    msg.currentVersion = 1;
+                } else if (msg.currentVersion && msg.currentVersion > 0) {
+                    // Update existing version
                     msg.versions[msg.currentVersion - 1].content = text;
-                    msg.currentVersion = msg.versions.length;
                 }
-                msg.text = text;
             }
         },
         setConversationTitle: (state, action) => {
@@ -347,6 +481,32 @@ const conversationSlice = createSlice({
                         text: '',
                         status: 'streaming'
                     };
+                }
+            }
+        },
+        // ✅ NEW: Mark message as retrying WITHOUT clearing text
+        markRetrying: (state, action) => {
+            const { conversationId, messageId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            const idx = messages.findIndex(m => m._id === messageId);
+            if (idx !== -1) {
+                messages[idx].status = 'retrying'; // Set status, don't clear text
+            }
+        },
+        // ✅ NEW: Complete retry - clear retrying flag and set final status
+        completeRetry: (state, action) => {
+            const { conversationId, messageId, success, error } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            const idx = messages.findIndex(m => m._id === messageId);
+            if (idx !== -1) {
+                const msg = messages[idx];
+                msg.status = success ? 'sent' : 'failed';
+                if (!success) {
+                    msg.retryError = error;
                 }
             }
         },
@@ -568,6 +728,7 @@ export const {
     addMessageToConversation,
     setAssistantTyping,
     addAssistantPlaceholder,
+    updatePendingPlaceholderWithRealId,
     updateAssistantText,
     finalizeAssistantMessage,
     setConversationTitle,

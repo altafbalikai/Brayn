@@ -108,10 +108,10 @@ const personaSlice = createSlice({
         builder
             .addCase(switchPersonaThunk.pending, (state) => {
                 state.error = null;
-                console.log('🟡 Switching persona (pending)...');
+                // console.log('🟡 Switching persona (pending)...');
             })
             .addCase(switchPersonaThunk.fulfilled, (state, action) => {
-                console.log('✅ Persona switched (fulfilled):', action.payload.personaId);
+                // console.log('✅ Persona switched (fulfilled):', action.payload.personaId);
                 state.currentPersonaId = action.payload.personaId;
                 state.lastUsedPersonaId = action.payload.personaId;
             })

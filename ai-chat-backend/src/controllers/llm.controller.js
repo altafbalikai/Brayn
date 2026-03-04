@@ -1,10 +1,21 @@
 const llmService = require('../services/llm.service');
+const { idempotencyCache } = require('../config/idempotencyCache');
 
 async function ask(req, res, next) {
   try {
     const userId = req.user && req.user.id;
     const { cid: conversationId } = req.params;
-    const { message } = req.body;
+    const { message, overrideModelId } = req.body;
+
+    // ================================================================================
+    // NEW: Get idempotency key from header
+    // ================================================================================
+    const requestKey = req.headers['x-request-idempotency-key'];
+    if (!requestKey) {
+      return res.status(400).json({
+        error: 'X-Request-Idempotency-Key header required'
+      });
+    }
 
     if (!message) {
       return res.status(400).json({ error: 'message required' });
@@ -18,49 +29,169 @@ async function ask(req, res, next) {
       return res.status(400).json({ error: "conversationId and message are required" });
     }
 
-    console.log(`🔵 POST /api/llm/${conversationId}/ask | INFO: ENTERED CONTROLLER`);
-
-    // Prepare context and start LLM stream via Service Orchestrator
-    const { stream, userMsg, assistantMsg } = await llmService.prepareAskContext(userId, conversationId, message);
-
-    // START SSE RESPONSE
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    // 1. Send Metadata Event FIRST
-    res.write(`event: metadata\n`);
-    res.write(`data: ${JSON.stringify({ messageId: assistantMsg._id })}\n\n`);
-
-    let fullReply = "";
-
-    // Consume stream and send to client
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        fullReply += content;
-        // 2. Stream JSON-Safe Chunk Events
-        res.write(`event: chunk\n`);
-        res.write(`data: ${JSON.stringify(content)}\n\n`);
+    // ================================================================================
+    // NEW: Check idempotency cache BEFORE processing
+    // ================================================================================
+    const cached = idempotencyCache.get(requestKey);
+    if (cached) {
+      if (cached.status === 'pending') {
+        // Request already in flight
+        return res.status(409).json({
+          error: 'Duplicate request in progress'
+        });
+      }
+      if (cached.status === 'completed') {
+        // Return cached message ID
+        return res.status(200).json({
+          messageId: cached.result.messageId,
+          cached: true
+        });
+      }
+      if (cached.status === 'failed') {
+        // Return cached error
+        return res.status(500).json({
+          error: cached.error.message,
+          cached: true
+        });
       }
     }
 
-    // Finalize persistence and side effects via Service Orchestrator
-    await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
+    // ================================================================================
+    // NEW: Mark request as in-flight
+    // ================================================================================
+    idempotencyCache.set(requestKey, 'pending');
 
-    res.end();
+    console.log(`🔵 POST /api/llm/${conversationId}/ask | INFO: ENTERED CONTROLLER`);
+
+    // ================================================================================
+    // NEW: Wrap entire operation in timeout
+    // ================================================================================
+    const STREAM_TIMEOUT = 120000; // 2 minutes
+    const timeoutHandle = setTimeout(() => {
+      if (!res.headersSent) {
+        // Pre-stream timeout → retriable
+        idempotencyCache.set(requestKey, 'failed', null, {
+          message: 'Stream timeout (pre-start)'
+        });
+        return res.status(504).json({ error: 'Stream timeout (pre-start)' });
+      }
+      // Already streaming → close connection
+      res.write('\n\n⚠️ Stream timeout: LLM response took too long');
+      res.end();
+    }, STREAM_TIMEOUT);
+
+    try {
+      // Prepare context and start LLM stream via Service Orchestrator
+      // ✅ NEW: Pass overrideModelId for model failover support
+      const { stream, userMsg, assistantMsg } = await llmService.prepareAskContext(
+        userId,
+        conversationId,
+        message,
+        overrideModelId
+      );
+
+      // START SSE RESPONSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders?.();
+
+      // 1. Send Metadata Event FIRST
+      res.write(`event: metadata\n`);
+      res.write(`data: ${JSON.stringify({ messageId: assistantMsg._id })}\n\n`);
+
+      let fullReply = "";
+
+      // ================================================================================
+      // STREAMING LOOP - Errors here are NOT retriable
+      // ================================================================================
+      try {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            fullReply += content;
+            // 2. Stream JSON-Safe Chunk Events
+            res.write(`event: chunk\n`);
+            res.write(`data: ${JSON.stringify(content)}\n\n`);
+          }
+        }
+
+        if (!fullReply || !fullReply.trim()) {
+          res.write(`\n\n⚠️ LLM returned empty response`);
+          res.end();
+
+          // Cache this error for duplicate prevention
+          idempotencyCache.set(requestKey, 'failed', null, {
+            message: 'LLM returned empty response'
+          });
+          return;
+        }
+
+        // Finalize persistence and side effects via Service Orchestrator
+        await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
+
+        // ================================================================================
+        // SUCCESS: Cache the result
+        // ================================================================================
+        idempotencyCache.set(requestKey, 'completed', {
+          messageId: assistantMsg._id
+        });
+
+        res.end();
+
+      } catch (streamErr) {
+        // Stream interrupted mid-transfer (NOT retriable)
+        console.error('Stream iteration error (non-retriable):', {
+          requestKey,
+          error: streamErr.message,
+          messageId: assistantMsg._id
+        });
+
+        if (res.writable) {
+          res.write(`\n\n⚠️ Connection interrupted. Response was not saved.`);
+        }
+        res.end();
+
+        // Cache the error (don't auto-retry stream failures)
+        idempotencyCache.set(requestKey, 'failed', null, {
+          message: 'Stream interrupted'
+        });
+      }
+
+    } finally {
+      clearTimeout(timeoutHandle); // ✅ Always clear timeout
+    }
 
   } catch (err) {
-    console.error("Streaming error:", err);
+    // ================================================================================
+    // Pre-stream errors (retriable)
+    // ================================================================================
+    const requestKey = req.headers['x-request-idempotency-key'];
+
+    console.error("Ask prep error (retriable):", {
+      requestKey,
+      message: err.message,
+      status: err.status || 500
+    });
+
+    if (requestKey) {
+      idempotencyCache.set(requestKey, 'failed', null, {
+        message: err.message,
+        status: err.status || 500
+      });
+    }
 
     if (!res.headersSent) {
       // If streaming hasn't started, return standard JSON error
-      return res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
+      return res.status(err.status || 500).json({
+        error: err.message || 'Internal Server Error',
+        code: err.code || null,
+        retriable: err.retriable ?? false
+      });
     }
 
     // If streaming has started, push the error directly to the active stream
-    res.write(`\n\n⚠️ Service Interruption. This model is temporarily unavailable or free models are temporarily rate-limited upstream. Please retry shortly or switch to a different model to continue.`);
+    res.write(`\n\n⚠️ ${err.message}`);
     res.end();
   }
 }

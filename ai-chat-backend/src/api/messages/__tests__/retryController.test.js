@@ -176,4 +176,144 @@ describe('Retry Controller Integration Tests', () => {
             expect(res.body.error).toMatch(/version not found/i);
         });
     });
+
+    describe('retryController - empty message versioning', () => {
+
+        it('should create Version 1 with empty content when original message text is empty', async () => {
+            // SETUP:
+            // - Create a Message document with text: "" and versions: []
+            // - Ensure no MessageVersion documents exist for this messageId
+
+            const emptyMsg = await Message.create({
+                conversationId: testConversation._id,
+                userId: testUser._id,
+                role: 'assistant',
+                text: '',
+                versions: []
+            });
+
+            // ACTION:
+            await request(app)
+                .post(`/api/conversations/${testConversation._id}/messages/${emptyMsg._id}/retry`)
+                .set('Authorization', authToken)
+                .set('X-Request-Idempotency-Key', 'unique-key-1');
+
+            // ASSERT:
+            const v1 = await MessageVersion.findOne({ messageId: emptyMsg._id, version: 1 });
+            expect(v1).not.toBeNull();
+            expect(v1.content).toBe("");
+
+            const updatedMsg = await Message.findById(emptyMsg._id);
+            expect(updatedMsg.versions).toContainEqual(v1._id);
+        });
+
+        it('should create Version 2 with retry content after Version 1 empty snapshot', async () => {
+            // SETUP:
+            const emptyMsg = await Message.create({
+                conversationId: testConversation._id,
+                userId: testUser._id,
+                role: 'assistant',
+                text: '',
+                versions: []
+            });
+
+            // ACTION:
+            await request(app)
+                .post(`/api/conversations/${testConversation._id}/messages/${emptyMsg._id}/retry`)
+                .set('Authorization', authToken)
+                .set('X-Request-Idempotency-Key', 'unique-key-2');
+
+            // ASSERT:
+            const v2 = await MessageVersion.findOne({ messageId: emptyMsg._id, version: 2 });
+            expect(v2).not.toBeNull();
+            expect(v2.content).toBe("Regenerated response.");
+
+            const updatedMsg = await Message.findById(emptyMsg._id);
+            expect(updatedMsg.versions).toHaveLength(2);
+            expect(updatedMsg.currentVersionId.toString()).toBe(v2._id.toString());
+        });
+
+        it('should return 200 when switching to version 1 (empty)', async () => {
+            const emptyMsg = await Message.create({
+                conversationId: testConversation._id,
+                userId: testUser._id,
+                role: 'assistant',
+                text: '',
+                versions: []
+            });
+
+            // Create versions
+            await request(app)
+                .post(`/api/conversations/${testConversation._id}/messages/${emptyMsg._id}/retry`)
+                .set('Authorization', authToken)
+                .set('X-Request-Idempotency-Key', 'unique-key-3');
+
+            // ACTION:
+            const res = await request(app)
+                .patch(`/api/messages/${emptyMsg._id}/version`)
+                .set('Authorization', authToken)
+                .send({ versionNumber: 1 });
+
+            // ASSERT:
+            expect(res.status).toBe(200);
+            expect(res.body.message.content).toBe("");
+
+            const updatedMsg = await Message.findById(emptyMsg._id);
+            const v1 = await MessageVersion.findOne({ messageId: emptyMsg._id, version: 1 });
+            expect(updatedMsg.currentVersionId.toString()).toBe(v1._id.toString());
+        });
+
+        it('should return 200 when switching back to version 2 (retry)', async () => {
+            const emptyMsg = await Message.create({
+                conversationId: testConversation._id,
+                userId: testUser._id,
+                role: 'assistant',
+                text: '',
+                versions: []
+            });
+
+            await request(app)
+                .post(`/api/conversations/${testConversation._id}/messages/${emptyMsg._id}/retry`)
+                .set('Authorization', authToken)
+                .set('X-Request-Idempotency-Key', 'unique-key-4');
+
+            // Switch to V1
+            await request(app)
+                .patch(`/api/messages/${emptyMsg._id}/version`)
+                .set('Authorization', authToken)
+                .send({ versionNumber: 1 });
+
+            // ACTION:
+            const res = await request(app)
+                .patch(`/api/messages/${emptyMsg._id}/version`)
+                .set('Authorization', authToken)
+                .send({ versionNumber: 2 });
+
+            // ASSERT:
+            expect(res.status).toBe(200); // FIXES THE BUG
+            expect(res.body.message.content).toBe("Regenerated response.");
+        });
+
+        it('should not affect version switching for non-empty messages', async () => {
+            // Regression test: switching works for normal messages
+            const res = await request(app)
+                .post(`/api/conversations/${testConversation._id}/messages/${testMessage._id}/retry`)
+                .set('Authorization', authToken)
+                .set('X-Request-Idempotency-Key', 'unique-key-5');
+
+            const switch1 = await request(app)
+                .patch(`/api/messages/${testMessage._id}/version`)
+                .set('Authorization', authToken)
+                .send({ versionNumber: 1 });
+            expect(switch1.status).toBe(200);
+            expect(switch1.body.message.content).toBe("Initial response.");
+
+            const switch2 = await request(app)
+                .patch(`/api/messages/${testMessage._id}/version`)
+                .set('Authorization', authToken)
+                .send({ versionNumber: 2 });
+            expect(switch2.status).toBe(200);
+            expect(switch2.body.message.content).toBe("Regenerated response.");
+        });
+    });
 });

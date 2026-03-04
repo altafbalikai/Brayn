@@ -7,13 +7,14 @@
  */
 
 import { refreshAccessToken } from '../axios';
+import { retryWithBackoff, generateUuid } from '../utils/retryWithBackoff';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 if (!API_BASE_URL) {
     throw new Error("VITE_API_BASE_URL is not defined");
 }
-console.log('[DEBUG] messageInteractionsService: API_BASE_URL =', API_BASE_URL);
+// console.log('[DEBUG] messageInteractionsService: API_BASE_URL =', API_BASE_URL);
 
 /**
  * Shared fetch wrapper with automatic token refresh and error normalization.
@@ -35,7 +36,7 @@ async function fetchClient(url, options = {}) {
     };
 
     const fullUrl = `${API_BASE_URL}${url}`;
-    console.log('[DEBUG] messageInteractionsService: Fetching', fullUrl);
+    // console.log('[DEBUG] messageInteractionsService: Fetching', fullUrl);
 
     const res = await fetch(fullUrl, {
         ...options,
@@ -137,14 +138,15 @@ export async function getFeedback(messageId) {
  * @param {string} params.conversationId - UUID of the conversation
  * @param {string} params.messageId - UUID of the message to regenerate
  * @param {Object} [params.options] - Optional model parameters
+ * @param {string} [params.requestKey] - Request idempotency key (auto-generated if not provided)
  * @returns {Object} { start, cancel }
  */
-export function retryMessageStream({ conversationId, messageId, options = {} }) {
+export function retryMessageStream({ conversationId, messageId, options = {}, requestKey = generateUuid(), signal: externalSignal = null }) {
     if (!conversationId) throw new Error("conversationId is required");
     if (!messageId) throw new Error("messageId is required");
 
-    const controller = new AbortController();
-    const signal = controller.signal;
+    const controller = externalSignal ? null : new AbortController();
+    const signal = externalSignal ?? controller.signal;
 
     async function start(onChunk, onComplete, retry = true) {
         const url = `${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}/retry`;
@@ -152,14 +154,17 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
 
         const headers = {
             "Content-Type": "application/json",
+            "X-Request-Idempotency-Key": requestKey, // ✅ NEW: Idempotency key
             ...(token && { Authorization: `Bearer ${token}` }),
         };
 
         const body = {
             ...(options.temperature && { temperature: options.temperature }),
             ...(options.maxTokens && { maxTokens: options.maxTokens }),
+            ...(options.overrideModelId && { overrideModelId: options.overrideModelId }),
         };
 
+        // One-shot fetch attempt. The Redux thunk handles retries and UI progress.
         let res;
         try {
             res = await fetch(url, {
@@ -174,15 +179,12 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
             throw new Error(`Network error: ${error.message}`);
         }
 
-        // 🔐 HANDLE EXPIRED TOKEN (BEFORE STREAMING)
+        // Handle 401 BEFORE streaming
         if (res.status === 401 && retry) {
             try {
-                const newToken = await refreshAccessToken();
-                return start(
-                    onChunk,
-                    onComplete,
-                    false // ❗ retry only once
-                );
+                await refreshAccessToken();
+                // After refresh, the next call will use the new token from localStorage
+                return start(onChunk, onComplete, false);
             } catch (refreshError) {
                 localStorage.removeItem("accessToken");
                 throw new Error("Session expired. Please log in again.");
@@ -191,7 +193,19 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
 
         if (!res.ok) {
             const txt = await res.text();
-            throw new Error(`Retry stream failed: ${res.status} ${txt}`);
+            let errorMessage = `Retry stream failed: ${res.status} ${txt}`;
+            let errorCode = null;
+
+            try {
+                const parsed = JSON.parse(txt);
+                errorMessage = parsed.error || parsed.message || errorMessage;
+                errorCode = parsed.code || null;
+            } catch (_) { }
+
+            const error = new Error(errorMessage);
+            error.status = res.status;
+            error.code = errorCode;
+            throw error;
         }
 
         if (!res.body) {
@@ -202,6 +216,7 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
         const decoder = new TextDecoder("utf-8");
         let accumulatedText = "";
 
+        // ✅ STREAMING LOOP - Errors here NOT retriable
         try {
             while (true) {
                 const { value, done } = await reader.read();
@@ -234,6 +249,9 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
 
             if (onComplete) onComplete(accumulatedText, finalMetadata);
             return { fullText: accumulatedText, metadata: finalMetadata };
+        } catch (streamErr) {
+            // Stream interrupted mid-transfer (NOT retriable)
+            throw new Error(`Stream interrupted: ${streamErr.message}`);
         } finally {
             reader.releaseLock();
         }
@@ -241,7 +259,7 @@ export function retryMessageStream({ conversationId, messageId, options = {} }) 
 
     return {
         start,
-        cancel: () => controller.abort()
+        cancel: () => controller ? controller.abort() : null
     };
 }
 

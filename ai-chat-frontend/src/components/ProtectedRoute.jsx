@@ -19,6 +19,7 @@
 import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
 import { GiBrain } from "react-icons/gi";
+import SpiningLoader from "./ui/SpiningLoader";
 
 // /**
 //  * ProtectedRoute - Ensures only authenticated users can access protected pages
@@ -38,11 +39,9 @@ export default function ProtectedRoute({ children }) {
           />
 
           <h1 className="text-lg font-semibold tracking-wide text-theme-text">
-            Brayning
+            Brayn AI
           </h1>
-          <span className="inline-block animate-pulse">.</span>
-          <span className="inline-block animate-pulse delay-150">.</span>
-          <span className="inline-block animate-pulse delay-300">.</span>
+          <SpiningLoader />
         </div>
       </div>
     );

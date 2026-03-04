@@ -1,5 +1,6 @@
 import api from '../axios';
 import { refreshAccessToken } from '../axios'; // axios instance
+import { retryWithBackoff, generateUuid } from '../utils/retryWithBackoff';
 
 // export const llmService = {
 //     ask: async (message, conversationId) => {
@@ -106,35 +107,61 @@ export const llmService = {
     /**
      * STREAMING ASK
      */
-    askStream: ({ message, conversationId }) => {
+    askStream: ({
+        message,
+        conversationId,
+        overrideModelId = null,
+        signal: externalSignal = null,
+        requestKey = generateUuid()
+    }) => {
         if (!conversationId) {
             throw new Error("conversationId is required");
         }
 
-        const controller = new AbortController();
-        const signal = controller.signal;
+        const controller = externalSignal ? null : new AbortController();
+        const signal = externalSignal ?? controller.signal;
+        const token = localStorage.getItem("accessToken");
 
         async function start(onMetadata, onChunk, onComplete, retry = true) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
-            const token = localStorage.getItem("accessToken");
 
             const headers = {
                 "Content-Type": "application/json",
+                "X-Request-Idempotency-Key": requestKey, // ✅ NEW: Idempotency key
             };
 
             if (token) {
                 headers.Authorization = `Bearer ${token}`;
             }
 
+            // ✅ NEW: Wrap fetch in retry logic (not streaming loop)
             let res;
             try {
-                res = await fetch(url, {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({ message }), // ✅ ONLY message
-                    signal,
-                });
-
+                res = await retryWithBackoff(
+                    async () => {
+                        return fetch(url, {
+                            method: "POST",
+                            headers,
+                            body: JSON.stringify({
+                                message,
+                                ...(overrideModelId && { overrideModelId }),
+                                ...(requestKey && { requestKey })
+                            }),
+                            signal,
+                        });
+                    },
+                    {
+                        maxAttempts: 5,
+                        isRetriable: (error) => {
+                            // Network error
+                            if (!error.status) return true;
+                            // 409 duplicate in-flight
+                            if (error.status === 409) return true;
+                            // Server errors
+                            return [500, 502, 503, 504].includes(error.status);
+                        }
+                    }
+                );
             } catch (error) {
                 if (error.name === "AbortError") {
                     throw new Error("Request was cancelled");
@@ -142,16 +169,18 @@ export const llmService = {
                 throw new Error(`Network error: ${error.message}`);
             }
 
-            // 🔐 HANDLE EXPIRED TOKEN (BEFORE STREAMING)
+            // ✅ Fetch succeeded → response received
+            // ❌ DO NOT RETRY AFTER THIS POINT
+
+            // Handle 401 BEFORE streaming
             if (res.status === 401 && retry) {
                 try {
                     const newToken = await refreshAccessToken();
-
                     return start(
                         onMetadata,
                         onChunk,
                         onComplete,
-                        false // ❗ retry only once
+                        false // Only retry refresh once
                     );
                 } catch (refreshError) {
                     throw new Error("Session expired. Please log in again.");
@@ -159,8 +188,19 @@ export const llmService = {
             }
 
             if (!res.ok) {
-                const txt = await res.text();
-                throw new Error(`Stream failed: ${res.status} ${txt}`);
+                let body = {};
+                try {
+                    const txt = await res.text();
+                    body = JSON.parse(txt);
+                } catch {
+                    body = { error: `Stream failed: ${res.status}` };
+                }
+
+                const err = new Error(body.error || `Stream failed: ${res.status}`);
+                err.status = res.status;
+                err.code = body.code || null;
+                err.retriable = body.retriable ?? false;
+                throw err;
             }
 
             if (!res.body) {
@@ -175,6 +215,7 @@ export const llmService = {
             let realMessageId = null;
             let pendingChunks = [];
 
+            // ✅ STREAMING LOOP - Errors here NOT retriable
             try {
                 while (true) {
                     const { value, done } = await reader.read();
@@ -194,14 +235,22 @@ export const llmService = {
                                         realMessageId = data.messageId;
 
                                         if (onMetadata) {
-                                            try { onMetadata(realMessageId); } catch (err) { console.error("onMetadata error", err); }
+                                            try {
+                                                onMetadata(realMessageId);
+                                            } catch (err) {
+                                                console.error("onMetadata error", err);
+                                            }
                                         }
 
-                                        // Flush any early chunks
+                                        // Flush early chunks
                                         pendingChunks.forEach(chunk => {
                                             fullText += chunk;
                                             if (onChunk) {
-                                                try { onChunk(chunk); } catch (err) { console.error("onChunk error", err); }
+                                                try {
+                                                    onChunk(chunk);
+                                                } catch (err) {
+                                                    console.error("onChunk error", err);
+                                                }
                                             }
                                         });
                                         pendingChunks = [];
@@ -222,7 +271,11 @@ export const llmService = {
                                         } else {
                                             fullText += content;
                                             if (onChunk) {
-                                                try { onChunk(content); } catch (err) { console.error("onChunk error", err); }
+                                                try {
+                                                    onChunk(content);
+                                                } catch (err) {
+                                                    console.error("onChunk error", err);
+                                                }
                                             }
                                         }
                                     }
@@ -242,6 +295,7 @@ export const llmService = {
                 if (error.name === "AbortError") {
                     throw new Error("Streaming was cancelled");
                 }
+                // Stream error → don't retry
                 throw error;
             } finally {
                 reader.releaseLock();
@@ -250,7 +304,7 @@ export const llmService = {
 
         return {
             start,
-            cancel: () => controller.abort(),
+            cancel: () => controller ? controller.abort() : null
         };
     },
 };

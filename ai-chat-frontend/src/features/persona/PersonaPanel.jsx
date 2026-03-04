@@ -27,13 +27,13 @@ export const PersonaPanel = ({ conversationId }) => {
     }, [dispatch, personas.length]);
 
     const handlePersonaSelect = (personaId) => {
-        console.log('🔵 handlePersonaSelect called:', { conversationId, personaId });
+        // console.log('🔵 handlePersonaSelect called:', { conversationId, personaId });
         
         if (!conversationId || conversationId === 'draft') {
-            console.log('✅ Local persona switch (Draft/New Chat)');
+            // console.log('✅ Local persona switch (Draft/New Chat)');
             dispatch(setCurrentPersona(personaId));
         } else {
-            console.log('✅ Dispatching switchPersonaThunk for:', conversationId);
+            // console.log('✅ Dispatching switchPersonaThunk for:', conversationId);
             dispatch(
                 switchPersonaThunk({
                     conversationId,

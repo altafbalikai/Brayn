@@ -1,0 +1,116 @@
+﻿  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.test -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (30) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.info
+    [MAIL] Using SMTP transport (smtp.gmail.com:587)
+
+      at Object.info (src/utils/mailer.js:84:11)
+
+2026-03-04 11:27:12 [32minfo[39m: [32mSwagger UI available at /api-docs[39m
+node.exe : (node:16044) [MONGOOSE] Warning: Duplicate schema index 
+on {"id":1} found. This is often due to declaring an index using 
+both "index: true" and "schema.index()". Please remove the 
+duplicate index definition.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~
+    + CategoryInfo          : NotSpecified: ((node:16044) [M...dex  
+   definition.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was 
+created)
+(node:16044) [MONGOOSE] Warning: Duplicate schema index on 
+{"slug":1} found. This is often due to declaring an index using 
+both "index: true" and "schema.index()". Please remove the 
+duplicate index definition.
+2026-03-04 11:27:13 [32minfo[39m: [32mOriginal message found:[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCurrent versions[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreated version 1 snapshot (atomic)[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreating version[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreated new version[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mMessage saved after retry[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mOriginal message found:[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCurrent versions[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreated version 1 snapshot (atomic)[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreating version[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mCreated new version[39m
+2026-03-04 11:27:13 [32minfo[39m: [32mMessage saved after retry[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mOriginal message found:[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCurrent versions[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreated version 1 snapshot (atomic)[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreating version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreated new version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage saved after retry[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mswitchVersion called[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage found[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mLooking for version by number[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mVersion switched successfully[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mOriginal message found:[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCurrent versions[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreated version 1 snapshot (atomic)[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreating version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreated new version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage saved after retry[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mswitchVersion called[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage found[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mLooking for version by number[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mVersion switched successfully[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mswitchVersion called[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage found[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mLooking for version by number[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mVersion switched successfully[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mOriginal message found:[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCurrent versions[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreating version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mCreated new version[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage saved after retry[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mswitchVersion called[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage found[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mLooking for version by number[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mVersion switched successfully[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mswitchVersion called[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mMessage found[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mLooking for version by number[39m
+2026-03-04 11:27:14 [32minfo[39m: [32mVersion switched successfully[39m
+PASS src/api/messages/__tests__/retryController.test.js (7.2 s)
+  Retry Controller Integration Tests
+    POST /api/conversations/:cid/messages/:mid/retry
+      Γùï skipped should trigger regeneration and create a new 
+version
+      Γùï skipped should return 403 if user does not own the 
+conversation
+    PATCH /api/messages/:messageId/version
+      Γùï skipped should switch the active version of a message
+      Γùï skipped should return 400 for invalid version number
+    retryController - empty message versioning
+      ΓêÜ should create Version 1 with empty content when original 
+message text is empty (441 ms)
+      ΓêÜ should create Version 2 with retry content after Version 
+1 empty snapshot (268 ms)
+      ΓêÜ should return 200 when switching to version 1 (empty) 
+(199 ms)
+      ΓêÜ should return 200 when switching back to version 2 
+(retry) (154 ms)
+      ΓêÜ should not affect version switching for non-empty 
+messages (141 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 skipped, 5 passed, 9 total
+Snapshots:   0 total
+Time:        7.349 s
+Ran all test suites matching 
+src/api/messages/__tests__/retryController.test.js with tests 
+matching "retryController - empty message versioning".
+Force exiting Jest: Have you considered using `--detectOpenHandles` 
+to detect async operations that kept running after all tests 
+finished?
