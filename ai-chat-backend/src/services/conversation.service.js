@@ -78,7 +78,7 @@ async function listConversations(userId, agentId, page = 1, limit = 50) {
 
   const [items, total] = await Promise.all([
     Conversation.find(filter)
-      .select({ title: 1, agentId: 1, createdAt: 1, updatedAt: 1 })
+      .select({ title: 1, agentId: 1, createdAt: 1, updatedAt: 1, selectedModelId: 1 })
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)

@@ -26,13 +26,6 @@ export default function ChatFeature() {
 
   // 1. Integrations & Data
   const user = useCurrentUser();
-  const { 
-    llmmodels, 
-    selectedModelId, 
-    llmsloading, 
-    memoizedLLMModels 
-  } = useLLMIntegration();
-
   const {
     currentConversation,
     conversations,
@@ -46,6 +39,13 @@ export default function ChatFeature() {
     messagesLoadingMore,
     messagesLoading
   } = useChatMessages(conversationId); // Pass ID to hook
+
+  const {
+    llmmodels,
+    selectedModelId,
+    llmsloading,
+    memoizedLLMModels
+  } = useLLMIntegration(currentConversation);
 
   // 2. Actions
   const {

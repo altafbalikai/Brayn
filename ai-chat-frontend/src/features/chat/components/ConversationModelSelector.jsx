@@ -22,7 +22,9 @@ function Conversationllmmodelselector({
       state.conversation.assistantTyping[currentConversation._id]
   );
 
-  const activeModelId = currentConversation?.selectedModelId ?? selectedModelId;
+  const convModelId = currentConversation?.selectedModelId;
+  const isConvModelValid = convModelId && llmmodels.some(m => m._id === convModelId);
+  const activeModelId = isConvModelValid ? convModelId : selectedModelId;
 
   const selectedModel = llmmodels.find((m) => m._id === activeModelId);
 
@@ -125,6 +127,9 @@ function Conversationllmmodelselector({
 
   const handleSelect = (modelId) => {
     if (isStreaming) return;
+
+    // Explicitly persist manual user preference
+    localStorage.setItem("selectedModelId", modelId);
 
     // 🟡 Draft or no conversation → global model
     if (!currentConversation || currentConversation.isDraft) {

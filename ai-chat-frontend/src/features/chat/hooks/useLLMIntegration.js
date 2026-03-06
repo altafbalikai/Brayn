@@ -5,7 +5,7 @@ import {
     setSelectedModelId,
 } from '../../LLM-Models/llm-modelsSlice';
 
-export const useLLMIntegration = () => {
+export const useLLMIntegration = (currentConversation) => {
     const dispatch = useDispatch();
 
     const {
@@ -13,6 +13,11 @@ export const useLLMIntegration = () => {
         selectedModelId,
         loading: llmsloading,
     } = useSelector((state) => state.llmModels);
+
+    const selectedModelIdRef = useRef(selectedModelId);
+    useEffect(() => {
+        selectedModelIdRef.current = selectedModelId;
+    }, [selectedModelId]);
 
     // Memoize models
     const memoizedLLMModels = useMemo(() => llmmodels, [llmmodels]);
@@ -22,25 +27,43 @@ export const useLLMIntegration = () => {
         dispatch(getLLMModels({ capability: "text" }));
     }, [dispatch]);
 
-    // Set default model
+    // Model Sync Logic: Source of Truth is currentConversation or Fallbacks
     useEffect(() => {
-        if (!selectedModelId && llmmodels.length > 0) {
-            dispatch(setSelectedModelId(llmmodels[2]._id));
-        }
-    }, [llmmodels.length, selectedModelId, dispatch, llmmodels]);
+        if (llmmodels.length === 0) return;
 
-    // Load from localStorage
-    const hasLoadedFromStorage = useRef(false);
-    useEffect(() => {
-        if (!hasLoadedFromStorage.current && llmmodels.length > 0) {
-            hasLoadedFromStorage.current = true;
-            const savedModelId = localStorage.getItem("selectedModelId");
+        const activeModels = llmmodels.filter(m => m.status === 'active');
+        if (activeModels.length === 0) return;
 
-            if (savedModelId && llmmodels.some((m) => m._id === savedModelId)) {
-                dispatch(setSelectedModelId(savedModelId));
+        const defaultModelId = activeModels[0]._id;
+        const savedModelId = localStorage.getItem("selectedModelId");
+        const validSavedModel = savedModelId && activeModels.some(m => m._id === savedModelId);
+
+        // CASE 1: Existing Conversation
+        if (currentConversation && !currentConversation.isDraft && currentConversation._id) {
+            const convModelId = currentConversation.selectedModelId;
+            const isModelValid = convModelId && activeModels.some(m => m._id === convModelId);
+
+            const targetId = isModelValid ? convModelId : defaultModelId;
+
+            if (selectedModelIdRef.current !== targetId) {
+                dispatch(setSelectedModelId(targetId));
             }
         }
-    }, [llmmodels.length, dispatch, llmmodels]);
+        // CASE 2: New Chat / Draft (Handles initial LocalStorage load)
+        else {
+            const targetId = validSavedModel ? savedModelId : defaultModelId;
+
+            if (selectedModelIdRef.current !== targetId) {
+                dispatch(setSelectedModelId(targetId));
+            }
+        }
+    }, [
+        currentConversation?._id,
+        currentConversation?.selectedModelId,
+        llmmodels,
+        dispatch
+        // selectedModelId intentionally omitted to prevent infinite loop. Guard inside handles it.
+    ]);
 
     return {
         llmmodels,

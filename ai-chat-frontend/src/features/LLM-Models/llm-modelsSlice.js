@@ -122,7 +122,6 @@ const llmModelsSlice = createSlice({
         // NEW: user selects model before chat starts
         setSelectedModelId(state, action) {
             state.selectedModelId = action.payload;
-            localStorage.setItem("selectedModelId", action.payload);
         },
     },
     extraReducers: (builder) => {
@@ -135,11 +134,6 @@ const llmModelsSlice = createSlice({
             .addCase(getLLMModels.fulfilled, (state, action) => {
                 state.loading = false;
                 state.llmmodels = action.payload;
-
-                // Set default model ONLY if none selected yet
-                if (!state.selectedModelId && action.payload.length > 0) {
-                    state.selectedModelId = action.payload[0]._id;
-                }
             })
             .addCase(getLLMModels.rejected, (state, action) => {
                 state.loading = false;
