@@ -8,14 +8,22 @@ const logger = require('../config/logger');
 function handleValidationErrors(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorDetails = errors.array();
+    console.error("❌ VALIDATION FAILED", {
+      path: req.path,
+      method: req.method,
+      body: req.body,
+      params: req.params,
+      errors: errorDetails,
+    });
     logger.warn('Validation errors:', {
       path: req.path,
       method: req.method,
-      errors: errors.array(),
+      errors: errorDetails,
     });
     return res.status(400).json({
       error: 'Validation failed',
-      details: errors.array().map(err => ({
+      details: errorDetails.map(err => ({
         field: err.path || err.param,
         message: err.msg,
         value: err.value,

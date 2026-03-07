@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom"; // Import routing hooks
 import {
   VirtualizedMessageList,
@@ -8,9 +9,7 @@ import {
 } from "./components";
 import RewindBackground from "../../components/ui/RewindBackground.jsx";
 import NewChatHero from "./components/NewChatHero";
-import {
-  TbLayoutSidebarLeftExpand,
-} from "react-icons/tb";
+import { TbLayoutSidebarLeftExpand } from "react-icons/tb";
 
 // Hooks
 import { useChatMessages } from "./hooks/useChatMessages";
@@ -19,10 +18,15 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useChatSidebar } from "./hooks/useChatSidebar";
 import { useLLMIntegration } from "./hooks/useLLMIntegration";
 import { useCurrentUser } from "./hooks/useCurrentUser";
+import { clearPendingNavigationConversationId } from "../conversations/conversationSlice";
 
 export default function ChatFeature() {
   const { conversationId } = useParams(); // Get ID from URL
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const pendingNavigationConversationId = useSelector(
+    (state) => state.conversation.pendingNavigationConversationId,
+  );
 
   // 1. Integrations & Data
   const user = useCurrentUser();
@@ -37,15 +41,11 @@ export default function ChatFeature() {
     conversationsPage,
     messagesPages,
     messagesLoadingMore,
-    messagesLoading
+    messagesLoading,
   } = useChatMessages(conversationId); // Pass ID to hook
 
-  const {
-    llmmodels,
-    selectedModelId,
-    llmsloading,
-    memoizedLLMModels
-  } = useLLMIntegration(currentConversation);
+  const { llmmodels, selectedModelId, llmsloading, memoizedLLMModels } =
+    useLLMIntegration(currentConversation);
 
   // 2. Actions
   const {
@@ -58,7 +58,7 @@ export default function ChatFeature() {
     handleLogout,
     handleSendMessage,
     handlePromptClick,
-    titleUpdatedRef
+    titleUpdatedRef,
   } = useChatActions(currentConversation, selectedModelId);
 
   // 3. UI State
@@ -71,7 +71,7 @@ export default function ChatFeature() {
     messagesContainerRef,
     conversationsScrollRef,
     handleConversationsScroll,
-    handleMessagesScroll
+    handleMessagesScroll,
   } = useChatScroll({
     currentConversation,
     messages: currentMessages,
@@ -84,9 +84,9 @@ export default function ChatFeature() {
 
   // UI Wrappers
   const handleSelectConversation = (conv) => {
-    // Navigation instead of Action
+    selectConversationAction(conv);
     navigate(`/chat/${conv._id}`);
-    
+
     if (window.innerWidth < 768 && !isRenamingTitle) {
       setSidebarOpen(false);
     }
@@ -95,7 +95,7 @@ export default function ChatFeature() {
   const handleNewChatWrapper = () => {
     // Navigation instead of Action
     navigate("/chat");
-    
+
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -104,7 +104,21 @@ export default function ChatFeature() {
   // Helper
   // Draft logic: If URL has no ID, it's a new chat.
   // Or if currentConversation is a draft object returned by hook.
-  const showHero = !conversationId || (currentConversation?.isDraft && (!currentConversation.messages || currentConversation.messages.length === 0));
+  const showHero =
+    !conversationId ||
+    (currentConversation?.isDraft &&
+      (!currentConversation.messages ||
+        currentConversation.messages.length === 0));
+  const sidebarActiveConversationId =
+    currentConversation?.parentConversationId || currentConversation?._id;
+
+  useEffect(() => {
+    if (!pendingNavigationConversationId) return;
+    if (conversationId !== pendingNavigationConversationId) {
+      navigate(`/chat/${pendingNavigationConversationId}`, { replace: true });
+    }
+    dispatch(clearPendingNavigationConversationId());
+  }, [pendingNavigationConversationId, conversationId, navigate, dispatch]);
 
   return (
     <>
@@ -132,7 +146,8 @@ export default function ChatFeature() {
             toggleSidebar={toggleSidebar}
             onLogout={handleLogout}
             conversations={conversations}
-            currentConversationId={currentConversation?._id}
+            currentConversationId={sidebarActiveConversationId}
+            footerConversationId={currentConversation?._id}
             loading={loading}
             conversationsLoadingMore={conversationsLoadingMore}
             onSelectConversation={handleSelectConversation}
@@ -143,7 +158,7 @@ export default function ChatFeature() {
             onScroll={handleConversationsScroll}
           />
         </div>
-        
+
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div
@@ -188,7 +203,7 @@ export default function ChatFeature() {
               <>
                 <VirtualizedMessageList
                   messages={currentMessages}
-                  conversationId={conversationId}
+                  conversationId={currentConversation?._id}
                   messagesEndRef={messagesEndRef}
                   containerRef={messagesContainerRef}
                   onScroll={handleMessagesScroll}
@@ -196,7 +211,7 @@ export default function ChatFeature() {
                   isLoadingMore={messagesLoadingMore?.[currentConversation._id]}
                   isLoading={messagesLoading}
                 />
-                
+
                 <Composer
                   onSend={handleSendMessage}
                   disabled={sending || assistantTyping}

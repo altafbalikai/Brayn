@@ -2,6 +2,7 @@
 const { askGemini } = require('../services/llm.service');
 const ConversationService = require('../services/conversation.service');
 const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
 
 async function createConversation(req, res, next) {
   try {
@@ -53,6 +54,59 @@ async function getMessages(req, res, next) {
     res.json(data);
   } catch (err) {
     next(err);
+  }
+}
+
+async function getConversation(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+
+    const conv = await Conversation.findById(cid).lean();
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+    if (conv.userId.toString() !== userId)
+      return res.status(403).json({ error: 'Forbidden' });
+
+    res.json(conv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getBranches(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { cid } = req.params;
+
+    const conv = await Conversation.findById(cid)
+      .select('userId parentConversationId')
+      .lean();
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+    if (conv.userId.toString() !== userId)
+      return res.status(403).json({ error: 'Forbidden' });
+
+    const rootId = conv.parentConversationId || conv._id;
+
+    const [root, branches] = await Promise.all([
+      Conversation.findById(rootId).select('_id title createdAt').lean(),
+      Conversation.find({ parentConversationId: rootId })
+        .select('_id branchedFromMessageId editedMessageId branchEditedMessageId createdAt title')
+        .sort({ createdAt: 1 })
+        .lean()
+    ]);
+
+    res.json([
+      {
+        ...root,
+        branchedFromMessageId: null,
+        editedMessageId: null,
+        branchEditedMessageId: null,
+        isRoot: true
+      },
+      ...branches
+    ]);
+  } catch (error) {
+    next(error);
   }
 }
 
@@ -118,6 +172,8 @@ module.exports = {
   listConversations,
   addMessage,
   getMessages,
+  getConversation,
+  getBranches,
   renameConversation,
   deleteConversation,
   updateConversationModel,

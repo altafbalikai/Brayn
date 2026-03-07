@@ -11,6 +11,7 @@ export default function Sidebar({
   onLogout,
   conversations,
   currentConversationId,
+  footerConversationId,
   loading,
   conversationsLoadingMore,
   onSelectConversation,
@@ -47,7 +48,11 @@ export default function Sidebar({
         containerRef={containerRef}
         onScroll={onScroll}
       />
-      <SidebarFooter user={user} onLogout={onLogout} conversationId={currentConversationId} />
+      <SidebarFooter
+        user={user}
+        onLogout={onLogout}
+        conversationId={footerConversationId || currentConversationId}
+      />
     </div>
   );
 }

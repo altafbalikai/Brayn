@@ -236,7 +236,7 @@ export const llmService = {
 
                                         if (onMetadata) {
                                             try {
-                                                onMetadata(realMessageId);
+                                                onMetadata(data);
                                             } catch (err) {
                                                 console.error("onMetadata error", err);
                                             }

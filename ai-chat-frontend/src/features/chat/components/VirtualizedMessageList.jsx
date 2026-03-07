@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
+import { useSelector } from "react-redux";
 import MessageItem from "./MessageItem";
 import MessageGroup from "./MessageGroup";
 import MessageListSkeleton from "../../../components/PageSkeletonLoaders/MessageListSkeleton";
@@ -22,6 +23,14 @@ function VirtualizedMessageList({
   const [containerHeight, setContainerHeight] = useState(600);
   const [VariableSizeList, setVariableSizeList] = useState(null);
   const [loadingVirtual, setLoadingVirtual] = useState(false);
+
+  const editingMessageId = useSelector(state => state.conversation.editingMessageId);
+  const branchMap = useSelector(state => state.conversation.branchMap);
+  const currentConversationId = useSelector(state => state.conversation.currentConversation?._id);
+
+  // ✅ Safety: Always prefer Redux currentConversationId over prop
+  // This ensures we never render stale messages even if parent passes stale conversationId
+  const activeConvId = currentConversationId || conversationId;
 
   useEffect(() => {
     if (messages.length >= 50 && !VariableSizeList && !loadingVirtual) {
@@ -109,8 +118,11 @@ function VirtualizedMessageList({
                 <MessageGroup
                   key={group.id}
                   group={group}
-                  conversationId={conversationId}
+                  conversationId={activeConvId}
                   isFirst={idx === 0}
+                  editingMessageId={editingMessageId}
+                  branchMap={branchMap}
+                  currentConversationId={currentConversationId}
                 />
               ))
             : messages.map((msg) => (
@@ -121,8 +133,11 @@ function VirtualizedMessageList({
                     `${msg.role}-${msg.createdAt || Date.now()}`
                   }
                   msg={msg}
-                  conversationId={conversationId}
+                  conversationId={activeConvId}
                   showTime={false}
+                  editingMessageId={editingMessageId}
+                  branchMap={branchMap}
+                  currentConversationId={currentConversationId}
                 />
               ))}
 
@@ -148,15 +163,28 @@ function VirtualizedMessageList({
         itemSize={getItemSize}
         width="100%"
         style={{ overflowX: "hidden" }}
+        itemData={{
+          messages,
+          conversationId: activeConvId,
+          editingMessageId,
+          branchMap,
+          currentConversationId
+        }}
       >
-        {({ index, style }) => {
-          const msg = messages[index];
-          const isLast = index === messages.length - 1;
+        {({ index, style, data }) => {
+          const msg = data.messages[index];
+          const isLast = index === data.messages.length - 1;
 
           return (
             <div style={style} className="flex justify-center">
               <div className="w-full max-w-3xl px-4 min-w-0">
-                 <MessageItem msg={msg} conversationId={conversationId} />
+                 <MessageItem 
+                   msg={msg} 
+                   conversationId={data.conversationId}
+                   editingMessageId={data.editingMessageId}
+                   branchMap={data.branchMap}
+                   currentConversationId={data.currentConversationId}
+                 />
                 {isLast && <div ref={messagesEndRef} />}
               </div>
             </div>

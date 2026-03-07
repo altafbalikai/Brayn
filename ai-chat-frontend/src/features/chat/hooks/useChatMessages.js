@@ -1,9 +1,12 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useDispatch, useSelector, shallowEqual } from 'react-redux';
+import api from '../../../api/axios';
 import { cache, CACHE_KEYS } from '../../../utils/cache';
 import {
     fetchConversations,
     fetchMessages,
+    setCurrentConversation,
+    switchToBranch,
 } from '../../conversations/conversationSlice';
 import { initializePersonaForConversation } from '../../persona/personaSlice';
 import { groupMessagesByTime } from '../../../utils/messageGrouping';
@@ -11,18 +14,37 @@ import { groupMessagesByTime } from '../../../utils/messageGrouping';
 export const useChatMessages = (conversationId) => {
     const dispatch = useDispatch();
     const hydratedRef = useRef({});
+    const conversationHydrationRef = useRef({});
 
     // Selectors
     const conversations = useSelector(
         (state) => state.conversation.conversations,
         shallowEqual
     );
+    const currentConversationFromState = useSelector(
+        (state) => state.conversation.currentConversation
+    );
+    const pendingNavigationConversationId = useSelector(
+        (state) => state.conversation.pendingNavigationConversationId
+    );
+    const isSwitchingBranch = useSelector(
+        (state) => state.conversation.isSwitchingBranch
+    );
 
-    // Derived State: Single Source of Truth from URL params
+    // URL is authoritative for "new chat" mode; Redux is authoritative for in-app branch switches.
     const currentConversation = useMemo(() => {
-        if (!conversationId) return { isDraft: true, messages: [] };
+        if (!conversationId) {
+            return currentConversationFromState?.isDraft
+                ? currentConversationFromState
+                : { isDraft: true, messages: [] };
+        }
+
+        if (currentConversationFromState?._id || currentConversationFromState?.isDraft) {
+            return currentConversationFromState;
+        }
+
         return conversations.find((c) => c._id === conversationId) || { _id: conversationId };
-    }, [conversations, conversationId]);
+    }, [conversations, conversationId, currentConversationFromState]);
 
     const messages = useSelector(
         (state) => state.conversation.messages
@@ -48,9 +70,10 @@ export const useChatMessages = (conversationId) => {
         shallowEqual
     );
 
+    const activeConversationId = currentConversation?._id || conversationId;
     const messagesLoading =
-        !!conversationId &&
-        messagesPages?.[conversationId] === undefined;
+        !!activeConversationId &&
+        messagesPages?.[activeConversationId] === undefined;
 
     // Load conversations with cache
     useEffect(() => {
@@ -69,11 +92,47 @@ export const useChatMessages = (conversationId) => {
         }
     }, [conversations]);
 
-    // Load messages
+    // Load messages when conversationId changes (URL-based)
     useEffect(() => {
         if (!conversationId) return;
+        if (isSwitchingBranch) return;
+        if (
+            pendingNavigationConversationId &&
+            currentConversationFromState?._id?.toString() === pendingNavigationConversationId?.toString() &&
+            conversationId?.toString() !== pendingNavigationConversationId?.toString()
+        ) {
+            return;
+        }
+
+        if (currentConversationFromState?._id !== conversationId) {
+            const matched = conversations.find((c) => c._id === conversationId);
+            if (matched) {
+                dispatch(setCurrentConversation(matched));
+            } else {
+                if (conversationHydrationRef.current[conversationId]) return;
+                conversationHydrationRef.current[conversationId] = true;
+
+                api
+                    .get(`/conversations/${conversationId}`)
+                    .then((res) => {
+                        dispatch(
+                            switchToBranch({
+                                conversation: res.data,
+                                messages: messages[conversationId] || [],
+                            })
+                        );
+                    })
+                    .catch(() => {
+                        dispatch(setCurrentConversation({ _id: conversationId }));
+                    });
+            }
+        }
 
         if (hydratedRef.current[conversationId]) return;
+        if (messages[conversationId]?.length > 0) {
+            hydratedRef.current[conversationId] = true;
+            return;
+        }
         hydratedRef.current[conversationId] = true;
 
         dispatch(
@@ -83,7 +142,35 @@ export const useChatMessages = (conversationId) => {
                 append: false,
             })
         );
-    }, [conversationId, dispatch]);
+    }, [
+        conversationId,
+        currentConversationFromState?._id,
+        conversations,
+        messages,
+        isSwitchingBranch,
+        pendingNavigationConversationId,
+        dispatch
+    ]);
+
+    // ✅ Load messages when currentConversation changes (Redux branch switch)
+    useEffect(() => {
+        if (isSwitchingBranch) return;
+        if (!currentConversation?._id || conversationId === currentConversation._id) return;
+        if (hydratedRef.current[currentConversation._id]) return;
+        if (messages[currentConversation._id]?.length > 0) {
+            hydratedRef.current[currentConversation._id] = true;
+            return;
+        }
+        hydratedRef.current[currentConversation._id] = true;
+
+        dispatch(
+            fetchMessages({
+                conversationId: currentConversation._id,
+                page: 1,
+                append: false,
+            })
+        );
+    }, [currentConversation?._id, conversationId, messages, isSwitchingBranch, dispatch]);
 
     // Sync persona ID on conversation change
     useEffect(() => {
@@ -96,16 +183,18 @@ export const useChatMessages = (conversationId) => {
 
     // Cache messages
     useEffect(() => {
-        if (conversationId && messages[conversationId]) {
-            const cacheKey = CACHE_KEYS.MESSAGES(conversationId);
-            cache.set(cacheKey, messages[conversationId]);
+        if (activeConversationId && messages[activeConversationId]) {
+            const cacheKey = CACHE_KEYS.MESSAGES(activeConversationId);
+            cache.set(cacheKey, messages[activeConversationId]);
         }
-    }, [messages, conversationId]);
+    }, [messages, activeConversationId]);
 
-    // Memoized current messages
+    // Memoized current messages - reactive to Redux state
+    // ✅ Prefer currentConversation._id (reactive to branch switches)
+    // over conversationId (URL param, doesn't update on branch switch)
     const currentMessages = useMemo(() => {
-        return conversationId ? messages[conversationId] || [] : [];
-    }, [conversationId, messages]);
+        return activeConversationId ? messages[activeConversationId] || [] : [];
+    }, [activeConversationId, messages]);
 
     // Group messages
     const groupedMessages = useMemo(() => {

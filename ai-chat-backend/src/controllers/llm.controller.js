@@ -98,7 +98,10 @@ async function ask(req, res, next) {
 
       // 1. Send Metadata Event FIRST
       res.write(`event: metadata\n`);
-      res.write(`data: ${JSON.stringify({ messageId: assistantMsg._id })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        messageId: assistantMsg._id,
+        userMessageId: userMsg?._id,
+      })}\n\n`);
 
       let fullReply = "";
 

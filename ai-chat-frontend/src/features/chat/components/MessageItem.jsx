@@ -1,5 +1,14 @@
-import React, { useState, useMemo } from "react";
-import { useSelector } from "react-redux";
+import React, { useState, useMemo, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import api from "../../../api/axios";
+import {
+  setEditingMessage,
+  cancelEditing,
+  editMessage,
+  fetchMessages,
+  switchToBranch,
+} from "../../../features/conversations/conversationSlice";
 import { selectPersonas } from "../../../features/persona/personaSlice";
 import { getPersonaIcon } from "../../../utils/personaIcons";
 import ReactMarkdown from "react-markdown";
@@ -7,10 +16,21 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 // import "highlight.js/styles/github-dark.css";
 import remarkBreaks from "remark-breaks";
-import { FaCheck } from "react-icons/fa6";
+import {
+  FaPen,
+  FaChevronLeft,
+  FaChevronRight,
+  FaRegCopy,
+  FaCheck,
+} from "react-icons/fa6";
 import LoadingIndicator from "./LoadingIndicator";
 import { MessageActions } from "./MessageActions";
-import { MessageVersions } from "./MessageVersions";
+
+/**
+ * Validate that an ID is a real MongoDB ObjectId (24-char hex string)
+ * Temp frontend IDs like 'user-1772849303104' will fail this check
+ */
+const isValidMongoId = (id) => /^[a-f\d]{24}$/i.test(id?.toString() ?? "");
 
 /**
  * Fixes incomplete markdown during streaming
@@ -76,7 +96,7 @@ function CodeBlock({ node, inline, className, children, ...props }) {
         className="absolute right-2 top-2 z-10 px-2 py-1 text-xs rounded-md bg-theme-code-header text-theme-text hover:bg-theme-secondary transition-colors border border-theme-secondary"
         type="button"
       >
-        {copied ? "Copied" : "Copy"}
+        {copied ? "Copied" : <FaRegCopy size={14} />}
       </button>
 
       <pre className="rounded-md bg-theme-code-bg text-theme-text text-sm pt-10 max-w-full overflow-x-auto border border-theme-secondary">
@@ -86,7 +106,7 @@ function CodeBlock({ node, inline, className, children, ...props }) {
             block
             font-mono
             text-[0.85rem]
-            p-2
+            px-4 pt-2 pb-4
           `}
           {...props}
         >
@@ -97,7 +117,197 @@ function CodeBlock({ node, inline, className, children, ...props }) {
   );
 }
 
-function MessageItem({ msg, showTime, conversationId }) {
+function MessageItem({
+  msg,
+  showTime,
+  conversationId,
+  editingMessageId,
+  branchMap,
+  currentConversationId,
+}) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const sending = useSelector((state) => state.conversation.sending);
+  const activeConversation = useSelector(
+    (state) => state.conversation.currentConversation,
+  );
+  const isUser = msg.role === "user";
+  const realMessageId = msg._id?.toString();
+
+  // Only use msg._id (real MongoDB ObjectId), never the temp frontend ID (msg.id)
+  const isEditing = !!realMessageId && editingMessageId === realMessageId;
+  const isMessageSynced = isValidMongoId(msg._id);
+
+  const [editContent, setEditContent] = useState(msg.text || "");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    setEditContent(msg.text || "");
+  }, [msg.text]);
+
+  useEffect(() => {
+    if (!isEditing) setIsSubmittingEdit(false);
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateViewportFlag = (e) => setIsMobileViewport(e.matches);
+    setIsMobileViewport(mediaQuery.matches);
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", updateViewportFlag);
+      return () => mediaQuery.removeEventListener("change", updateViewportFlag);
+    }
+
+    mediaQuery.addListener(updateViewportFlag);
+    return () => mediaQuery.removeListener(updateViewportFlag);
+  }, []);
+
+  const handleEditSubmit = async () => {
+    const trimmed = editContent.trim();
+    if (!trimmed || sending || isSubmittingEdit || !isMessageSynced) {
+      return;
+    }
+
+    const targetConvId = (
+      msg.conversationId ||
+      currentConversationId ||
+      conversationId
+    )?.toString();
+
+    if (!targetConvId) {
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      await dispatch(
+        editMessage({
+          messageId: msg._id,
+          conversationId: targetConvId,
+          newContent: trimmed,
+          tempAssistantId: `ast-${Date.now()}`,
+        }),
+      ).unwrap();
+
+      dispatch(cancelEditing());
+    } catch (err) {
+      console.error("Failed to edit message:", err);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  // Branch Navigation Logic
+  // Fallback to null if currentConversationId is somehow falsy (e.g. during very early render)
+  const activeConversationId = currentConversationId || conversationId || null;
+  const rootId = useMemo(() => {
+    const explicitRoot = activeConversation?.parentConversationId?.toString();
+    if (explicitRoot) return explicitRoot;
+
+    const activeId = activeConversationId?.toString();
+    if (!activeId) return null;
+
+    if (branchMap?.[activeId]) return activeId;
+
+    const inferredRoot = Object.keys(branchMap || {}).find((candidateRootId) =>
+      (branchMap[candidateRootId] || []).some(
+        (b) => b.branchConvId?.toString() === activeId,
+      ),
+    );
+
+    return inferredRoot || activeId;
+  }, [
+    activeConversation?.parentConversationId,
+    activeConversationId,
+    branchMap,
+  ]);
+
+  const navigatorConvs = useMemo(() => {
+    if (!rootId || !branchMap?.[rootId]) return [];
+
+    // Find all branches that branched FROM this message
+    const messageId = msg._id?.toString();
+    const childBranches = branchMap[rootId].filter((b) => {
+      const editedId = b.editedMessageId?.toString();
+      const branchEditedId = b.branchEditedMessageId?.toString();
+      const legacyMatch =
+        !editedId && b.branchedFromMessageId?.toString() === messageId;
+
+      return (
+        editedId === messageId || branchEditedId === messageId || legacyMatch
+      );
+    });
+    if (childBranches.length === 0) return [];
+
+    // rootId is the original conversation — always first in the list
+    return [rootId, ...childBranches.map((b) => b.branchConvId?.toString())];
+  }, [branchMap, rootId, msg._id]);
+
+  const currentNavIndex = navigatorConvs.findIndex(
+    (id) => id?.toString() === activeConversationId?.toString(),
+  );
+  const displayIndex =
+    currentNavIndex === -1 ? navigatorConvs.length - 1 : currentNavIndex;
+
+  const handleNavPrev = () => {
+    if (displayIndex <= 0) return;
+    const targetId = navigatorConvs[displayIndex - 1];
+    handleBranchSwitch(targetId);
+  };
+
+  const handleNavNext = () => {
+    if (displayIndex >= navigatorConvs.length - 1) return;
+    const targetId = navigatorConvs[displayIndex + 1];
+    handleBranchSwitch(targetId);
+  };
+
+  const handleBranchSwitch = async (targetId) => {
+    if (!targetId || targetId === activeConversationId) return;
+
+    try {
+      const convRes = await api.get(`/conversations/${targetId}`);
+      const targetConv = convRes.data;
+
+      const fetchResult = await dispatch(
+        fetchMessages({ conversationId: targetId, page: 1, append: false }),
+      ).unwrap();
+
+      dispatch(
+        switchToBranch({
+          conversation: targetConv,
+          messages: fetchResult?.items || [],
+        }),
+      );
+      navigate(`/chat/${targetId}`);
+    } catch (error) {
+      console.error("Failed to switch branch:", error);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(msg.text ?? "");
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = msg.text ?? "";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const actionButtonClass =
+    "p-1.5 rounded-md transition-all duration-200 flex items-center justify-center hover:bg-theme-secondary text-theme-muted hover:text-theme-text";
+
   // Check if message is in any processing state (streaming, retrying, pending, initializing)
   const isProcessing = [
     "streaming",
@@ -144,15 +354,21 @@ function MessageItem({ msg, showTime, conversationId }) {
       className={`group flex w-full min-w-0 ${
         msg.role === "user" ? "justify-end" : "justify-start"
       } px-2 md:px-4 mb-1`}
+      onMouseEnter={() => {
+        if (isUser) setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        if (isUser) setIsHovered(false);
+      }}
     >
       {/* Bubble wrapper */}
-      <div
-        className={`flex flex-col min-w-0 sm:max-w-[80%] ${
+      <div className={`flex flex-col min-w-0 transition-all duration-200 ${
           msg.role === "user"
-            ? "max-w-[80%] md:max-w-[70%]"
+            ? isEditing
+              ? "w-full max-w-full"           // ← full width in edit mode
+              : "max-w-[80%] md:max-w-[70%]" // ← normal bubble width otherwise
             : "max-w-[100%] md:max-w-[100%]"
-        }`}
-      >
+        }`}>
         {showTime && (
           <div
             className={`text-xs text-theme-muted opacity-50 mb-1 ${
@@ -167,13 +383,13 @@ function MessageItem({ msg, showTime, conversationId }) {
         )}
 
         {/* Bubble */}
-        <div
-          className={`rounded-lg min-w-0 overflow-hidden ${
+        <div className={`rounded-lg min-w-0 ${
             msg.role === "user"
-              ? "px-4 py-3 bg-theme-secondary text-theme-text"
+              ? isEditing
+                ? "text-theme-text"            // ← no padding/bg, editor takes over
+                : "px-4 py-3 bg-theme-secondary text-theme-text"
               : "px-0 py-0 bg-theme-transparent text-theme-chat-text"
-          }`}
-        >
+          }`}>
           {isLoading ? (
             // Initial loading state (no content yet)
             <LoadingIndicator />
@@ -292,12 +508,186 @@ function MessageItem({ msg, showTime, conversationId }) {
               ) : (
                 // User message (plain text)
                 <div className="whitespace-pre-wrap break-words min-w-0">
-                  {displayText}
+                  {isEditing ? (
+                    <div className="flex flex-col w-full rounded-xl border border-theme-secondary bg-theme-secondary/30 overflow-hidden">
+                      
+                      {/* Auto-growing textarea — no fixed min-height */}
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => {
+                          setEditContent(e.target.value);
+                          // Auto-grow
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        ref={(el) => {
+                          // Auto-grow on mount
+                          if (el) {
+                            el.style.height = "auto";
+                            el.style.height = `${el.scrollHeight}px`;
+                          }
+                        }}
+                        className="
+                          w-full
+                          bg-theme-dark
+                          border-none
+                          outline-none
+                          resize-none
+                          overflow-y-auto
+                          text-theme-text
+                          placeholder:text-theme-muted
+                          text-sm md:text-base
+                          leading-6
+                          px-4 pt-3 pb-2
+                          min-h-[2.5rem]
+                          max-h-[60vh]
+                        "
+                        disabled={sending || isSubmittingEdit}
+                        autoFocus
+                      />
+
+                      {/* Footer */}
+                        <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-theme-secondary">
+                        <button
+                          type="button"
+                          onClick={() => dispatch(cancelEditing())}
+                          className="
+                            inline-flex items-center justify-center
+                            h-8 px-4 rounded-lg text-sm leading-none
+                            text-theme-muted hover:text-theme-text
+                            bg-transparent hover:bg-theme-secondary
+                            transition-colors duration-150
+                            border border-theme-secondary
+                          "
+                          disabled={sending || isSubmittingEdit}
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleEditSubmit}
+                          className="
+                            inline-flex items-center justify-center
+                            h-8 px-4 rounded-lg text-sm leading-none
+                            text-theme-text bg-theme-secondary
+                            hover:opacity-90 active:opacity-80
+                            transition-opacity duration-150
+                            disabled:opacity-40 disabled:cursor-not-allowed
+                            border border-theme-secondary
+                          "
+                          disabled={sending || isSubmittingEdit || !editContent.trim() || editContent.trim() === displayText}
+                        >
+                          {isSubmittingEdit ? "Saving..." : "Submit"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative group/userMsg">{displayText}</div>
+                  )}              
                 </div>
               )}
             </>
           )}
         </div>
+
+        {/* ── Unified action bar ─────────────────────────────── */}
+        {isUser && !isEditing && (
+          <div
+            className="
+            flex items-center gap-1 justify-end
+            mt-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200
+          "
+          >
+            {/* 1 ── Copy button */}
+            <button
+              onClick={handleCopy}
+              title="Copy to clipboard"
+              className={`${actionButtonClass} ml-1`}
+              type="button"
+            >
+              {isCopied ? (
+                <FaCheck className="text-theme-muted" size={14} />
+              ) : (
+                <FaRegCopy size={14} />
+              )}
+            </button>
+
+            {/* 2 ── Edit button */}
+            <button
+              onClick={() => {
+                if (!isMessageSynced || sending || !realMessageId) return;
+                dispatch(setEditingMessage(realMessageId));
+              }}
+              disabled={!isMessageSynced || sending}
+              title={
+                !isMessageSynced
+                  ? "Message still sending..."
+                  : sending
+                    ? "Cannot edit while sending"
+                    : "Edit message"
+              }
+              className={`${actionButtonClass} ${
+                !isMessageSynced || sending
+                  ? "opacity-30 cursor-not-allowed hover:bg-transparent hover:text-theme-muted"
+                  : ""
+              }`}
+              type="button"
+            >
+              <FaPen size={14} />
+            </button>
+
+            {/* 3 ── Version navigator — only when multiple versions exist */}
+            {navigatorConvs.length > 1 && (
+              <div
+                className="
+                flex items-center bg-theme-secondary/40 rounded-md p-0.5 min-h-[32px]
+              "
+              >
+                {/* Left arrow */}
+                <button
+                  onClick={handleNavPrev}
+                  disabled={displayIndex <= 0}
+                  title="Previous version"
+                  className={`p-1.5 rounded-md transition-colors ${
+                    displayIndex <= 0
+                      ? "text-theme-muted opacity-30 cursor-not-allowed"
+                      : "text-theme-text hover:bg-theme-secondary"
+                  }`}
+                  type="button"
+                >
+                  <FaChevronLeft size={12} />
+                </button>
+
+                {/* Version label */}
+                <span
+                  className="
+                  text-[12px] font-medium px-1.5 text-theme-muted select-none whitespace-nowrap flex items-center gap-1
+                "
+                >
+                  {displayIndex + 1} <span className="opacity-50">/</span>{" "}
+                  {navigatorConvs.length}
+                </span>
+
+                {/* Right arrow */}
+                <button
+                  onClick={handleNavNext}
+                  disabled={displayIndex >= navigatorConvs.length - 1}
+                  title="Next version"
+                  className={`p-1.5 rounded-md transition-colors ${
+                    displayIndex >= navigatorConvs.length - 1
+                      ? "text-theme-muted opacity-30 cursor-not-allowed"
+                      : "text-theme-text hover:bg-theme-secondary"
+                  }`}
+                  type="button"
+                >
+                  <FaChevronRight size={12} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ── End action bar ──────────────────────────────────── */}
       </div>
     </div>
   );

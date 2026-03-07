@@ -3,6 +3,7 @@ const { generateEmbedding } = require("./embeddings.service");
 const { QDRANT_URL, QDRANT_COLLECTION } = require("../config/qdrant");
 const { fetchWithDns } = require("../utils/fetchWithDns");
 const { objectIdToUuid } = require("../utils/uuid.utils");
+const Conversation = require("../models/Conversation");
 
 // ─── Phase 2 Configuration ─────────────────────────────────────
 const RETRIEVAL_CANDIDATE_COUNT = 15; // fetch more candidates for re-ranking
@@ -18,6 +19,7 @@ const MAX_IMPORTANCE = 10;            // must match importance.utils.js
 async function readRelevantMemory({
     userId,
     conversationId,
+    parentConversationId = undefined,
     query,
     limit = RETRIEVAL_FINAL_COUNT,
     excludeIds = []
@@ -45,6 +47,24 @@ async function readRelevantMemory({
         // Map excludeIds to UUIDs
         const mustNotIds = (excludeIds || []).map(id => objectIdToUuid(id)).filter(Boolean);
 
+        const conversationIds = [conversationId.toString()];
+
+        // If parentConversationId is explicitly provided by caller, avoid extra DB lookup.
+        if (typeof parentConversationId !== 'undefined') {
+            if (parentConversationId) {
+                conversationIds.push(parentConversationId.toString());
+            }
+        } else {
+            // Fallback for existing callers: resolve branch scope from conversation document.
+            const convForRag = await Conversation.findById(conversationId)
+                .select('parentConversationId')
+                .lean();
+
+            if (convForRag?.parentConversationId) {
+                conversationIds.push(convForRag.parentConversationId.toString());
+            }
+        }
+
         // Phase 2: fetch more candidates (15) to allow re-ranking room
         const body = {
             vector,
@@ -53,7 +73,7 @@ async function readRelevantMemory({
             filter: {
                 must: [
                     { key: "userId", match: { value: userId.toString() } },
-                    { key: "conversationId", match: { value: conversationId.toString() } }
+                    { key: "conversationId", match: { any: conversationIds } }
                 ],
                 ...(mustNotIds.length > 0 && {
                     must_not: [

@@ -110,6 +110,7 @@ async function resolveConversationModel(conversationId) {
 async function getVectorMemorySafe({
   userId,
   conversationId,
+  parentConversationId = undefined,
   userMessage,
   excludeIds = []
 }) {
@@ -117,6 +118,7 @@ async function getVectorMemorySafe({
     return await readRelevantMemory({
       userId,
       conversationId,
+      parentConversationId,
       query: userMessage,
       limit: 5,
       excludeIds
@@ -217,7 +219,15 @@ async function assembleSystemPrompt(userId, conversationId) {
 /* ===========================
    STREAMING RESPONSE
    =========================== */
-async function askConversationStream(conversationId, messages, userId, summaryText = null, excludeMessageIds = [], overrideModelId = null) {
+async function askConversationStream(
+  conversationId,
+  messages,
+  userId,
+  summaryText = null,
+  excludeMessageIds = [],
+  overrideModelId = null,
+  parentConversationId = undefined
+) {
   try {
     const openrouter = await getOpenRouter();
 
@@ -273,6 +283,7 @@ async function askConversationStream(conversationId, messages, userId, summaryTe
     const retrievedMemory = await getVectorMemorySafe({
       userId,
       conversationId,
+      parentConversationId,
       userMessage: lastUserMessage,
       excludeIds: contextIds
     });
@@ -417,6 +428,38 @@ async function askGeminiStream(
   }
 }
 
+async function getContextMessages(conversationId, MAX_CONTEXT) {
+  const conv = await Conversation.findById(conversationId)
+    .select('parentConversationId branchedFromMessageId')
+    .lean();
+
+  if (!conv?.parentConversationId || !conv?.branchedFromMessageId) {
+    // ROOT: Fetch last MAX_CONTEXT messages and return in chronological order (oldest first)
+    const rootMessages = await Message.find({ conversationId })
+      .sort({ createdAt: -1 })
+      .limit(MAX_CONTEXT)
+      .lean();
+    return rootMessages.reverse();
+  }
+
+  const branchMessages = await Message.find({ conversationId })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const needed = MAX_CONTEXT - branchMessages.length;
+  if (needed <= 0) return branchMessages.reverse();
+
+  const parentMessages = await Message.find({
+    conversationId: conv.parentConversationId,
+    _id: { $lte: conv.branchedFromMessageId }
+  })
+    .sort({ createdAt: -1 })
+    .limit(needed)
+    .lean();
+
+  return [...parentMessages.reverse(), ...branchMessages.reverse()];
+}
+
 /**
  * Orchestrates the "ask" flow preparation:
  * - Persists user message
@@ -425,33 +468,72 @@ async function askGeminiStream(
  * - Loads summary
  */
 async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null) {
-  // 1. Save user message
-  const userMsg = await ConversationService.addMessage(userId, conversationId, {
-    role: "user",
-    text: messageText,
-  });
-
-  // 1b. Create Assistant Message Placeholder BEFORE Streaming
   const conversation = await Conversation.findById(conversationId);
-  const assistantMsg = await Message.create({
-    conversationId,
-    role: 'assistant',
-    text: '',
-    userId,
-    personaId: conversation ? conversation.currentPersonaId : null,
-    versions: [],
-    isRetried: false
-  });
+  if (!conversation) {
+    throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  }
+  if (conversation.userId.toString() !== userId) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 });
+  }
 
-  // 2. Load recent context window (last 4 messages)
-  const MAX_CONTEXT = 4;
+  let userMsg = null;
   const recentMessages = await Message.find({ conversationId })
     .sort({ createdAt: -1 })
-    .limit(MAX_CONTEXT)
+    .limit(10)
     .lean();
-  let ordered = recentMessages.reverse();
 
-  // Safety: ensure user message is present in context
+  const latestNonPlaceholder = recentMessages.find(
+    (m) => !(m.role === 'assistant' && m.text === '')
+  );
+  const hasPendingAssistantPlaceholder = recentMessages.some(
+    (m) => m.role === 'assistant' && m.text === ''
+  );
+
+  // Reuse latest user message for branch-first ask and retry/failover asks.
+  if (
+    latestNonPlaceholder?.role === 'user' &&
+    latestNonPlaceholder.text === messageText &&
+    hasPendingAssistantPlaceholder
+  ) {
+    userMsg = latestNonPlaceholder;
+  }
+
+  if (!userMsg) {
+    userMsg = await ConversationService.addMessage(userId, conversationId, {
+      role: 'user',
+      text: messageText,
+    });
+
+    // Backfill branch-side edited message pointer when the first branch user message is created.
+    if (conversation.parentConversationId && !conversation.branchEditedMessageId) {
+      await Conversation.findByIdAndUpdate(conversationId, {
+        $set: { branchEditedMessageId: userMsg._id }
+      });
+      conversation.branchEditedMessageId = userMsg._id;
+    }
+  }
+
+  let assistantMsg = await Message.findOne({
+    conversationId,
+    role: 'assistant',
+    text: ''
+  }).sort({ createdAt: -1 });
+
+  if (!assistantMsg) {
+    assistantMsg = await Message.create({
+      conversationId,
+      role: 'assistant',
+      text: '',
+      userId,
+      personaId: conversation.currentPersonaId || null,
+      versions: [],
+      isRetried: false
+    });
+  }
+
+  const MAX_CONTEXT = 4;
+  let ordered = await getContextMessages(conversationId, MAX_CONTEXT);
+
   if (!ordered.length || ordered[ordered.length - 1]._id?.toString() !== userMsg._id?.toString()) {
     ordered.push({
       role: userMsg.role,
@@ -460,22 +542,19 @@ async function prepareAskContext(userId, conversationId, messageText, overrideMo
     });
   }
 
-  // EXCLUDE PLACEHOLDER FROM LLM CONTEXT
   ordered = ordered.filter(m => !(m.role === 'assistant' && m.text === ''));
 
-  // 3. Load summary
   const latestSummary = await getLatestSummary(conversationId);
   const summaryText = latestSummary?.summaryText || null;
 
-  // 4. Return all needed for streaming
-  // ✅ NEW: Pass overrideModelId to streaming service
   const { stream, modelId } = await askConversationStream(
     conversationId,
     ordered,
     userId,
     summaryText,
-    [userMsg._id, assistantMsg._id], // Exclude both from vector memory retrieval context
-    overrideModelId // ✅ NEW: Support model failover
+    [userMsg._id, assistantMsg._id],
+    overrideModelId,
+    conversation.parentConversationId || null
   );
 
   return { stream, modelId, userMsg, assistantMsg };
@@ -508,7 +587,9 @@ module.exports = {
   askConversationStream,
   askGemini,
   askGeminiStream,
+  getContextMessages,
   getInjectedUserMemory,
   prepareAskContext,
   handlePostStreamTasks
 };
+

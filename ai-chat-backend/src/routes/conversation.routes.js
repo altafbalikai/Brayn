@@ -17,8 +17,12 @@ const {
 } = require('../validators/conversation.validator');
 const { retryMessageValidation } = require('../validators/retry.validator');
 
+const { param } = require('express-validator');
+
 // ─── Shared: ObjectId param validator for consistency ──────────────────────────
-const cidParam = (name) => [...retryMessageValidation]; // We'll use the existing validator
+const cidParam = (name) => [
+  param(name).isMongoId().withMessage('Invalid conversation ID format')
+];
 
 // ensure auth middleware is required before protected routes
 router.use(auth);
@@ -37,6 +41,8 @@ router.post('/', createConversationValidation, handleValidationErrors, convContr
 router.get('/my', listConversationsValidation, handleValidationErrors, cacheMiddleware(60000), convController.listConversations); // Cache for 1 minute
 router.post('/:cid/messages', addMessageValidation, handleValidationErrors, convController.addMessage);
 router.get('/:cid/messages', getMessagesValidation, handleValidationErrors, cacheMiddleware(30000), convController.getMessages); // Cache for 30 seconds
+router.get('/:cid/branches', cidParam('cid'), handleValidationErrors, convController.getBranches);
+router.get('/:cid', cidParam('cid'), handleValidationErrors, convController.getConversation);
 router.patch('/:cid/rename', renameConversationValidation, handleValidationErrors, convController.renameConversation);
 router.delete('/:cid', deleteConversationValidation, handleValidationErrors, convController.deleteConversation);
 router.patch(

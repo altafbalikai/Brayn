@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { conversationService } from '../../api/services/conversationService';
 import { llmService } from '../../api/services/llmService';
+import api from '../../api/axios';
 import { logout } from '../auth/authSlice';
 import { switchVersion, retryMessage, updateModelFailover, clearModelFailover } from '../messages/messageInteractionsSlice';
 import { generateUuid } from '../../api/utils/retryWithBackoff';
@@ -47,9 +48,31 @@ export const createConversation = createAsyncThunk(
 
 export const fetchMessages = createAsyncThunk(
     'conversation/fetchMessages',
-    async ({ conversationId, page = 1, append = false }, { rejectWithValue }) => {
+    async ({ conversationId, page = 1, append = false }, { dispatch, rejectWithValue }) => {
         try {
             const data = await conversationService.getMessages(conversationId, page, 50);
+
+            if (page === 1) {
+                try {
+                    const convRes = await api.get(`/conversations/${conversationId}`);
+                    const rootId = convRes.data.parentConversationId || conversationId;
+                    const branchesRes = await api.get(`/conversations/${conversationId}/branches`);
+
+                    branchesRes.data.forEach(branch => {
+                        dispatch(registerBranch({
+                            originalConvId: rootId,
+                            branchConvId: branch._id,
+                            branchedFromMessageId: branch.branchedFromMessageId,
+                            editedMessageId: branch.editedMessageId,
+                            branchEditedMessageId: branch.branchEditedMessageId,
+                            isRoot: branch.isRoot || false
+                        }));
+                    });
+                } catch (branchErr) {
+                    console.warn('Branch hydration failed:', branchErr.message);
+                }
+            }
+
             return {
                 conversationId,
                 items: data.items || data.messages || data,
@@ -93,8 +116,10 @@ export const sendMessage = createAsyncThunk(
 
         try {
             // Add user message immediately
+            const tempUserId = `user-${Date.now()}`;
             const userMsg = {
-                _id: `user-${Date.now()}`,
+                _id: tempUserId,
+                id: tempUserId,
                 role: 'user',
                 text: message,
                 createdAt: new Date().toISOString(),
@@ -142,13 +167,23 @@ export const sendMessage = createAsyncThunk(
                         let realMessageId = null;
                         let accumulated = '';
 
-                        const onMetadata = (messageId) => {
+                        const onMetadata = (data) => {
+                            const messageId = typeof data === 'object' ? data?.messageId : data;
+                            const userMessageId = typeof data === 'object' ? data?.userMessageId : null;
                             realMessageId = messageId;
                             dispatch(updatePendingPlaceholderWithRealId({
                                 conversationId,
                                 tempId: tempAssistantId,
                                 realId: realMessageId
                             }));
+
+                            if (userMessageId) {
+                                dispatch(updateUserMessageId({
+                                    conversationId,
+                                    tempId: tempUserId,
+                                    realId: userMessageId
+                                }));
+                            }
                         };
 
                         const onChunk = (chunk) => {
@@ -228,6 +263,225 @@ export const sendMessage = createAsyncThunk(
     }
 );
 
+export const editMessage = createAsyncThunk(
+    'conversation/editMessage',
+    async ({ messageId, conversationId, newContent, tempAssistantId }, { dispatch, getState, rejectWithValue }) => {
+        const trimmedContent = (newContent || '').trim();
+        const isValidMongoId = /^[a-f\d]{24}$/i.test(messageId ?? '');
+
+        if (!isValidMongoId) {
+            console.error('[editMessage] Invalid messageId - not a MongoDB ObjectId:', messageId);
+            return rejectWithValue('Cannot edit a message that is still sending.');
+        }
+
+        const state = getState();
+        if (state.conversation.assistantTyping?.[conversationId]) {
+            return rejectWithValue('Cannot edit while a response is streaming.');
+        }
+        if (!trimmedContent) {
+            return rejectWithValue('Edited message cannot be empty.');
+        }
+
+        const currentConv = state.conversation.currentConversation;
+        const selectedModelId = currentConv?.selectedModelId;
+        const allModels = state.llmModels.llmmodels.filter(m => m.status === 'active');
+        const selectedModel = allModels.find(m => m._id === selectedModelId);
+        const otherModels = allModels.filter(m => m._id !== selectedModelId);
+        const orderedModels = selectedModel ? [selectedModel, ...otherModels] : allModels;
+        const maxAttempts = 5;
+
+        let newConversationId = null;
+        let rootConversationId = conversationId;
+        let tempEditedUserId = null;
+
+        try {
+            const res = await api.post(`/llm/conversations/${conversationId}/branch`, {
+                editedMessageId: messageId,
+                newContent: trimmedContent
+            });
+
+            newConversationId = res.data.newConversationId;
+            const conversation = res.data.conversation;
+
+            dispatch(setPendingNavigationConversationId(newConversationId));
+
+            rootConversationId = conversation?.parentConversationId?.toString() || conversationId;
+            dispatch(registerBranch({
+                originalConvId: rootConversationId,
+                branchConvId: newConversationId,
+                branchedFromMessageId: conversation.branchedFromMessageId,
+                editedMessageId: conversation.editedMessageId || messageId,
+                branchEditedMessageId: conversation.branchEditedMessageId || null,
+                isRoot: false
+            }));
+
+            dispatch(setBranchSwitching(true));
+            const fetchResult = await dispatch(
+                fetchMessages({ conversationId: newConversationId, page: 1, append: false })
+            ).unwrap();
+            dispatch(switchToBranch({
+                conversation,
+                messages: fetchResult?.items || []
+            }));
+            dispatch(setBranchSwitching(false));
+
+            tempEditedUserId = `edited-user-${Date.now()}`;
+            dispatch(addMessageToConversation({
+                conversationId: newConversationId,
+                message: {
+                    _id: tempEditedUserId,
+                    id: tempEditedUserId,
+                    role: 'user',
+                    text: trimmedContent,
+                    createdAt: new Date().toISOString(),
+                    status: 'sent'
+                }
+            }));
+
+            if (abortControllers[newConversationId]) {
+                abortControllers[newConversationId].abort();
+                delete abortControllers[newConversationId];
+            }
+            abortControllers[newConversationId] = new AbortController();
+            const signal = abortControllers[newConversationId].signal;
+
+            let requestKey = generateUuid();
+            let streamSucceeded = false;
+
+            const placeholderMsg = {
+                _id: tempAssistantId,
+                role: 'assistant',
+                text: '',
+                createdAt: new Date().toISOString(),
+                status: 'pending',
+                versions: [],
+                currentVersion: 1
+            };
+            dispatch(addAssistantPlaceholder({ conversationId: newConversationId, message: placeholderMsg }));
+            dispatch(setAssistantTyping({ conversationId: newConversationId, value: true }));
+
+            for (let modelIndex = 0; modelIndex < orderedModels.length; modelIndex++) {
+                const model = orderedModels[modelIndex];
+                const isModelSwitch = model._id !== selectedModelId;
+
+                if (modelIndex > 0) {
+                    requestKey = generateUuid();
+                    dispatch(updateModelFailover({
+                        messageId: newConversationId,
+                        modelName: model.displayName || model.name || model.modelId,
+                        isSwitching: true
+                    }));
+                }
+
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        const stream = llmService.askStream({
+                            message: trimmedContent,
+                            conversationId: newConversationId,
+                            overrideModelId: model._id,
+                            requestKey,
+                            signal
+                        });
+
+                        let realMessageId = null;
+                        let accumulated = '';
+
+                        const onMetadata = (data) => {
+                            const incomingMessageId = typeof data === 'object' ? data?.messageId : data;
+                            const userMessageId = typeof data === 'object' ? data?.userMessageId : null;
+                            realMessageId = incomingMessageId;
+                            dispatch(updatePendingPlaceholderWithRealId({
+                                conversationId: newConversationId,
+                                tempId: tempAssistantId,
+                                realId: realMessageId
+                            }));
+
+                            if (userMessageId && tempEditedUserId) {
+                                dispatch(updateUserMessageId({
+                                    conversationId: newConversationId,
+                                    tempId: tempEditedUserId,
+                                    realId: userMessageId
+                                }));
+                            }
+                        };
+
+                        const onChunk = (chunk) => {
+                            accumulated += chunk;
+                            if (!realMessageId) return;
+                            dispatch(updateAssistantText({
+                                conversationId: newConversationId,
+                                tempId: realMessageId,
+                                text: accumulated,
+                                status: 'streaming'
+                            }));
+                        };
+
+                        const full = await stream.start(onMetadata, onChunk);
+
+                        if (realMessageId) {
+                            dispatch(finalizeAssistantMessage({
+                                conversationId: newConversationId,
+                                tempId: realMessageId,
+                                text: full,
+                                status: 'sent'
+                            }));
+                        }
+
+                        if (isModelSwitch) {
+                            try {
+                                await dispatch(updateConversationModel({
+                                    conversationId: newConversationId,
+                                    modelId: model._id
+                                })).unwrap();
+                            } catch (persistErr) {
+                                console.error('Model persistence failed:', persistErr);
+                            }
+                        }
+
+                        dispatch(clearModelFailover(newConversationId));
+                        dispatch(setAssistantTyping({ conversationId: newConversationId, value: false }));
+                        streamSucceeded = true;
+                        break;
+                    } catch (err) {
+                        const { isUnavailable, isRetriable } = classifyError(err);
+
+                        if (isUnavailable) break;
+
+                        if (isRetriable && attempt < maxAttempts) {
+                            const delay = calculateBackoff(attempt);
+                            await new Promise(r => setTimeout(r, delay));
+                            continue;
+                        }
+
+                        if (modelIndex < orderedModels.length - 1) break;
+                        throw err;
+                    }
+                }
+
+                if (streamSucceeded) break;
+            }
+
+            if (!streamSucceeded) {
+                throw new Error('Selected LLM model is unavailable. Please try again later.');
+            }
+
+            return { conversationId: newConversationId, rootConversationId };
+        } catch (error) {
+            const errMsg = error.message || error.response?.data?.error || 'Failed to edit message';
+            if (newConversationId) {
+                dispatch(setAssistantTyping({ conversationId: newConversationId, value: false }));
+                dispatch(clearModelFailover(newConversationId));
+            }
+            return rejectWithValue(errMsg);
+        } finally {
+            dispatch(setBranchSwitching(false));
+            if (newConversationId) {
+                delete abortControllers[newConversationId];
+            }
+        }
+    }
+);
+
 export const renameConversationTitle = createAsyncThunk(
     'conversation/renameConversationTitle',
     async ({ conversationId, title }, { rejectWithValue }) => {
@@ -278,6 +532,9 @@ export const updateConversationModel = createAsyncThunk(
 const initialState = {
     conversations: [],
     currentConversation: null,
+    isSwitchingBranch: false,
+    editingMessageId: null,
+    branchMap: {},
     messages: {},
     loading: false,
     sending: false,
@@ -289,6 +546,7 @@ const initialState = {
     assistantTyping: {},
     messagesPages: {}, // { conversationId: { page: 1, hasMore: true } }
     messagesLoadingMore: {},
+    pendingNavigationConversationId: null,
 };
 
 const conversationSlice = createSlice({
@@ -298,6 +556,73 @@ const conversationSlice = createSlice({
         setCurrentConversation: (state, action) => {
             state.currentConversation = action.payload;
             state.loading = false;
+        },
+        setBranchSwitching(state, action) {
+            state.isSwitchingBranch = !!action.payload;
+        },
+        switchToBranch(state, action) {
+            const { conversation, messages = [] } = action.payload || {};
+            if (!conversation?._id) return;
+
+            state.currentConversation = conversation;
+
+            const conversationId = conversation._id;
+            state.messages[conversationId] = (messages || []).map(item => ({
+                ...item,
+                currentVersion: item.currentVersion || (item.versions?.length || 1)
+            }));
+            state.loading = false;
+        },
+        setPendingNavigationConversationId(state, action) {
+            state.pendingNavigationConversationId = action.payload;
+        },
+        clearPendingNavigationConversationId(state) {
+            state.pendingNavigationConversationId = null;
+        },
+        setEditingMessage(state, action) {
+            state.editingMessageId = action.payload;
+        },
+        cancelEditing(state) {
+            state.editingMessageId = null;
+        },
+        registerBranch(state, action) {
+            const {
+                originalConvId,
+                branchConvId,
+                branchedFromMessageId,
+                editedMessageId = null,
+                branchEditedMessageId = null,
+                isRoot
+            } = action.payload;
+            if (!state.branchMap[originalConvId]) {
+                state.branchMap[originalConvId] = [];
+            }
+            const existing = state.branchMap[originalConvId]
+                .find(b => b.branchConvId === branchConvId);
+
+            if (existing) {
+                if (typeof branchedFromMessageId !== 'undefined') {
+                    existing.branchedFromMessageId = branchedFromMessageId;
+                }
+                if (editedMessageId) {
+                    existing.editedMessageId = editedMessageId;
+                }
+                if (branchEditedMessageId) {
+                    existing.branchEditedMessageId = branchEditedMessageId;
+                }
+                if (isRoot) {
+                    existing.isRoot = true;
+                }
+            } else {
+                state.branchMap[originalConvId].push({
+                    branchConvId,
+                    branchedFromMessageId,
+                    editedMessageId,
+                    branchEditedMessageId,
+                    isRoot: isRoot || false,
+                    createdAt: new Date().toISOString()
+                });
+            }
         },
         addAssistantPlaceholder: (state, action) => {
             const { conversationId, message } = action.payload;
@@ -318,6 +643,23 @@ const conversationSlice = createSlice({
                 // Update the message with real ID and status
                 messages[tempIndex]._id = realId;
                 messages[tempIndex].status = 'streaming';
+            }
+        },
+        updateUserMessageId: (state, action) => {
+            const { conversationId, tempId, realId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+
+            const idx = messages.findIndex((m) =>
+                m._id === tempId ||
+                m.id === tempId ||
+                m._id?.toString() === tempId?.toString() ||
+                m.id?.toString() === tempId?.toString()
+            );
+            if (idx !== -1) {
+                const normalizedRealId = realId?.toString();
+                messages[idx]._id = normalizedRealId;
+                messages[idx].id = normalizedRealId;
             }
         },
         // RESTORED: Required by initial sendMessage streaming flow
@@ -532,23 +874,24 @@ const conversationSlice = createSlice({
                     ...conv,
                     formattedDate: conv.createdAt ? new Date(conv.createdAt).toLocaleDateString() : ''
                 }));
+                const rootConversations = formattedConversations.filter(conv => !conv.parentConversationId);
 
                 if (action.payload.append) {
                     // Append for infinite scroll
                     // state.conversations = [...state.conversations, ...formattedConversations];
                     const existingIds = new Set(state.conversations.map(c => c._id));
-                    formattedConversations.forEach(conv => {
-                        if (!existingIds.has(conv._id)) {
+                    rootConversations.forEach(conv => {
+                        if (!conv.parentConversationId && !existingIds.has(conv._id)) {
                             state.conversations.push(conv);
                         }
                     });
                 } else {
                     // Replace for initial load
-                    state.conversations = formattedConversations;
+                    state.conversations = rootConversations;
                 }
 
                 state.conversationsPage = action.payload.page || 1;
-                state.conversationsHasMore = formattedConversations.length === 20; // Assuming limit is 20
+                state.conversationsHasMore = rootConversations.length === 20; // Assuming limit is 20
             })
             .addCase(fetchConversations.rejected, (state, action) => {
                 state.loading = false;
@@ -561,7 +904,9 @@ const conversationSlice = createSlice({
                     ...action.payload,
                     formattedDate: action.payload.createdAt ? new Date(action.payload.createdAt).toLocaleDateString() : ''
                 };
-                state.conversations.unshift(newConv);
+                if (!newConv.parentConversationId) {
+                    state.conversations.unshift(newConv);
+                }
                 state.currentConversation = action.payload;
                 state.messages[action.payload._id] = [];
             })
@@ -591,10 +936,8 @@ const conversationSlice = createSlice({
                     // Prepend older messages for infinite scroll (scrolling up)
                     state.messages[conversationId] = [...processedItems, ...existing];
                 } else {
-                    // Replace for initial load
-                    if (existing.length === 0) {
-                        state.messages[conversationId] = processedItems;
-                    }
+                    // Replace with latest server state for hydration/sync correctness.
+                    state.messages[conversationId] = processedItems;
                 }
 
                 // Update pagination state
@@ -625,6 +968,27 @@ const conversationSlice = createSlice({
                 }
             })
             .addCase(sendMessage.rejected, (state, action) => {
+                state.sending = false;
+                state.error = action.payload;
+                const { conversationId } = action.meta.arg;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                }
+            })
+            // Edit message
+            .addCase(editMessage.pending, (state) => {
+                state.sending = true;
+                state.error = null;
+            })
+            .addCase(editMessage.fulfilled, (state, action) => {
+                state.sending = false;
+                state.editingMessageId = null;
+                const { conversationId } = action.payload;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                }
+            })
+            .addCase(editMessage.rejected, (state, action) => {
                 state.sending = false;
                 state.error = action.payload;
                 const { conversationId } = action.meta.arg;
@@ -724,11 +1088,19 @@ const conversationSlice = createSlice({
 
 export const {
     setCurrentConversation,
+    setBranchSwitching,
+    switchToBranch,
+    setPendingNavigationConversationId,
+    clearPendingNavigationConversationId,
+    setEditingMessage,
+    cancelEditing,
+    registerBranch,
     clearCurrentConversation,
     addMessageToConversation,
     setAssistantTyping,
     addAssistantPlaceholder,
     updatePendingPlaceholderWithRealId,
+    updateUserMessageId,
     updateAssistantText,
     finalizeAssistantMessage,
     setConversationTitle,
@@ -740,3 +1112,4 @@ export const {
     switchMessageVersion,
 } = conversationSlice.actions;
 export default conversationSlice.reducer;
+

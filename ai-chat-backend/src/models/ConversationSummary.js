@@ -18,6 +18,11 @@ const ConversationSummarySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
     },
+    validUpToMessageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null
+    },
   },
   { timestamps: true }
 );

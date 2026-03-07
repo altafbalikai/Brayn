@@ -64,7 +64,10 @@ async function listConversations(userId, agentId, page = 1, limit = 50) {
   page = Math.max(1, parseInt(page, 10) || 1);
   limit = Math.max(1, Math.min(200, parseInt(limit, 10) || 50)); // cap limit for safety
 
-  const filter = { userId: new mongoose.Types.ObjectId(userId) };
+  const filter = {
+    userId: new mongoose.Types.ObjectId(userId),
+    parentConversationId: null
+  };
 
   if (agentId) {
     // Prefer exact agentId match; if not present then fallback to title contains (case-insensitive)
@@ -78,7 +81,7 @@ async function listConversations(userId, agentId, page = 1, limit = 50) {
 
   const [items, total] = await Promise.all([
     Conversation.find(filter)
-      .select({ title: 1, agentId: 1, createdAt: 1, updatedAt: 1, selectedModelId: 1 })
+      .select({ title: 1, agentId: 1, createdAt: 1, updatedAt: 1, selectedModelId: 1, parentConversationId: 1 })
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -147,14 +150,29 @@ async function getMessages(userId, conversationId, { page = 1, limit = 50 }) {
   if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
 
   const skip = (page - 1) * limit;
+
+  let query = { conversationId: new mongoose.Types.ObjectId(conversationId) };
+
+  if (conv.parentConversationId && conv.branchedFromMessageId) {
+    query = {
+      $or: [
+        { conversationId: new mongoose.Types.ObjectId(conversationId) },
+        {
+          conversationId: conv.parentConversationId,
+          _id: { $lte: conv.branchedFromMessageId }
+        }
+      ]
+    };
+  }
+
   const [items, total] = await Promise.all([
-    Message.find({ conversationId: new mongoose.Types.ObjectId(conversationId) })
+    Message.find(query)
       .sort({ createdAt: 1 })
       .populate('versions')
       .skip(skip)
       .limit(limit)
       .lean(),
-    Message.countDocuments({ conversationId: new mongoose.Types.ObjectId(conversationId) })
+    Message.countDocuments(query)
   ]);
 
   // Enrich items with persona metadata

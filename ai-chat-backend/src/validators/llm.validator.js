@@ -29,6 +29,25 @@ const askValidation = [
     .withMessage("modelId must not be provided; model is resolved from conversation"),
 ];
 
+const branchValidation = [
+  body('editedMessageId')
+    .notEmpty().withMessage('editedMessageId is required')
+    .isMongoId().withMessage('editedMessageId must be a valid MongoDB ObjectId'),
+  body('newContent')
+    .notEmpty().withMessage('newContent is required')
+    .isString().withMessage('newContent must be a string')
+    .trim()
+    .isLength({ min: 1, max: 10000 })
+    .withMessage('newContent must be between 1 and 10000 characters'),
+  param('cid')
+    .notEmpty().withMessage('Conversation ID is required')
+    .custom((value) => {
+      if (!mongoose.isValidObjectId(value)) throw new Error('Invalid conversation ID format');
+      return true;
+    })
+];
+
 module.exports = {
   askValidation,
+  branchValidation,
 };
