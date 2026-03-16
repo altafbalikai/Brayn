@@ -25,7 +25,7 @@ import {
 } from "react-icons/fa6";
 import LoadingIndicator from "./LoadingIndicator";
 import { MessageActions } from "./MessageActions";
-
+import SpiningLoader from "../../../components/ui/SpiningLoader";
 /**
  * Validate that an ID is a real MongoDB ObjectId (24-char hex string)
  * Temp frontend IDs like 'user-1772849303104' will fail this check
@@ -578,7 +578,7 @@ function MessageItem({
                           "
                           disabled={sending || isSubmittingEdit || !editContent.trim() || editContent.trim() === displayText}
                         >
-                          {isSubmittingEdit ? "Saving..." : "Submit"}
+                          {isSubmittingEdit ? <SpiningLoader size={10} /> : "Submit"}
                         </button>
                       </div>
                     </div>
