@@ -1,5 +1,5 @@
 // src/controllers/copy.controller.js
-const Message = require('../models/Message');
+const copyService = require('../services/copy.service');
 const logger = require('../config/logger');
 
 /**
@@ -11,21 +11,8 @@ const logger = require('../config/logger');
 async function trackMessageCopy(req, res, next) {
     try {
         const { messageId } = req.params;
-
-        const message = await Message.findById(messageId);
-        if (!message) {
-            return res.status(404).json({ error: 'Message not found' });
-        }
-
-        // Use the helper method added in Phase 1.3
-        await message.incrementCopyCount();
-
-        res.status(200).json({
-            success: true,
-            messageId: message._id,
-            copiedCount: message.copiedCount,
-            lastCopiedAt: message.lastCopiedAt
-        });
+        const data = await copyService.trackCopy({ messageId });
+        res.status(200).json(data);
     } catch (err) {
         logger.error('Error tracking message copy:', { messageId: req.params.messageId, error: err.message });
         next(err);

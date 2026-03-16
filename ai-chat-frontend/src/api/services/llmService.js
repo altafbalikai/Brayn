@@ -1,5 +1,5 @@
 import api from '../axios';
-import { refreshAccessToken } from '../axios'; // axios instance
+import { refreshAccessToken, getAccessToken, setAccessToken } from '../axios'; // axios instance
 import { retryWithBackoff, generateUuid } from '../utils/retryWithBackoff';
 
 // export const llmService = {
@@ -105,6 +105,63 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
  */
 export const llmService = {
     /**
+     * POST /api/llm/conversations/:cid/branch
+     * Branch a conversation by editing a prior user message.
+     */
+    branchConversation: async ({ conversationId, editedMessageId, newContent }) => {
+        if (!conversationId) throw new Error("conversationId is required");
+        if (!editedMessageId) throw new Error("editedMessageId is required");
+
+        const url = `${API_BASE_URL}/llm/conversations/${conversationId}/branch`;
+        const token = getAccessToken();
+
+        const headers = {
+            "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
+        };
+
+        const body = JSON.stringify({ editedMessageId, newContent });
+
+        const res = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers,
+            body,
+        });
+
+        if (res.status === 401) {
+            try {
+                const newToken = await refreshAccessToken();
+                setAccessToken(newToken);
+                const retryRes = await fetch(url, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        ...headers,
+                        Authorization: `Bearer ${newToken}`,
+                    },
+                    body,
+                });
+                if (!retryRes.ok) {
+                    const txt = await retryRes.text();
+                    throw new Error(txt || `Branch failed: ${retryRes.status}`);
+                }
+                return retryRes.json();
+            } catch (e) {
+                setAccessToken(null);
+                throw e;
+            }
+        }
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt || `Branch failed: ${res.status}`);
+        }
+
+        return res.json();
+    },
+
+    /**
      * STREAMING ASK
      */
     askStream: ({
@@ -120,7 +177,7 @@ export const llmService = {
 
         const controller = externalSignal ? null : new AbortController();
         const signal = externalSignal ?? controller.signal;
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
 
         async function start(onMetadata, onChunk, onComplete, retry = true) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
@@ -176,6 +233,7 @@ export const llmService = {
             if (res.status === 401 && retry) {
                 try {
                     const newToken = await refreshAccessToken();
+                    setAccessToken(newToken);
                     return start(
                         onMetadata,
                         onChunk,
@@ -183,6 +241,7 @@ export const llmService = {
                         false // Only retry refresh once
                     );
                 } catch (refreshError) {
+                    setAccessToken(null);
                     throw new Error("Session expired. Please log in again.");
                 }
             }

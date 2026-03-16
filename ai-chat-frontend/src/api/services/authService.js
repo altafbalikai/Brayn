@@ -1,4 +1,5 @@
 import api from '../axios';
+import { setAccessToken, getAccessToken } from '../axios';
 
 export const authService = {
     signup: async (email, password, name) => {
@@ -14,8 +15,7 @@ export const authService = {
             throw new Error('No access token received');
         }
 
-        // Token persistence (OK here, or move to thunk)
-        localStorage.setItem('accessToken', accessToken);
+        setAccessToken(accessToken);
 
         return { user, accessToken };
     },
@@ -24,7 +24,7 @@ export const authService = {
         try {
             await api.post('/auth/logout', {});
         } finally {
-            localStorage.removeItem('accessToken');
+            setAccessToken(null);
         }
     },
 
@@ -48,7 +48,7 @@ export const authService = {
             throw new Error('No access token received on refresh');
         }
 
-        localStorage.setItem('accessToken', accessToken);
+        setAccessToken(accessToken);
         return accessToken;
     },
 
@@ -59,7 +59,7 @@ export const authService = {
     },
 
     changePassword: async (currentPassword, newPassword) => {
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
 
         if (!token) {
             throw new Error("Not authenticated");

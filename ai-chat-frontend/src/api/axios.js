@@ -7,6 +7,16 @@ if (!API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL is not defined');
 }
 
+let _accessToken = null;
+
+export function setAccessToken(token) {
+    _accessToken = token || null;
+}
+
+export function getAccessToken() {
+    return _accessToken;
+}
+
 const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
@@ -18,7 +28,7 @@ const api = axios.create({
 // Add access token to requests
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -45,11 +55,11 @@ api.interceptors.response.use(
             try {
                 const response = await api.post('/auth/refresh', {});
                 const { accessToken } = response.data;
-                localStorage.setItem('accessToken', accessToken);
+                setAccessToken(accessToken);
                 originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                 return api(originalRequest);
             } catch (refreshError) {
-                localStorage.removeItem('accessToken');
+                setAccessToken(null);
                 return Promise.reject(refreshError);
             }
         }
@@ -67,16 +77,16 @@ api.interceptors.response.use(
 let refreshPromise = null;
 export async function refreshAccessToken() {
     if (!refreshPromise) {
-        refreshPromise = api
-            .post("/auth/refresh", {})
-            .then((response) => {
+        refreshPromise = (async () => {
+            try {
+                const response = await api.post("/auth/refresh", {});
                 const { accessToken } = response.data;
-                localStorage.setItem("accessToken", accessToken);
+                setAccessToken(accessToken);
                 return accessToken;
-            })
-            .finally(() => {
+            } finally {
                 refreshPromise = null;
-            });
+            }
+        })();
     }
 
     return refreshPromise;

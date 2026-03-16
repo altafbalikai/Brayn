@@ -6,7 +6,7 @@
  * Replaces the legacy axios-based messageService.js.
  */
 
-import { refreshAccessToken } from '../axios';
+import { refreshAccessToken, getAccessToken, setAccessToken } from '../axios';
 import { retryWithBackoff, generateUuid } from '../utils/retryWithBackoff';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -25,7 +25,7 @@ if (!API_BASE_URL) {
  * @returns {Promise<any>} Parsed JSON response or null for 204
  */
 async function fetchClient(url, options = {}) {
-    const token = localStorage.getItem("accessToken");
+    const token = getAccessToken();
     const retry = options.retry !== false;
 
     // Build headers
@@ -49,6 +49,7 @@ async function fetchClient(url, options = {}) {
     if (res.status === 401 && retry) {
         try {
             const newToken = await refreshAccessToken();
+            setAccessToken(newToken);
             return fetchClient(url, {
                 ...options,
                 headers: {
@@ -58,7 +59,7 @@ async function fetchClient(url, options = {}) {
                 retry: false, // CRITICAL: Only retry once
             });
         } catch (refreshError) {
-            localStorage.removeItem("accessToken");
+            setAccessToken(null);
             throw refreshError;
         }
     }
@@ -150,7 +151,7 @@ export function retryMessageStream({ conversationId, messageId, options = {}, re
 
     async function start(onChunk, onComplete, retry = true) {
         const url = `${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}/retry`;
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
 
         const headers = {
             "Content-Type": "application/json",
@@ -182,11 +183,11 @@ export function retryMessageStream({ conversationId, messageId, options = {}, re
         // Handle 401 BEFORE streaming
         if (res.status === 401 && retry) {
             try {
-                await refreshAccessToken();
-                // After refresh, the next call will use the new token from localStorage
+                const newToken = await refreshAccessToken();
+                setAccessToken(newToken);
                 return start(onChunk, onComplete, false);
             } catch (refreshError) {
-                localStorage.removeItem("accessToken");
+                setAccessToken(null);
                 throw new Error("Session expired. Please log in again.");
             }
         }

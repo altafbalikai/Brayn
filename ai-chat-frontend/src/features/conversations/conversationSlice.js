@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { conversationService } from '../../api/services/conversationService';
 import { llmService } from '../../api/services/llmService';
-import api from '../../api/axios';
 import { logout } from '../auth/authSlice';
 import { switchVersion, retryMessage, updateModelFailover, clearModelFailover } from '../messages/messageInteractionsSlice';
 import { generateUuid } from '../../api/utils/retryWithBackoff';
@@ -54,11 +53,11 @@ export const fetchMessages = createAsyncThunk(
 
             if (page === 1) {
                 try {
-                    const convRes = await api.get(`/conversations/${conversationId}`);
-                    const rootId = convRes.data.parentConversationId || conversationId;
-                    const branchesRes = await api.get(`/conversations/${conversationId}/branches`);
+                    const conv = await conversationService.getConversation(conversationId);
+                    const rootId = conv.parentConversationId || conversationId;
+                    const branches = await conversationService.getBranches(conversationId);
 
-                    branchesRes.data.forEach(branch => {
+                    branches.forEach(branch => {
                         dispatch(registerBranch({
                             originalConvId: rootId,
                             branchConvId: branch._id,
@@ -295,13 +294,14 @@ export const editMessage = createAsyncThunk(
         let tempEditedUserId = null;
 
         try {
-            const res = await api.post(`/llm/conversations/${conversationId}/branch`, {
+            const res = await llmService.branchConversation({
+                conversationId,
                 editedMessageId: messageId,
-                newContent: trimmedContent
+                newContent: trimmedContent,
             });
 
-            newConversationId = res.data.newConversationId;
-            const conversation = res.data.conversation;
+            newConversationId = res.newConversationId;
+            const conversation = res.conversation;
 
             dispatch(setPendingNavigationConversationId(newConversationId));
 

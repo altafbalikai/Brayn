@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const LLMModel = require("../models/LLMModel");
 const ConversationSummary = require('../models/ConversationSummary');
 const { computeMessageImportance } = require('../utils/importance.utils');
+const logger = require('../config/logger');
 
 async function createConversation(userId, agentId, title, selectedModelId = '695c80a243c5787036d8173c', personaId = null) {
   if (!mongoose.isValidObjectId(userId)) {
@@ -136,7 +137,7 @@ async function addMessage(userId, conversationId, { role, text, personaId: provi
     personaId: role === 'assistant' ? (personaId || conv.currentPersonaId) : null,
   });
 
-  console.log(`✅ Message saved | Role: ${role} | PersonaId: ${msg.personaId || 'user'}`);
+  logger.info('Message saved', { role, personaId: msg.personaId || 'user' });
 
   return msg.toObject();
 }
@@ -277,4 +278,57 @@ async function switchPersona(userId, conversationId, personaId) {
   return conv.toObject();
 }
 
-module.exports = { createConversation, listConversations, addMessage, getMessages, renameConversation, deleteConversation, updateConversationModel, switchPersona };
+async function getConversationById(userId, conversationId) {
+  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+
+  const conv = await Conversation.findById(conversationId).lean();
+  if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+  return conv;
+}
+
+async function getBranchesForConversation(userId, conversationId) {
+  if (!mongoose.isValidObjectId(userId)) throw Object.assign(new Error('Invalid userId'), { status: 400 });
+  if (!mongoose.isValidObjectId(conversationId)) throw Object.assign(new Error('Invalid conversationId'), { status: 400 });
+
+  const conv = await Conversation.findById(conversationId)
+    .select('userId parentConversationId')
+    .lean();
+  if (!conv) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  if (conv.userId.toString() !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+
+  const rootId = conv.parentConversationId || conv._id;
+
+  const [root, branches] = await Promise.all([
+    Conversation.findById(rootId).select('_id title createdAt').lean(),
+    Conversation.find({ parentConversationId: rootId })
+      .select('_id branchedFromMessageId editedMessageId branchEditedMessageId createdAt title')
+      .sort({ createdAt: 1 })
+      .lean()
+  ]);
+
+  return [
+    {
+      ...root,
+      branchedFromMessageId: null,
+      editedMessageId: null,
+      branchEditedMessageId: null,
+      isRoot: true
+    },
+    ...branches
+  ];
+}
+
+module.exports = {
+  createConversation,
+  listConversations,
+  addMessage,
+  getMessages,
+  renameConversation,
+  deleteConversation,
+  updateConversationModel,
+  switchPersona,
+  getConversationById,
+  getBranchesForConversation
+};

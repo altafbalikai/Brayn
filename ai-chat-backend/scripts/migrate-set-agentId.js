@@ -1,7 +1,12 @@
 // scripts/migrate-set-agentId.js
 const mongoose = require('mongoose');
 const Conversation = require('../src/models/Conversation');
-const MONGO = 'mongodb://root:altaf%402025@localhost:27018/?authSource=admin';
+const MONGO = process.env.MIGRATION_MONGO_URI || process.env.MONGO_URI;
+
+if (!MONGO) {
+  console.error('MIGRATION_MONGO_URI or MONGO_URI env var is required');
+  process.exit(1);
+}
 
 (async () => {
   try {

@@ -6,6 +6,7 @@ const {
 } = require("../validators/promptSettings.validator");
 
 const auth = require('../middlewares/auth.middleware');
+const { authorize } = require('../middlewares/auth.middleware');
 const {
     getPrompt,
     updatePrompt,
@@ -18,6 +19,7 @@ router.put(
     "/",
     updatePromptSettingsValidation,
     auth,
+    authorize('admin'),
     updatePrompt
 );
 
@@ -25,6 +27,7 @@ router.post(
     "/reset",
     resetPromptSettingsValidation,
     auth,
+    authorize('admin'),
     resetPrompt
 );
 

@@ -1,5 +1,7 @@
 // src/services/promptSettingsService.js
 
+import { getAccessToken } from "../axios";
+
 // Use relative URL when using Vite proxy, or absolute URL if VITE_API_URL is set
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -11,7 +13,7 @@ if (!API_BASE_URL) {
  * Shared fetch wrapper (same pattern as llmModelsService)
  */
 async function fetchClient(url, options = {}) {
-    const token = localStorage.getItem("accessToken");
+    const token = getAccessToken();
 
     const res = await fetch(`${API_BASE_URL}/prompt-settings${url}`, {
         ...options,

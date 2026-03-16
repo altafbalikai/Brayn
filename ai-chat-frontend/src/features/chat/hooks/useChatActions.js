@@ -68,9 +68,6 @@ export const useChatActions = (currentConversation, selectedModelId) => {
     }, [dispatch]);
 
     const handleLogout = useCallback(async () => {
-        // 1. Client-side guard: Prevent auto-login on immediate refresh
-        localStorage.setItem("forceLogout", "true");
-
         await dispatch(logout());
         // State reset is handled by conversationSlice extraReducer listening to logout.fulfilled
         navigate("/login", { replace: true });

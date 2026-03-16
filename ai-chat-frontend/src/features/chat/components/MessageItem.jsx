@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import api from "../../../api/axios";
 import {
   setEditingMessage,
   cancelEditing,
@@ -9,6 +8,7 @@ import {
   fetchMessages,
   switchToBranch,
 } from "../../../features/conversations/conversationSlice";
+import { conversationService } from "../../../api/services/conversationService";
 import { selectPersonas } from "../../../features/persona/personaSlice";
 import { getPersonaIcon } from "../../../utils/personaIcons";
 import ReactMarkdown from "react-markdown";
@@ -271,8 +271,7 @@ function MessageItem({
     if (!targetId || targetId === activeConversationId) return;
 
     try {
-      const convRes = await api.get(`/conversations/${targetId}`);
-      const targetConv = convRes.data;
+      const targetConv = await conversationService.getConversation(targetId);
 
       const fetchResult = await dispatch(
         fetchMessages({ conversationId: targetId, page: 1, append: false }),
@@ -362,13 +361,15 @@ function MessageItem({
       }}
     >
       {/* Bubble wrapper */}
-      <div className={`flex flex-col min-w-0 transition-all duration-200 ${
+      <div
+        className={`flex flex-col min-w-0 transition-all duration-200 ${
           msg.role === "user"
             ? isEditing
-              ? "w-full max-w-full"           // ← full width in edit mode
+              ? "w-full max-w-full" // ← full width in edit mode
               : "max-w-[80%] md:max-w-[70%]" // ← normal bubble width otherwise
             : "max-w-[100%] md:max-w-[100%]"
-        }`}>
+        }`}
+      >
         {showTime && (
           <div
             className={`text-xs text-theme-muted opacity-50 mb-1 ${
@@ -383,13 +384,15 @@ function MessageItem({
         )}
 
         {/* Bubble */}
-        <div className={`rounded-lg min-w-0 ${
+        <div
+          className={`rounded-lg min-w-0 ${
             msg.role === "user"
               ? isEditing
-                ? "text-theme-text"            // ← no padding/bg, editor takes over
+                ? "text-theme-text" // ← no padding/bg, editor takes over
                 : "px-4 py-3 bg-theme-secondary text-theme-text"
               : "px-0 py-0 bg-theme-transparent text-theme-chat-text"
-          }`}>
+          }`}
+        >
           {isLoading ? (
             // Initial loading state (no content yet)
             <LoadingIndicator />
@@ -510,7 +513,6 @@ function MessageItem({
                 <div className="whitespace-pre-wrap break-words min-w-0">
                   {isEditing ? (
                     <div className="flex flex-col w-full rounded-xl border border-theme-secondary bg-theme-secondary/30 overflow-hidden">
-                      
                       {/* Auto-growing textarea — no fixed min-height */}
                       <textarea
                         value={editContent}
@@ -547,7 +549,7 @@ function MessageItem({
                       />
 
                       {/* Footer */}
-                        <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-theme-secondary">
+                      <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-theme-secondary">
                         <button
                           type="button"
                           onClick={() => dispatch(cancelEditing())}
@@ -576,15 +578,24 @@ function MessageItem({
                             disabled:opacity-40 disabled:cursor-not-allowed
                             border border-theme-secondary
                           "
-                          disabled={sending || isSubmittingEdit || !editContent.trim() || editContent.trim() === displayText}
+                          disabled={
+                            sending ||
+                            isSubmittingEdit ||
+                            !editContent.trim() ||
+                            editContent.trim() === displayText
+                          }
                         >
-                          {isSubmittingEdit ? <SpiningLoader size={10} /> : "Submit"}
+                          {isSubmittingEdit ? (
+                            <SpiningLoader size={10} />
+                          ) : (
+                            "Submit"
+                          )}
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="relative group/userMsg">{displayText}</div>
-                  )}              
+                  )}
                 </div>
               )}
             </>

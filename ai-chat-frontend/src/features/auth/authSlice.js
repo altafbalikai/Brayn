@@ -86,12 +86,9 @@ export const resetPassword = createAsyncThunk(
 export const initializeAuth = createAsyncThunk(
     "auth/initializeAuth",
     async (_, { rejectWithValue }) => {
-        // 1. Check for client-side logout guard
-        if (localStorage.getItem("forceLogout") === "true") {
-            return rejectWithValue("User explicitly logged out");
-        }
-
         try {
+            // Ensure we have a fresh access token in memory (refresh cookie → access token)
+            await authService.refresh();
             const user = await authService.getProfile();
             return { user };
         } catch {
@@ -151,8 +148,6 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.isAuthenticated = true;
-                // Clear the guard flag
-                localStorage.removeItem("forceLogout");
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
@@ -168,7 +163,6 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.isAuthenticated = true;
-                localStorage.removeItem("forceLogout");
             })
             .addCase(signup.rejected, (state, action) => {
                 state.loading = false;

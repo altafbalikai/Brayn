@@ -168,7 +168,7 @@ async function getInjectedUserMemory(userId) {
     return "[User Memory]\n" + memories.map(m => `- ${m.key}: ${m.value}`).join('\n');
 
   } catch (err) {
-    console.warn('[promptAssembly] getInjectedUserMemory failed:', err);
+    logger.warn('[promptAssembly] getInjectedUserMemory failed', { message: err?.message });
     return '';
   }
 }
@@ -201,16 +201,22 @@ async function assembleSystemPrompt(userId, conversationId) {
     if (persona && persona.isActive) {
       systemPrompt += `[Persona: ${persona.name}]\n${persona.systemPrompt}\n\n`;
       systemPrompt += `[Core Instructions]\n${baseSystemPrompt}`;
-      console.log(`✅ Using persona: ${persona.name}`);
+      logger.info('Using persona', { personaName: persona.name, conversationId });
     } else {
       // Fallback: Use global static prompt
       systemPrompt += baseSystemPrompt;
-      console.warn(`⚠️ Persona not found or inactive (${conversation.currentPersonaId}). Using global prompt.`);
+      logger.warn('Persona not found or inactive; using global prompt', {
+        conversationId,
+        currentPersonaId: conversation.currentPersonaId,
+      });
     }
 
     return systemPrompt;
   } catch (error) {
-    console.error('❌ Error assembling system prompt:', error);
+    logger.error('Error assembling system prompt', {
+      message: error?.message,
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+    });
     // Fallback: Return global prompt
     return await getSystemPrompt();
   }
@@ -288,7 +294,10 @@ async function askConversationStream(
       excludeIds: contextIds
     });
 
-    console.log("Retrieved vector memory items (filtered):", retrievedMemory.length);
+    logger.debug('Retrieved vector memory items (filtered)', {
+      count: retrievedMemory.length,
+      conversationId,
+    });
 
     // 5️⃣ Slot 4: Inject Vector Memory (separate slot)
     if (retrievedMemory.length > 0) {
@@ -301,7 +310,7 @@ async function askConversationStream(
     // 6️⃣ Slot 5: Messages
     payload.push(...buildMessagesPayload(normalized));
 
-    console.log("Payload:", payload);
+    logger.debug('LLM payload assembled', { conversationId, payloadCount: payload.length });
 
     // 5️⃣ Send to LLM
     return {

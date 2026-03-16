@@ -1,5 +1,7 @@
 // src/services/llmModelsService.js
 
+import { refreshAccessToken, getAccessToken, setAccessToken } from "../axios";
+
 // Use relative URL when using Vite proxy, or absolute URL if VITE_API_URL is set
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -11,7 +13,7 @@ if (!API_BASE_URL) {
  * Shared fetch wrapper
  */
 async function fetchClient(endpoint, options = {}) {
-    const token = localStorage.getItem("accessToken");
+    const token = getAccessToken();
     const retry = options.retry !== false; // default true
 
     // endpoint should start with /llm-models or /admin/llm-models
@@ -28,23 +30,20 @@ async function fetchClient(endpoint, options = {}) {
     // 🔴 Handle unauthorized
     if (res.status === 401 && retry) {
         try {
-            // Delegate refresh to axios
             const newToken = await refreshAccessToken();
+            setAccessToken(newToken);
 
             // Retry fetch ONCE with new token
-            return fetchClient(
-                url,
-                {
-                    ...options,
-                    headers: {
-                        ...options.headers,
-                        Authorization: `Bearer ${newToken}`,
-                    },
+            return fetchClient(endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    Authorization: `Bearer ${newToken}`,
                 },
-                false // prevent infinite loop
-            );
+                retry: false, // prevent infinite loop
+            });
         } catch (refreshError) {
-            localStorage.removeItem("accessToken");
+            setAccessToken(null);
             throw refreshError;
         }
     }

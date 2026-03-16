@@ -1,5 +1,5 @@
 // src/api/services/personaService.js
-import { refreshAccessToken } from '../axios';
+import { refreshAccessToken, getAccessToken, setAccessToken } from '../axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -13,7 +13,7 @@ if (!API_BASE_URL) {
  * localStorage, automatic 401 retry with refresh, error normalization.
  */
 async function fetchClient(url, options = {}) {
-    const token = localStorage.getItem("accessToken");
+    const token = getAccessToken();
     const retry = options.retry !== false;
 
     // The backend persona routes are prefixed with /api/personas or /api/conversations
@@ -40,6 +40,7 @@ async function fetchClient(url, options = {}) {
     if (res.status === 401 && retry) {
         try {
             const newToken = await refreshAccessToken();
+            setAccessToken(newToken);
             return fetchClient(
                 url,
                 {
@@ -52,7 +53,7 @@ async function fetchClient(url, options = {}) {
                 }
             );
         } catch (refreshError) {
-            localStorage.removeItem("accessToken");
+            setAccessToken(null);
             throw refreshError;
         }
     }

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useDispatch, useSelector, shallowEqual } from 'react-redux';
-import api from '../../../api/axios';
 import { cache, CACHE_KEYS } from '../../../utils/cache';
 import {
     fetchConversations,
@@ -8,6 +7,7 @@ import {
     setCurrentConversation,
     switchToBranch,
 } from '../../conversations/conversationSlice';
+import { conversationService } from '../../../api/services/conversationService';
 import { initializePersonaForConversation } from '../../persona/personaSlice';
 import { groupMessagesByTime } from '../../../utils/messageGrouping';
 
@@ -112,19 +112,21 @@ export const useChatMessages = (conversationId) => {
                 if (conversationHydrationRef.current[conversationId]) return;
                 conversationHydrationRef.current[conversationId] = true;
 
-                api
-                    .get(`/conversations/${conversationId}`)
-                    .then((res) => {
+                const hydrateConversation = async () => {
+                    try {
+                        const conversation = await conversationService.getConversation(conversationId);
                         dispatch(
                             switchToBranch({
-                                conversation: res.data,
+                                conversation,
                                 messages: messages[conversationId] || [],
                             })
                         );
-                    })
-                    .catch(() => {
+                    } catch {
                         dispatch(setCurrentConversation({ _id: conversationId }));
-                    });
+                    }
+                };
+
+                hydrateConversation();
             }
         }
 

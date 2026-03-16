@@ -5,7 +5,7 @@
  * Follows the shared fetchClient pattern with automatic token refresh.
  */
 
-import { refreshAccessToken } from '../axios';
+import { refreshAccessToken, getAccessToken, setAccessToken } from '../axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -22,7 +22,7 @@ if (!API_BASE_URL) {
  * @returns {Promise<any>} Parsed JSON response or null for 204
  */
 async function fetchClient(url, options = {}) {
-    const token = localStorage.getItem("accessToken");
+    const token = getAccessToken();
     const retry = options.retry !== false;
 
     const headers = {
@@ -43,6 +43,7 @@ async function fetchClient(url, options = {}) {
     if (res.status === 401 && retry) {
         try {
             const newToken = await refreshAccessToken();
+            setAccessToken(newToken);
             return fetchClient(url, {
                 ...options,
                 headers: {
@@ -52,7 +53,7 @@ async function fetchClient(url, options = {}) {
                 retry: false,
             });
         } catch (refreshError) {
-            localStorage.removeItem("accessToken");
+            setAccessToken(null);
             throw refreshError;
         }
     }
@@ -154,6 +155,24 @@ export async function updateConversationModel(conversationId, modelId) {
     });
 }
 
+/**
+ * GET /api/conversations/:cid
+ * Get a single conversation (used for hydration / branch switching)
+ */
+export async function getConversation(conversationId) {
+    if (!conversationId) throw new Error("conversationId is required");
+    return fetchClient(`/conversations/${conversationId}`);
+}
+
+/**
+ * GET /api/conversations/:cid/branches
+ * Get branch list for a conversation
+ */
+export async function getBranches(conversationId) {
+    if (!conversationId) throw new Error("conversationId is required");
+    return fetchClient(`/conversations/${conversationId}/branches`);
+}
+
 // Backward-compatible named export for existing imports
 export const conversationService = {
     createConversation,
@@ -163,4 +182,6 @@ export const conversationService = {
     renameConversationTitle,
     deleteConversation,
     updateConversationModel,
+    getConversation,
+    getBranches,
 };

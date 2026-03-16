@@ -1,5 +1,6 @@
 const llmService = require('../services/llm.service');
 const { idempotencyCache } = require('../config/idempotencyCache');
+const logger = require('../config/logger');
 
 async function ask(req, res, next) {
   try {
@@ -61,7 +62,7 @@ async function ask(req, res, next) {
     // ================================================================================
     idempotencyCache.set(requestKey, 'pending');
 
-    console.log(`🔵 POST /api/llm/${conversationId}/ask | INFO: ENTERED CONTROLLER`);
+    logger.info('Entered LLM ask controller', { conversationId, requestKey });
 
     // ================================================================================
     // NEW: Wrap entire operation in timeout
@@ -144,7 +145,7 @@ async function ask(req, res, next) {
 
       } catch (streamErr) {
         // Stream interrupted mid-transfer (NOT retriable)
-        console.error('Stream iteration error (non-retriable):', {
+        logger.error('Stream iteration error (non-retriable)', {
           requestKey,
           error: streamErr.message,
           messageId: assistantMsg._id
@@ -171,7 +172,7 @@ async function ask(req, res, next) {
     // ================================================================================
     const requestKey = req.headers['x-request-idempotency-key'];
 
-    console.error("Ask prep error (retriable):", {
+    logger.error("Ask prep error (retriable)", {
       requestKey,
       message: err.message,
       status: err.status || 500
