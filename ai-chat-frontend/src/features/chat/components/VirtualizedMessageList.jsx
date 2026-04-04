@@ -24,9 +24,15 @@ function VirtualizedMessageList({
   const [VariableSizeList, setVariableSizeList] = useState(null);
   const [loadingVirtual, setLoadingVirtual] = useState(false);
 
-  const editingMessageId = useSelector(state => state.conversation.editingMessageId);
-  const siblingCounts = useSelector(state => state.conversation.siblingCounts);
-  const currentConversationId = useSelector(state => state.conversation.currentConversation?._id);
+  const editingMessageId = useSelector(
+    (state) => state.conversation.editingMessageId,
+  );
+  const siblingCounts = useSelector(
+    (state) => state.conversation.siblingCounts,
+  );
+  const currentConversationId = useSelector(
+    (state) => state.conversation.currentConversation?._id,
+  );
 
   // ✅ Safety: Always prefer Redux currentConversationId over prop
   // This ensures we never render stale messages even if parent passes stale conversationId
@@ -66,19 +72,19 @@ function VirtualizedMessageList({
       const estimatedLines = Math.ceil((msg.text?.length || 0) / 50);
       const estimatedHeight = Math.min(
         Math.max(estimatedLines * 20 + 40, 60),
-        300
+        300,
       );
       sizeMap.current[index] = estimatedHeight;
       return estimatedHeight;
     },
-    [messages]
+    [messages],
   );
 
   useEffect(() => {
     if (listRef.current && messages.length > 0) {
       setTimeout(
         () => listRef.current?.scrollToItem(messages.length - 1, "end"),
-        0
+        0,
       );
     }
   }, [messages.length]);
@@ -168,7 +174,7 @@ function VirtualizedMessageList({
           conversationId: activeConvId,
           editingMessageId,
           siblingCounts,
-          currentConversationId
+          currentConversationId,
         }}
       >
         {({ index, style, data }) => {
@@ -178,13 +184,13 @@ function VirtualizedMessageList({
           return (
             <div style={style} className="flex justify-center">
               <div className="w-full max-w-3xl px-4 min-w-0">
-                 <MessageItem 
-                   msg={msg} 
-                   conversationId={data.conversationId}
-                   editingMessageId={data.editingMessageId}
-                   siblingCounts={data.siblingCounts}
-                   currentConversationId={data.currentConversationId}
-                 />
+                <MessageItem
+                  msg={msg}
+                  conversationId={data.conversationId}
+                  editingMessageId={data.editingMessageId}
+                  siblingCounts={data.siblingCounts}
+                  currentConversationId={data.currentConversationId}
+                />
                 {isLast && <div ref={messagesEndRef} />}
               </div>
             </div>

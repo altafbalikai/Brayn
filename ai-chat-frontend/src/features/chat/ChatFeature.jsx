@@ -108,7 +108,6 @@ export default function ChatFeature() {
   const sidebarActiveConversationId =
     currentConversation?.parentConversationId || currentConversation?._id;
 
-
   return (
     <>
       <div className="relative h-full w-full bg-transparent overflow-hidden flex">
