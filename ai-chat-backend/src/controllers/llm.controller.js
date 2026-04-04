@@ -130,6 +130,7 @@ async function ask(req, res, next) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders?.();
 
       // 1. Send Metadata Event FIRST
@@ -152,6 +153,7 @@ async function ask(req, res, next) {
             // 2. Stream JSON-Safe Chunk Events
             res.write(`event: chunk\n`);
             res.write(`data: ${JSON.stringify(content)}\n\n`);
+            if (res.flush) res.flush();
           }
         }
 
@@ -180,6 +182,7 @@ async function ask(req, res, next) {
           messageId: assistantMsg._id
         });
 
+        res.write("event: done\ndata: [DONE]\n\n");
         res.end();
 
       } catch (streamErr) {
