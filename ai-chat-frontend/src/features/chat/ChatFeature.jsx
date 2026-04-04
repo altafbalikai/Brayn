@@ -18,15 +18,11 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useChatSidebar } from "./hooks/useChatSidebar";
 import { useLLMIntegration } from "./hooks/useLLMIntegration";
 import { useCurrentUser } from "./hooks/useCurrentUser";
-import { clearPendingNavigationConversationId } from "../conversations/conversationSlice";
 
 export default function ChatFeature() {
   const { conversationId } = useParams(); // Get ID from URL
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const pendingNavigationConversationId = useSelector(
-    (state) => state.conversation.pendingNavigationConversationId,
-  );
 
   // 1. Integrations & Data
   const user = useCurrentUser();
@@ -112,13 +108,6 @@ export default function ChatFeature() {
   const sidebarActiveConversationId =
     currentConversation?.parentConversationId || currentConversation?._id;
 
-  useEffect(() => {
-    if (!pendingNavigationConversationId) return;
-    if (conversationId !== pendingNavigationConversationId) {
-      navigate(`/chat/${pendingNavigationConversationId}`, { replace: true });
-    }
-    dispatch(clearPendingNavigationConversationId());
-  }, [pendingNavigationConversationId, conversationId, navigate, dispatch]);
 
   return (
     <>

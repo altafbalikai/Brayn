@@ -45,9 +45,34 @@ async function getMessages(req, res, next) {
   try {
     const userId = req.user?.id;
     const { cid } = req.params;
-    const page = parseInt(req.query.page || '1');
-    const limit = parseInt(req.query.limit || '50');
-    const data = await ConversationService.getMessages(userId, cid, { page, limit });
+    const useNodeTree =
+      req.query.nodeTree === 'true' ||
+      process.env.USE_NODE_TREE === 'true';
+    let data;
+    if (useNodeTree) {
+      data = await ConversationService.getMessagesNodeTree(userId, cid);
+    } else {
+      const page = parseInt(req.query.page || '1');
+      const limit = parseInt(req.query.limit || '50');
+      data = await ConversationService.getMessages(userId, cid, { page, limit });
+    }
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function activateNode(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    const { nodeId } = req.params;
+    const { targetSiblingId } = req.body;
+    if (!targetSiblingId) {
+      return res.status(400).json({ error: 'targetSiblingId is required' });
+    }
+    const data = await ConversationService.activateNode(
+      userId, nodeId, targetSiblingId
+    );
     res.json(data);
   } catch (err) {
     next(err);
@@ -139,6 +164,7 @@ module.exports = {
   listConversations,
   addMessage,
   getMessages,
+  activateNode,
   getConversation,
   getBranches,
   renameConversation,

@@ -5,7 +5,6 @@ import {
     fetchConversations,
     fetchMessages,
     setCurrentConversation,
-    switchToBranch,
 } from '../../conversations/conversationSlice';
 import { conversationService } from '../../../api/services/conversationService';
 import { initializePersonaForConversation } from '../../persona/personaSlice';
@@ -23,12 +22,6 @@ export const useChatMessages = (conversationId) => {
     );
     const currentConversationFromState = useSelector(
         (state) => state.conversation.currentConversation
-    );
-    const pendingNavigationConversationId = useSelector(
-        (state) => state.conversation.pendingNavigationConversationId
-    );
-    const isSwitchingBranch = useSelector(
-        (state) => state.conversation.isSwitchingBranch
     );
 
     // URL is authoritative for "new chat" mode; Redux is authoritative for in-app branch switches.
@@ -95,14 +88,6 @@ export const useChatMessages = (conversationId) => {
     // Load messages when conversationId changes (URL-based)
     useEffect(() => {
         if (!conversationId) return;
-        if (isSwitchingBranch) return;
-        if (
-            pendingNavigationConversationId &&
-            currentConversationFromState?._id?.toString() === pendingNavigationConversationId?.toString() &&
-            conversationId?.toString() !== pendingNavigationConversationId?.toString()
-        ) {
-            return;
-        }
 
         if (currentConversationFromState?._id !== conversationId) {
             const matched = conversations.find((c) => c._id === conversationId);
@@ -115,12 +100,7 @@ export const useChatMessages = (conversationId) => {
                 const hydrateConversation = async () => {
                     try {
                         const conversation = await conversationService.getConversation(conversationId);
-                        dispatch(
-                            switchToBranch({
-                                conversation,
-                                messages: messages[conversationId] || [],
-                            })
-                        );
+                        dispatch(setCurrentConversation(conversation));
                     } catch {
                         dispatch(setCurrentConversation({ _id: conversationId }));
                     }
@@ -149,14 +129,11 @@ export const useChatMessages = (conversationId) => {
         currentConversationFromState?._id,
         conversations,
         messages,
-        isSwitchingBranch,
-        pendingNavigationConversationId,
         dispatch
     ]);
 
     // ✅ Load messages when currentConversation changes (Redux branch switch)
     useEffect(() => {
-        if (isSwitchingBranch) return;
         if (!currentConversation?._id || conversationId === currentConversation._id) return;
         if (hydratedRef.current[currentConversation._id]) return;
         if (messages[currentConversation._id]?.length > 0) {
@@ -172,7 +149,7 @@ export const useChatMessages = (conversationId) => {
                 append: false,
             })
         );
-    }, [currentConversation?._id, conversationId, messages, isSwitchingBranch, dispatch]);
+    }, [currentConversation?._id, conversationId, messages, dispatch]);
 
     // Sync persona ID on conversation change
     useEffect(() => {

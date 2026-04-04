@@ -1,19 +1,17 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import {
   setEditingMessage,
   cancelEditing,
   editMessage,
-  fetchMessages,
-  switchToBranch,
+  activateNode,
 } from "../../../features/conversations/conversationSlice";
-import { conversationService } from "../../../api/services/conversationService";
 import { selectPersonas } from "../../../features/persona/personaSlice";
 import { getPersonaIcon } from "../../../utils/personaIcons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import rehypeRaw from "rehype-raw";
 // import "highlight.js/styles/github-dark.css";
 import remarkBreaks from "remark-breaks";
 import {
@@ -122,17 +120,14 @@ function MessageItem({
   showTime,
   conversationId,
   editingMessageId,
-  branchMap,
+  siblingCounts,
   currentConversationId,
 }) {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const sending = useSelector((state) => state.conversation.sending);
-  const activeConversation = useSelector(
-    (state) => state.conversation.currentConversation,
-  );
   const isUser = msg.role === "user";
   const realMessageId = msg._id?.toString();
+  const useNodeTree = import.meta.env.VITE_USE_NODE_TREE === "true";
 
   // Only use msg._id (real MongoDB ObjectId), never the temp frontend ID (msg.id)
   const isEditing = !!realMessageId && editingMessageId === realMessageId;
@@ -143,6 +138,7 @@ function MessageItem({
   const [isHovered, setIsHovered] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
     setEditContent(msg.text || "");
@@ -150,6 +146,20 @@ function MessageItem({
 
   useEffect(() => {
     if (!isEditing) setIsSubmittingEdit(false);
+  }, [isEditing]);
+
+  // Position cursor at end of textarea when edit mode opens
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      const el = textareaRef.current;
+      // Auto-grow on mount
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+      // Position cursor at end
+      const len = el.value.length;
+      el.focus();
+      el.setSelectionRange(len, len);
+    }
   }, [isEditing]);
 
   useEffect(() => {
@@ -203,90 +213,38 @@ function MessageItem({
     }
   };
 
-  // Branch Navigation Logic
-  // Fallback to null if currentConversationId is somehow falsy (e.g. during very early render)
-  const activeConversationId = currentConversationId || conversationId || null;
-  const rootId = useMemo(() => {
-    const explicitRoot = activeConversation?.parentConversationId?.toString();
-    if (explicitRoot) return explicitRoot;
-
-    const activeId = activeConversationId?.toString();
-    if (!activeId) return null;
-
-    if (branchMap?.[activeId]) return activeId;
-
-    const inferredRoot = Object.keys(branchMap || {}).find((candidateRootId) =>
-      (branchMap[candidateRootId] || []).some(
-        (b) => b.branchConvId?.toString() === activeId,
-      ),
-    );
-
-    return inferredRoot || activeId;
-  }, [
-    activeConversation?.parentConversationId,
-    activeConversationId,
-    branchMap,
-  ]);
-
-  const navigatorConvs = useMemo(() => {
-    if (!rootId || !branchMap?.[rootId]) return [];
-
-    // Find all branches that branched FROM this message
-    const messageId = msg._id?.toString();
-    const childBranches = branchMap[rootId].filter((b) => {
-      const editedId = b.editedMessageId?.toString();
-      const branchEditedId = b.branchEditedMessageId?.toString();
-      const legacyMatch =
-        !editedId && b.branchedFromMessageId?.toString() === messageId;
-
-      return (
-        editedId === messageId || branchEditedId === messageId || legacyMatch
-      );
-    });
-    if (childBranches.length === 0) return [];
-
-    // rootId is the original conversation — always first in the list
-    return [rootId, ...childBranches.map((b) => b.branchConvId?.toString())];
-  }, [branchMap, rootId, msg._id]);
-
-  const currentNavIndex = navigatorConvs.findIndex(
-    (id) => id?.toString() === activeConversationId?.toString(),
-  );
-  const displayIndex =
-    currentNavIndex === -1 ? navigatorConvs.length - 1 : currentNavIndex;
+  const conversationSiblingCounts =
+    siblingCounts?.[(msg.conversationId || conversationId)?.toString()] || {};
+  const msgSiblingData = conversationSiblingCounts[msg._id?.toString()];
+  const totalVersions = msgSiblingData?.total || 1;
+  const currentPosition = msgSiblingData?.position ?? 0;
+  const siblingIds = msgSiblingData?.siblingIds || [];
+  const displayIndex = currentPosition;
 
   const handleNavPrev = () => {
-    if (displayIndex <= 0) return;
-    const targetId = navigatorConvs[displayIndex - 1];
-    handleBranchSwitch(targetId);
+    if (displayIndex <= 0 || siblingIds.length === 0) return;
+    const targetSiblingId = siblingIds[displayIndex - 1];
+    if (!targetSiblingId) return;
+    dispatch(
+      activateNode({
+        conversationId: (msg.conversationId || conversationId)?.toString(),
+        nodeId: msg._id?.toString(),
+        targetSiblingId,
+      }),
+    );
   };
 
   const handleNavNext = () => {
-    if (displayIndex >= navigatorConvs.length - 1) return;
-    const targetId = navigatorConvs[displayIndex + 1];
-    handleBranchSwitch(targetId);
-  };
-
-  const handleBranchSwitch = async (targetId) => {
-    if (!targetId || targetId === activeConversationId) return;
-
-    try {
-      const targetConv = await conversationService.getConversation(targetId);
-
-      const fetchResult = await dispatch(
-        fetchMessages({ conversationId: targetId, page: 1, append: false }),
-      ).unwrap();
-
-      dispatch(
-        switchToBranch({
-          conversation: targetConv,
-          messages: fetchResult?.items || [],
-        }),
-      );
-      navigate(`/chat/${targetId}`);
-    } catch (error) {
-      console.error("Failed to switch branch:", error);
-    }
+    if (displayIndex >= totalVersions - 1 || siblingIds.length === 0) return;
+    const targetSiblingId = siblingIds[displayIndex + 1];
+    if (!targetSiblingId) return;
+    dispatch(
+      activateNode({
+        conversationId: (msg.conversationId || conversationId)?.toString(),
+        nodeId: msg._id?.toString(),
+        targetSiblingId,
+      }),
+    );
   };
 
   const handleCopy = async () => {
@@ -315,17 +273,7 @@ function MessageItem({
     "initializing",
   ].includes(msg.status);
 
-  // 🔄 Single Source of Truth for Versions (Phase 12)
-  const totalVersions = msg.versions?.length || 0;
-  const currentVersionIdx = msg.currentVersion ? msg.currentVersion - 1 : 0;
-
-  // Derive display text:
-  // 1. If versions exist, use the content of the CURRENT active version
-  // 2. Fallback to top-level msg.text (for initial non-versioned messages)
-  const displayText =
-    totalVersions > 0 && msg.versions[currentVersionIdx]
-      ? msg.versions[currentVersionIdx].content
-      : msg.text || "";
+  const displayText = msg.text || "";
 
   // Show loading when message is being processed but has no content yet
   const isLoading = isProcessing && !displayText;
@@ -414,7 +362,9 @@ function MessageItem({
                   <div className="relative">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm, remarkBreaks]}
-                      rehypePlugins={isLoading ? [] : [rehypeHighlight]}
+                      rehypePlugins={
+                        isLoading ? [] : [rehypeRaw, rehypeHighlight]
+                      }
                       components={{
                         code: CodeBlock,
 
@@ -496,15 +446,96 @@ function MessageItem({
 
                     {/* Show actions and versions ONLY when NOT processing */}
                     {!isProcessing && (
-                      <MessageActions
-                        messageId={msg._id}
-                        conversationId={conversationId || msg.conversationId}
-                        content={displayText}
-                        isAssistant={isAssistant}
-                        isLoading={false}
-                        totalVersions={totalVersions || 1}
-                        currentVersion={msg.currentVersion || 1}
-                      />
+                      <div className="not-prose flex w-full items-center justify-start  min-h-[32px] mt-2 pr-2">
+                        <div className="flex min-w-0 items-center">
+                          <MessageActions
+                            messageId={msg._id}
+                            conversationId={
+                              conversationId || msg.conversationId
+                            }
+                            content={displayText}
+                            isAssistant={isAssistant}
+                            isLoading={false}
+                            totalVersions={useNodeTree ? 1 : totalVersions || 1}
+                            currentVersion={msg.currentVersion || 1}
+                          />
+                        </div>
+
+                        {/* Assistant node navigator — node-tree mode only */}
+                        {useNodeTree && isAssistant && totalVersions > 1 && (
+                          <div className="flex items-center bg-theme-secondary/40 rounded-md p-0.5 min-h-[32px] shrink-0">
+                            <button
+                              onClick={() => {
+                                if (
+                                  currentPosition <= 0 ||
+                                  siblingIds.length === 0
+                                )
+                                  return;
+                                const targetSiblingId =
+                                  siblingIds[currentPosition - 1];
+                                if (!targetSiblingId) return;
+                                dispatch(
+                                  activateNode({
+                                    conversationId: (
+                                      msg.conversationId || conversationId
+                                    )?.toString(),
+                                    nodeId: msg._id?.toString(),
+                                    targetSiblingId,
+                                  }),
+                                );
+                              }}
+                              disabled={currentPosition <= 0}
+                              className={`p-1.5 rounded-md transition-colors ${
+                                currentPosition <= 0
+                                  ? "text-theme-muted opacity-30 cursor-not-allowed"
+                                  : "text-theme-text hover:bg-theme-secondary"
+                              }`}
+                              title="Previous response"
+                              type="button"
+                            >
+                              <FaChevronLeft size={12} />
+                            </button>
+                            <span className="text-[12px] font-medium px-1.5 text-theme-muted select-none whitespace-nowrap flex items-center gap-1">
+                              {currentPosition + 1}
+                              <span className="opacity-50">/</span>
+                              {totalVersions}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (
+                                  currentPosition >= siblingIds.length - 1 ||
+                                  siblingIds.length === 0
+                                )
+                                  return;
+                                const targetSiblingId =
+                                  siblingIds[currentPosition + 1];
+                                if (!targetSiblingId) return;
+                                dispatch(
+                                  activateNode({
+                                    conversationId: (
+                                      msg.conversationId || conversationId
+                                    )?.toString(),
+                                    nodeId: msg._id?.toString(),
+                                    targetSiblingId,
+                                  }),
+                                );
+                              }}
+                              disabled={
+                                currentPosition >= siblingIds.length - 1
+                              }
+                              className={`p-1.5 rounded-md transition-colors ${
+                                currentPosition >= siblingIds.length - 1
+                                  ? "text-theme-muted opacity-30 cursor-not-allowed"
+                                  : "text-theme-text hover:bg-theme-secondary"
+                              }`}
+                              title="Next response"
+                              type="button"
+                            >
+                              <FaChevronRight size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -522,13 +553,7 @@ function MessageItem({
                           e.target.style.height = "auto";
                           e.target.style.height = `${e.target.scrollHeight}px`;
                         }}
-                        ref={(el) => {
-                          // Auto-grow on mount
-                          if (el) {
-                            el.style.height = "auto";
-                            el.style.height = `${el.scrollHeight}px`;
-                          }
-                        }}
+                        ref={textareaRef}
                         className="
                           w-full
                           bg-theme-dark
@@ -545,7 +570,6 @@ function MessageItem({
                           max-h-[60vh]
                         "
                         disabled={sending || isSubmittingEdit}
-                        autoFocus
                       />
 
                       {/* Footer */}
@@ -648,8 +672,7 @@ function MessageItem({
               <FaPen size={14} />
             </button>
 
-            {/* 3 ── Version navigator — only when multiple versions exist */}
-            {navigatorConvs.length > 1 && (
+            {totalVersions > 1 && (
               <div
                 className="
                 flex items-center bg-theme-secondary/40 rounded-md p-0.5 min-h-[32px]
@@ -677,16 +700,16 @@ function MessageItem({
                 "
                 >
                   {displayIndex + 1} <span className="opacity-50">/</span>{" "}
-                  {navigatorConvs.length}
+                  {totalVersions}
                 </span>
 
                 {/* Right arrow */}
                 <button
                   onClick={handleNavNext}
-                  disabled={displayIndex >= navigatorConvs.length - 1}
+                  disabled={displayIndex >= totalVersions - 1}
                   title="Next version"
                   className={`p-1.5 rounded-md transition-colors ${
-                    displayIndex >= navigatorConvs.length - 1
+                    displayIndex >= totalVersions - 1
                       ? "text-theme-muted opacity-30 cursor-not-allowed"
                       : "text-theme-text hover:bg-theme-secondary"
                   }`}

@@ -1,0 +1,45 @@
+{
+  "conversation": {
+    "_id": "69cd94aebf0fc39e300dd424",
+    "rootMessageId": "69cd94c2bf0fc39e300dd43d",
+    "createdAt": "2026-04-01T21:57:02.858Z"
+  },
+  "messages": [
+    {
+      "_id": "69cd94afbf0fc39e300dd42c",
+      "role": "user",
+      "text": "Altaf",
+      "parentMessageId": null,
+      "activeChildId": null,
+      "status": "sent",
+      "createdAt": "2026-04-01T21:57:03.365Z"
+    },
+    {
+      "_id": "69cd94afbf0fc39e300dd42f",
+      "role": "assistant",
+      "text": "It seems like you mentioned \"Altaf,\" but I need more context to assist you effectively. Could you clarify what you're referring to? For example, is this a name, a term, or something else? Let me know, and I'll do my best to help!\n",
+      "parentMessageId": null,
+      "activeChildId": null,
+      "status": "sent",
+      "createdAt": "2026-04-01T21:57:03.481Z"
+    },
+    {
+      "_id": "69cd94c2bf0fc39e300dd43d",
+      "role": "user",
+      "text": "My name is Altaf",
+      "parentMessageId": null,
+      "activeChildId": "69cd94c2bf0fc39e300dd441",
+      "status": "sent",
+      "createdAt": "2026-04-01T21:57:22.381Z"
+    },
+    {
+      "_id": "69cd94c2bf0fc39e300dd441",
+      "role": "assistant",
+      "text": "Hi Altaf! It's great to meet you. How can I assist you today? Feel free to ask me anything—I'm here to help! 😊\n",
+      "parentMessageId": "69cd94c2bf0fc39e300dd43d",
+      "activeChildId": null,
+      "status": "sent",
+      "createdAt": "2026-04-01T21:57:22.594Z"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const logger = require("../config/logger");
 const Conversation = require("../models/Conversation");
 const LLMModel = require("../models/LLMModel");
@@ -312,6 +313,8 @@ async function askConversationStream(
 
     logger.debug('LLM payload assembled', { conversationId, payloadCount: payload.length });
 
+    console.log("Final LLM Payload:", payload);
+
     // 5️⃣ Send to LLM
     return {
       stream: await openrouter.chat.send({
@@ -469,6 +472,66 @@ async function getContextMessages(conversationId, MAX_CONTEXT) {
   return [...parentMessages.reverse(), ...branchMessages.reverse()];
 }
 
+async function getContextMessagesNodeTree(conversationId, maxContext) {
+  // Walk the active path from the conversation root to leaf,
+  // then take the last maxContext messages (excluding any
+  // empty assistant placeholder at the very end).
+
+  const conv = await Conversation.findById(conversationId)
+    .select('rootMessageId')
+    .lean();
+
+  if (!conv?.rootMessageId) {
+    // Not yet migrated — fall back to simple query
+    const msgs = await Message.find({ conversationId })
+      .sort({ createdAt: -1 })
+      .limit(maxContext)
+      .lean();
+    return msgs.reverse();
+  }
+
+  // Walk activeChildId from root to leaf
+  const pathIds = [];
+  const visited = new Set();
+  let currentId = conv.rootMessageId;
+
+  while (currentId) {
+    const key = String(currentId);
+    if (visited.has(key)) break; // cycle guard
+    visited.add(key);
+    pathIds.push(currentId);
+
+    const node = await Message.findById(
+      currentId,
+      { _id: 1, activeChildId: 1 }
+    ).lean();
+
+    if (!node || !node.activeChildId) break;
+    currentId = node.activeChildId;
+  }
+
+  if (!pathIds.length) return [];
+
+  // Load all messages in path order
+  const msgs = await Message.find(
+    { _id: { $in: pathIds } },
+    { role: 1, text: 1, _id: 1, createdAt: 1 }
+  ).lean();
+
+  const msgMap = new Map(msgs.map(m => [String(m._id), m]));
+  const ordered = pathIds
+    .map(id => msgMap.get(String(id)))
+    .filter(Boolean)
+    // Exclude empty assistant placeholders at the end
+    .filter((m, idx, arr) => {
+      const isLast = idx === arr.length - 1;
+      return !(isLast && m.role === 'assistant' && !m.text);
+    });
+
+  // Return last maxContext messages
+  return ordered.slice(-maxContext);
+}
+
 /**
  * Orchestrates the "ask" flow preparation:
  * - Persists user message
@@ -569,6 +632,254 @@ async function prepareAskContext(userId, conversationId, messageText, overrideMo
   return { stream, modelId, userMsg, assistantMsg };
 }
 
+async function prepareAskContextNodeTree(
+  userId,
+  conversationId,
+  messageText,
+  overrideModelId = null,
+  editNodeId = null
+) {
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    throw Object.assign(new Error('Conversation not found'), { status: 404 });
+  }
+  if (conversation.userId.toString() !== userId) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 });
+  }
+
+  // ── Determine parent node ──────────────────────────────
+  // If editNodeId is provided, the new user message is a
+  // sibling of that node (same parentMessageId).
+  // Otherwise, find the current leaf of the active path.
+  let parentMessageId = null;
+
+  if (editNodeId) {
+    const editedNode = await Message.findById(editNodeId).lean();
+    if (!editedNode) {
+      throw Object.assign(
+        new Error('Edited message not found'), { status: 404 }
+      );
+    }
+    if (editedNode.conversationId.toString() !== conversationId) {
+      throw Object.assign(
+        new Error('Edited message does not belong to this conversation'),
+        { status: 400 }
+      );
+    }
+    // New user message shares the same parent as the edited node
+    parentMessageId = editedNode.parentMessageId;
+  } else {
+    // Walk active path to find the current leaf
+    const conv = await Conversation.findById(conversationId)
+      .select('rootMessageId')
+      .lean();
+    if (conv?.rootMessageId) {
+      const visited = new Set();
+      let currentId = conv.rootMessageId;
+      while (currentId) {
+        const key = String(currentId);
+        if (visited.has(key)) break;
+        visited.add(key);
+        const node = await Message.findById(
+          currentId,
+          { _id: 1, activeChildId: 1 }
+        ).lean();
+        if (!node || !node.activeChildId) {
+          parentMessageId = node?._id || null;
+          break;
+        }
+        currentId = node.activeChildId;
+      }
+    } else {
+      const latestMsg = await Message.findOne(
+        { conversationId },
+        { _id: 1 }
+      ).sort({ createdAt: -1 }).lean();
+      parentMessageId = latestMsg?._id || null;
+    }
+  }
+
+  // ── Create user message node ───────────────────────────
+  const userMsg = await Message.create({
+    conversationId,
+    userId: new mongoose.Types.ObjectId(userId),
+    role: 'user',
+    text: messageText,
+    parentMessageId: parentMessageId || null,
+    status: 'sent',
+    importance: 0,
+  });
+
+  // Update parent's activeChildId to point to new user message
+  if (parentMessageId) {
+    await Message.findByIdAndUpdate(
+      parentMessageId,
+      { $set: { activeChildId: userMsg._id } }
+    );
+  } else {
+    // This is the root message — set rootMessageId on conversation
+    await Conversation.findByIdAndUpdate(
+      conversationId,
+      { $set: { rootMessageId: userMsg._id } }
+    );
+  }
+
+  // Update conversation metadata
+  await Conversation.findByIdAndUpdate(
+    conversationId,
+    { $inc: { messageCount: 1 }, $set: { updatedAt: new Date() } }
+  );
+
+  // ── Create assistant placeholder node ─────────────────
+  const assistantMsg = await Message.create({
+    conversationId,
+    userId: new mongoose.Types.ObjectId(userId),
+    role: 'assistant',
+    text: '',
+    parentMessageId: userMsg._id,
+    status: 'streaming',
+    personaId: conversation.currentPersonaId || null,
+  });
+
+  // Point user message's activeChildId to assistant placeholder
+  await Message.findByIdAndUpdate(
+    userMsg._id,
+    { $set: { activeChildId: assistantMsg._id } }
+  );
+
+  // ── Build context for LLM ──────────────────────────────
+  const MAX_CONTEXT = 4;
+  let ordered = await getContextMessagesNodeTree(conversationId, MAX_CONTEXT);
+
+  // Ensure the new user message is at the end of context
+  if (
+    !ordered.length ||
+    ordered[ordered.length - 1]._id?.toString() !== userMsg._id.toString()
+  ) {
+    ordered.push({
+      role: userMsg.role,
+      text: userMsg.text,
+      _id: userMsg._id,
+    });
+  }
+
+  // Remove empty assistant placeholders from context
+  ordered = ordered.filter(
+    m => !(m.role === 'assistant' && !m.text)
+  );
+
+  const latestSummary = await getLatestSummary(conversationId);
+  const summaryText = latestSummary?.summaryText || null;
+
+  const { stream, modelId } = await askConversationStream(
+    conversationId,
+    ordered,
+    userId,
+    summaryText,
+    [userMsg._id, assistantMsg._id],
+    overrideModelId,
+    null   // parentConversationId is null — node tree uses single conversationId
+  );
+
+  return { stream, modelId, userMsg, assistantMsg };
+}
+
+async function prepareRegenerateContextNodeTree(
+  userId,
+  conversationId,
+  overrideModelId,
+  regenerateNodeId
+) {
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) throw Object.assign(
+    new Error('Conversation not found'), { status: 404 }
+  );
+  if (conversation.userId.toString() !== userId) throw Object.assign(
+    new Error('Forbidden'), { status: 403 }
+  );
+
+  const regenerateNode = await Message.findById(regenerateNodeId).lean();
+  if (!regenerateNode) throw Object.assign(
+    new Error('Message not found'), { status: 404 }
+  );
+  if (regenerateNode.role !== 'assistant') throw Object.assign(
+    new Error('Can only regenerate assistant messages'),
+    { status: 400 }
+  );
+  if (regenerateNode.conversationId.toString() !== conversationId) {
+    throw Object.assign(
+      new Error('Message does not belong to this conversation'),
+      { status: 400 }
+    );
+  }
+
+  const parentUserNode = await Message.findById(
+    regenerateNode.parentMessageId
+  ).lean();
+  if (!parentUserNode) throw Object.assign(
+    new Error('Parent user message not found'), { status: 404 }
+  );
+
+  const assistantMsg = await Message.create({
+    conversationId,
+    userId: new mongoose.Types.ObjectId(userId),
+    role: 'assistant',
+    text: '',
+    parentMessageId: regenerateNode.parentMessageId,
+    status: 'streaming',
+    personaId: conversation.currentPersonaId || null,
+  });
+
+  await Message.findByIdAndUpdate(
+    regenerateNode.parentMessageId,
+    { $set: { activeChildId: assistantMsg._id } }
+  );
+
+  await Conversation.findByIdAndUpdate(
+    conversationId,
+    { $inc: { messageCount: 1 }, $set: { updatedAt: new Date() } }
+  );
+
+  // Build context using the same inline pattern as prepareAskContextNodeTree
+  const MAX_CONTEXT = 4;
+  let ordered = await getContextMessagesNodeTree(
+    conversationId, MAX_CONTEXT
+  );
+
+  // Ensure parent user node is at end of context
+  if (
+    !ordered.length ||
+    ordered[ordered.length - 1]._id?.toString() !==
+    parentUserNode._id.toString()
+  ) {
+    ordered.push({
+      role: parentUserNode.role,
+      text: parentUserNode.text,
+      _id: parentUserNode._id,
+    });
+  }
+
+  // Remove empty assistant placeholders
+  ordered = ordered.filter(
+    m => !(m.role === 'assistant' && !m.text)
+  );
+
+  const latestSummary = await getLatestSummary(conversationId);
+  const summaryText = latestSummary?.summaryText || null;
+
+  const { stream, modelId } = await askConversationStream(
+    conversationId,
+    ordered,
+    userId,
+    summaryText,
+    [parentUserNode._id, assistantMsg._id],
+    overrideModelId,
+    null
+  );
+
+  return { stream, modelId, userMsg: parentUserNode, assistantMsg };
+}
+
 /**
  * Orchestrates post-streaming tasks:
  * - Persists assistant message
@@ -591,6 +902,34 @@ async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg,
   return assistantMsg;
 }
 
+async function handlePostStreamTasksNodeTree(
+  userId,
+  conversationId,
+  fullReply,
+  userMsg,
+  assistantMsg
+) {
+  // Save assistant message text and update status
+  await Message.findByIdAndUpdate(
+    assistantMsg._id,
+    { $set: { text: fullReply, status: 'sent' } }
+  );
+  assistantMsg.text = fullReply;
+
+  // Fire-and-forget side effects (same as original)
+  safeFireAndForget(() => writeMessageToMemory(userMsg));
+  safeFireAndForget(() => writeMessageToMemory(assistantMsg));
+  safeFireAndForget(() => processAndStoreMemory(
+    userMsg.text, userMsg.role, userId, conversationId
+  ));
+  safeFireAndForget(() => processAndStoreMemory(
+    assistantMsg.text, assistantMsg.role, userId, conversationId
+  ));
+  safeFireAndForget(() => triggerSummaryIfNeeded(conversationId));
+
+  return assistantMsg;
+}
+
 module.exports = {
   askConversation,
   askConversationStream,
@@ -599,6 +938,9 @@ module.exports = {
   getContextMessages,
   getInjectedUserMemory,
   prepareAskContext,
-  handlePostStreamTasks
+  handlePostStreamTasks,
+  prepareAskContextNodeTree,
+  prepareRegenerateContextNodeTree,
+  handlePostStreamTasksNodeTree
 };
 

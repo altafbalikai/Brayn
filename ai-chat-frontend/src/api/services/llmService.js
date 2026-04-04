@@ -168,6 +168,8 @@ export const llmService = {
         message,
         conversationId,
         overrideModelId = null,
+        editNodeId = null,
+        regenerateNodeId = null,
         signal: externalSignal = null,
         requestKey = generateUuid()
     }) => {
@@ -202,6 +204,8 @@ export const llmService = {
                             body: JSON.stringify({
                                 message,
                                 ...(overrideModelId && { overrideModelId }),
+                                ...(editNodeId && { editNodeId }),
+                                ...(regenerateNodeId && { regenerateNodeId }),
                                 ...(requestKey && { requestKey })
                             }),
                             signal,

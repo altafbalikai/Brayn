@@ -5,7 +5,7 @@ import { formatGroupTime } from "../../../utils/messageGrouping";
 /**
  * @param {{group: {messages: Array, timestamp: string}, isFirst?: boolean}} props
  */
-function MessageGroup({ group, isFirst, conversationId, editingMessageId, branchMap, currentConversationId }) {
+function MessageGroup({ group, isFirst, conversationId, editingMessageId, siblingCounts, currentConversationId }) {
   // console.log("MessageGroup.jsx replainting");
   return (
     <div className="mb-4">
@@ -26,7 +26,7 @@ function MessageGroup({ group, isFirst, conversationId, editingMessageId, branch
               group.messages.length === 1 || idx === group.messages.length - 1
             }
             editingMessageId={editingMessageId}
-            branchMap={branchMap}
+            siblingCounts={siblingCounts}
             currentConversationId={currentConversationId}
           />
         ))}

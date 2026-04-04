@@ -107,8 +107,9 @@ export async function listConversations(agent, page = 1, limit = 50) {
  * GET /api/conversations/:cid/messages
  * Get messages for a conversation.
  */
-export async function getMessages(conversationId, page = 1, limit = 50) {
+export async function getMessages(conversationId, page = 1, limit = 50, nodeTree = false) {
     const params = new URLSearchParams({ page, limit });
+    if (nodeTree) params.set('nodeTree', 'true');
     return fetchClient(`/conversations/${conversationId}/messages?${params.toString()}`);
 }
 
@@ -173,6 +174,17 @@ export async function getBranches(conversationId) {
     return fetchClient(`/conversations/${conversationId}/branches`);
 }
 
+/**
+ * PATCH /api/messages/:nodeId/activate
+ * Activate a specific node in the message tree.
+ */
+export async function activateNode(nodeId, targetSiblingId) {
+    return fetchClient(`/messages/${nodeId}/activate`, {
+        method: "PATCH",
+        body: JSON.stringify({ targetSiblingId }),
+    });
+}
+
 // Backward-compatible named export for existing imports
 export const conversationService = {
     createConversation,
@@ -184,4 +196,5 @@ export const conversationService = {
     updateConversationModel,
     getConversation,
     getBranches,
+    activateNode,
 };

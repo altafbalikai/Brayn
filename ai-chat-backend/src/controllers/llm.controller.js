@@ -1,12 +1,18 @@
 const llmService = require('../services/llm.service');
 const { idempotencyCache } = require('../config/idempotencyCache');
 const logger = require('../config/logger');
+const Conversation = require('../models/Conversation');
 
 async function ask(req, res, next) {
   try {
     const userId = req.user && req.user.id;
     const { cid: conversationId } = req.params;
-    const { message, overrideModelId } = req.body;
+    const {
+      message,
+      overrideModelId,
+      editNodeId = null,
+      regenerateNodeId = null
+    } = req.body;
 
     // ================================================================================
     // NEW: Get idempotency key from header
@@ -18,16 +24,16 @@ async function ask(req, res, next) {
       });
     }
 
-    if (!message) {
-      return res.status(400).json({ error: 'message required' });
+    if (!message && !regenerateNodeId) {
+      return res.status(400).json({ error: 'message or regenerateNodeId required' });
     }
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    if (!conversationId || !message?.trim()) {
-      return res.status(400).json({ error: "conversationId and message are required" });
+    if (!conversationId || (!message?.trim() && !regenerateNodeId)) {
+      return res.status(400).json({ error: "conversationId and message or regenerateNodeId required" });
     }
 
     // ================================================================================
@@ -83,13 +89,42 @@ async function ask(req, res, next) {
 
     try {
       // Prepare context and start LLM stream via Service Orchestrator
-      // ✅ NEW: Pass overrideModelId for model failover support
-      const { stream, userMsg, assistantMsg } = await llmService.prepareAskContext(
-        userId,
-        conversationId,
-        message,
-        overrideModelId
-      );
+      // ✅ NEW: Support Node Tree ask flow if editNodeId is provided
+      let context;
+      if (editNodeId) {
+        context = await llmService.prepareAskContextNodeTree(
+          userId,
+          conversationId,
+          message,
+          overrideModelId,
+          editNodeId
+        );
+      } else if (regenerateNodeId) {
+        context = await llmService.prepareRegenerateContextNodeTree(
+          userId,
+          conversationId,
+          overrideModelId,
+          regenerateNodeId
+        );
+      } else {
+        const useNodeTree = process.env.USE_NODE_TREE === 'true';
+        if (useNodeTree) {
+          context = await llmService.prepareAskContextNodeTree(
+            userId,
+            conversationId,
+            message,
+            overrideModelId
+          );
+        } else {
+          context = await llmService.prepareAskContext(
+            userId,
+            conversationId,
+            message,
+            overrideModelId
+          );
+        }
+      }
+      const { stream, userMsg, assistantMsg } = context;
 
       // START SSE RESPONSE
       res.setHeader("Content-Type", "text/event-stream");
@@ -132,7 +167,11 @@ async function ask(req, res, next) {
         }
 
         // Finalize persistence and side effects via Service Orchestrator
-        await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
+        if (assistantMsg.status === 'streaming') {
+          await llmService.handlePostStreamTasksNodeTree(userId, conversationId, fullReply, userMsg, assistantMsg);
+        } else {
+          await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
+        }
 
         // ================================================================================
         // SUCCESS: Cache the result

@@ -4,13 +4,19 @@ const mongoose = require("mongoose");
 
 const askValidation = [
   body("message")
-    .exists({ checkFalsy: true })
+    .if((value, { req }) => !req.body.regenerateNodeId)
+    .notEmpty()
     .withMessage("Message is required")
     .isString()
     .withMessage("Message must be a string")
     .trim()
     .isLength({ min: 1, max: 10000 })
     .withMessage("Message must be between 1 and 10000 characters"),
+
+  body("regenerateNodeId")
+    .optional()
+    .isMongoId()
+    .withMessage("regenerateNodeId must be a valid MongoDB ObjectId"),
 
   param("cid")
     .notEmpty()

@@ -17,12 +17,13 @@ import {
   markMessageCopied,
   selectUserFeedback,
   selectFeedbackSubmitting,
-   selectIsRetrying,
+  selectIsRetrying,
   selectRetryAttempt,
   selectMaxRetries,
   selectIsFatalError,
   selectModelFailover,
 } from "../../messages/messageInteractionsSlice";
+import { regenerateNode } from "../../conversations/conversationSlice";
 
 /**
  * MessageActions Component
@@ -69,6 +70,7 @@ export const MessageActions = ({
 }) => {
   const dispatch = useDispatch();
   const [copied, setCopied] = useState(false);
+  const useNodeTree = import.meta.env.VITE_USE_NODE_TREE === "true";
 
   // Redux selectors
   const userFeedback = useSelector((state) =>
@@ -82,14 +84,18 @@ export const MessageActions = ({
     selectRetryAttempt(state, messageId),
   );
   const maxRetries = useSelector((state) => selectMaxRetries(state, messageId));
-   const isFatalError = useSelector((state) =>
+  const isFatalError = useSelector((state) =>
     selectIsFatalError(state, messageId),
   );
   const isModelSwitching = useSelector(
-    (state) => state.messageInteractions?.modelFailover?.byMessageId?.[messageId]?.isSwitching ?? false
+    (state) =>
+      state.messageInteractions?.modelFailover?.byMessageId?.[messageId]
+        ?.isSwitching ?? false,
   );
   const failoverModelName = useSelector(
-    (state) => state.messageInteractions?.modelFailover?.byMessageId?.[messageId]?.currentModelName ?? ""
+    (state) =>
+      state.messageInteractions?.modelFailover?.byMessageId?.[messageId]
+        ?.currentModelName ?? "",
   );
 
   // Don't show for user messages or while initial loading
@@ -113,7 +119,16 @@ export const MessageActions = ({
 
   const handleRetry = () => {
     if (isRetrying) return;
-    dispatch(retryMessage({ conversationId, messageId }));
+    if (useNodeTree) {
+      dispatch(
+        regenerateNode({
+          conversationId,
+          nodeId: messageId,
+        }),
+      );
+    } else {
+      dispatch(retryMessage({ conversationId, messageId }));
+    }
   };
 
   const handleManualRetry = () => {
@@ -127,7 +142,7 @@ export const MessageActions = ({
   const activeDislikeClass = "text-red-500 hover:text-red-400 bg-red-500/10";
 
   return (
-    <div className="flex items-center gap-1 mt-2 opacity-100 transition-opacity duration-200 -ml-1 flex-wrap">
+    <div className="flex min-h-[32px] items-center gap-1 opacity-100 transition-opacity duration-200 -ml-1 min-w-0">
       {/* 1. Copy Button */}
       <button
         onClick={handleCopy}
@@ -210,7 +225,7 @@ export const MessageActions = ({
         />
       )}
 
-       {(isSubmittingFeedback || isRetrying || isModelSwitching) && (
+      {(isSubmittingFeedback || isRetrying || isModelSwitching) && (
         <span className="text-[10px] text-theme-muted animate-pulse ml-1 whitespace-nowrap">
           {isModelSwitching
             ? `Trying ${failoverModelName}...`

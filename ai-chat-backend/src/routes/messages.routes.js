@@ -3,6 +3,7 @@ const router = express.Router();
 const retryController = require('../controllers/retry.controller');
 const feedbackController = require('../controllers/feedback.controller');
 const copyController = require('../controllers/copy.controller');
+const convController = require('../controllers/conversation.controller');
 const { authenticate, optionalAuth } = require('../middlewares/auth.middleware');
 const { handleValidationErrors } = require('../middlewares/validation.middleware');
 const {
@@ -67,6 +68,16 @@ router.patch(
     switchVersionValidation,
     handleValidationErrors,
     retryController.switchVersion
+);
+
+router.patch(
+    '/:nodeId/activate',
+    authenticate,
+    [
+        param('nodeId').isMongoId().withMessage('nodeId must be a valid MongoDB ObjectId'),
+    ],
+    handleValidationErrors,
+    convController.activateNode
 );
 
 /**

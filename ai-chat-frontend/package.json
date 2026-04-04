@@ -21,6 +21,7 @@
     "react-router-dom": "^6.20.0",
     "react-window": "^2.2.3",
     "rehype-highlight": "^7.0.2",
+    "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   },

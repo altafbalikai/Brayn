@@ -25,7 +25,7 @@ function VirtualizedMessageList({
   const [loadingVirtual, setLoadingVirtual] = useState(false);
 
   const editingMessageId = useSelector(state => state.conversation.editingMessageId);
-  const branchMap = useSelector(state => state.conversation.branchMap);
+  const siblingCounts = useSelector(state => state.conversation.siblingCounts);
   const currentConversationId = useSelector(state => state.conversation.currentConversation?._id);
 
   // ✅ Safety: Always prefer Redux currentConversationId over prop
@@ -121,7 +121,7 @@ function VirtualizedMessageList({
                   conversationId={activeConvId}
                   isFirst={idx === 0}
                   editingMessageId={editingMessageId}
-                  branchMap={branchMap}
+                  siblingCounts={siblingCounts}
                   currentConversationId={currentConversationId}
                 />
               ))
@@ -136,7 +136,7 @@ function VirtualizedMessageList({
                   conversationId={activeConvId}
                   showTime={false}
                   editingMessageId={editingMessageId}
-                  branchMap={branchMap}
+                  siblingCounts={siblingCounts}
                   currentConversationId={currentConversationId}
                 />
               ))}
@@ -167,7 +167,7 @@ function VirtualizedMessageList({
           messages,
           conversationId: activeConvId,
           editingMessageId,
-          branchMap,
+          siblingCounts,
           currentConversationId
         }}
       >
@@ -182,7 +182,7 @@ function VirtualizedMessageList({
                    msg={msg} 
                    conversationId={data.conversationId}
                    editingMessageId={data.editingMessageId}
-                   branchMap={data.branchMap}
+                   siblingCounts={data.siblingCounts}
                    currentConversationId={data.currentConversationId}
                  />
                 {isLast && <div ref={messagesEndRef} />}

@@ -40,29 +40,24 @@ const MessageSchema = new Schema({
     }
   },
 
-  // ── Version tracking ─────────────────────────────────────────────────────────
-  // Array of MessageVersion ObjectIds
-  versions: [{
-    type: Schema.Types.ObjectId,
-    ref: 'MessageVersion'
-  }],
-
-  // Which version is currently displayed
-  currentVersionId: {
-    type: Schema.Types.ObjectId,
-    ref: 'MessageVersion',
-    default: null
-  },
-
-  // ── Retry metadata ───────────────────────────────────────────────────────────
-  // Whether this message was generated via a retry action
-  isRetried: { type: Boolean, default: false },
-
-  // If retry, reference to the original assistant response
+  // ── Tree structure ───────────────────────────────────────────────────────────
+  // Tree structure — pointer to this node's parent in the message tree
   parentMessageId: {
     type: Schema.Types.ObjectId,
     ref: 'Message',
-    default: null
+    default: null,
+    index: true
+  },
+  activeChildId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null,
+    sparse: true
+  },
+  status: {
+    type: String,
+    enum: ['streaming', 'sent', 'error'],
+    default: 'sent'
   },
 
   // ── Copy analytics ───────────────────────────────────────────────────────────

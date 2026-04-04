@@ -18,23 +18,7 @@ const ConversationSchema = new mongoose.Schema({
     index: true,
     default: null // Will be set to a default persona on creation
   },
-  parentConversationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Conversation',
-    default: null,
-    index: true
-  },
-  branchedFromMessageId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message',
-    default: null
-  },
-  editedMessageId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message',
-    default: null
-  },
-  branchEditedMessageId: {
+  rootMessageId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message',
     default: null

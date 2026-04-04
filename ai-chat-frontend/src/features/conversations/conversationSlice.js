@@ -49,9 +49,12 @@ export const fetchMessages = createAsyncThunk(
     'conversation/fetchMessages',
     async ({ conversationId, page = 1, append = false }, { dispatch, rejectWithValue }) => {
         try {
-            const data = await conversationService.getMessages(conversationId, page, 50);
+            const useNodeTree = import.meta.env.VITE_USE_NODE_TREE === 'true';
+            const data = await conversationService.getMessages(
+                conversationId, page, 50, useNodeTree
+            );
 
-            if (page === 1) {
+            if (page === 1 && import.meta.env.VITE_USE_NODE_TREE !== 'true') {
                 try {
                     const conv = await conversationService.getConversation(conversationId);
                     const rootId = conv.parentConversationId || conversationId;
@@ -77,7 +80,8 @@ export const fetchMessages = createAsyncThunk(
                 items: data.items || data.messages || data,
                 page,
                 append,
-                hasMore: data.hasMore !== false && (data.items || data.messages || data).length === 50
+                hasMore: data.hasMore !== false && (data.items || data.messages || data).length === 50,
+                siblingCounts: data.siblingCounts || null,
             };
         } catch (error) {
             return rejectWithValue(
@@ -87,9 +91,28 @@ export const fetchMessages = createAsyncThunk(
     }
 );
 
+export const activateNode = createAsyncThunk(
+    'conversation/activateNode',
+    async ({ conversationId, nodeId, targetSiblingId }, { dispatch, rejectWithValue }) => {
+        try {
+            const data = await conversationService.activateNode(nodeId, targetSiblingId);
+            return {
+                conversationId,
+                activatedNodeId: data.activatedNodeId,
+                updatedPath: data.updatedPath,
+                siblingCounts: data.siblingCounts || null,
+            };
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.error || 'Failed to activate node'
+            );
+        }
+    }
+);
+
 export const sendMessage = createAsyncThunk(
     'conversation/sendMessage',
-    async ({ message, conversationId, tempAssistantId }, { dispatch, getState, rejectWithValue }) => {
+    async ({ message, conversationId, tempAssistantId, editNodeId = null }, { dispatch, getState, rejectWithValue }) => {
         const state = getState();
         const currentConv = state.conversation.currentConversation;
         const selectedModelId = currentConv?.selectedModelId;
@@ -124,6 +147,9 @@ export const sendMessage = createAsyncThunk(
                 createdAt: new Date().toISOString(),
                 status: 'sent'
             };
+            if (editNodeId) {
+                dispatch(truncateMessagesFromNode({ conversationId, fromNodeId: editNodeId }));
+            }
             dispatch(addMessageToConversation({ conversationId, message: userMsg }));
 
             // Add pending placeholder assistant message immediately
@@ -159,6 +185,7 @@ export const sendMessage = createAsyncThunk(
                             message,
                             conversationId,
                             overrideModelId: model._id,
+                            editNodeId,
                             requestKey,
                             signal
                         });
@@ -262,6 +289,87 @@ export const sendMessage = createAsyncThunk(
     }
 );
 
+export const regenerateNode = createAsyncThunk(
+    'conversation/regenerateNode',
+    async ({ conversationId, nodeId },
+        { dispatch, rejectWithValue }) => {
+        try {
+            const tempAssistantId = `temp-regen-${Date.now()}`;
+
+            // Remove the current assistant node and everything after it
+            // so the placeholder streams in-place instead of appending below
+            dispatch(truncateMessagesFromNode({
+                conversationId,
+                fromNodeId: nodeId
+            }));
+
+            dispatch(addAssistantPlaceholder({
+                conversationId,
+                message: {
+                    _id: tempAssistantId,
+                    role: 'assistant',
+                    text: '',
+                    status: 'pending',
+                    versions: [],
+                    currentVersion: 1,
+                    createdAt: new Date().toISOString(),
+                }
+            }));
+
+            const stream = llmService.askStream({
+                message: '',
+                conversationId,
+                regenerateNodeId: nodeId,
+                requestKey: generateUuid(),
+            });
+
+            let realAssistantId = tempAssistantId;
+
+            const onMetadata = (data) => {
+                const realId = typeof data === 'object'
+                    ? data?.messageId : data;
+                if (realId) {
+                    realAssistantId = realId;
+                    dispatch(updatePendingPlaceholderWithRealId({
+                        conversationId,
+                        tempId: tempAssistantId,
+                        realId,
+                    }));
+                }
+            };
+
+            const onChunk = (chunk) => {
+                dispatch(updateAssistantText({
+                    conversationId,
+                    messageId: realAssistantId,
+                    chunk,
+                }));
+            };
+
+            const fullText = await stream.start(onMetadata, onChunk);
+
+            dispatch(finalizeAssistantMessage({
+                conversationId,
+                tempId: realAssistantId,
+                text: fullText,
+                status: 'sent',
+            }));
+
+            await dispatch(fetchMessages({
+                conversationId,
+                page: 1,
+                append: false,
+            })).unwrap();
+
+            return { conversationId, nodeId };
+        } catch (error) {
+            return rejectWithValue(
+                error?.message || 'Regeneration failed'
+            );
+        }
+    }
+);
+
 export const editMessage = createAsyncThunk(
     'conversation/editMessage',
     async ({ messageId, conversationId, newContent, tempAssistantId }, { dispatch, getState, rejectWithValue }) => {
@@ -279,6 +387,23 @@ export const editMessage = createAsyncThunk(
         }
         if (!trimmedContent) {
             return rejectWithValue('Edited message cannot be empty.');
+        }
+
+        const useNodeTree = import.meta.env.VITE_USE_NODE_TREE === 'true';
+        if (useNodeTree) {
+            // Node Tree branching: just 'ask' again but telling backend to branch from messageId
+            await dispatch(sendMessage({
+                conversationId,
+                message: trimmedContent,
+                editNodeId: messageId,
+                tempAssistantId
+            })).unwrap();
+            await dispatch(fetchMessages({
+                conversationId,
+                page: 1,
+                append: false
+            })).unwrap();
+            return;
         }
 
         const currentConv = state.conversation.currentConversation;
@@ -547,6 +672,8 @@ const initialState = {
     messagesPages: {}, // { conversationId: { page: 1, hasMore: true } }
     messagesLoadingMore: {},
     pendingNavigationConversationId: null,
+    siblingCounts: {},
+    // shape: { [conversationId]: { [messageId]: { total, position, siblingIds } } }
 };
 
 const conversationSlice = createSlice({
@@ -798,6 +925,17 @@ const conversationSlice = createSlice({
             }
             state.messages[conversationId].push(message);
         },
+        truncateMessagesFromNode: (state, action) => {
+            const { conversationId, fromNodeId } = action.payload;
+            const msgs = state.messages[conversationId];
+            if (!msgs) return;
+            const idx = msgs.findIndex(
+                m => String(m._id) === String(fromNodeId)
+            );
+            if (idx !== -1) {
+                state.messages[conversationId] = msgs.slice(0, idx);
+            }
+        },
         setAssistantTyping(state, action) {
             const { conversationId, value } = action.payload;
             if (conversationId) {
@@ -938,6 +1076,10 @@ const conversationSlice = createSlice({
                 } else {
                     // Replace with latest server state for hydration/sync correctness.
                     state.messages[conversationId] = processedItems;
+                }
+
+                if (action.payload.siblingCounts) {
+                    state.siblingCounts[conversationId] = action.payload.siblingCounts;
                 }
 
                 // Update pagination state
@@ -1081,6 +1223,37 @@ const conversationSlice = createSlice({
             // RESET STATE ON LOGOUT
             .addCase(logout.fulfilled, () => {
                 return initialState;
+            })
+            .addCase(activateNode.fulfilled, (state, action) => {
+                const { conversationId, updatedPath, siblingCounts } = action.payload;
+                if (!updatedPath?.length) return;
+                state.editingMessageId = null;
+                const existingMessages = state.messages[conversationId] || [];
+                const firstUpdatedId = String(updatedPath[0]._id);
+                const splitIndex = existingMessages.findIndex(
+                    m => String(m._id) === firstUpdatedId
+                );
+                if (splitIndex === -1) {
+                    state.messages[conversationId] = updatedPath;
+                } else {
+                    state.messages[conversationId] = [
+                        ...existingMessages.slice(0, splitIndex),
+                        ...updatedPath,
+                    ];
+                }
+
+                if (siblingCounts) {
+                    state.siblingCounts[conversationId] = {
+                        ...(state.siblingCounts[conversationId] || {}),
+                        ...siblingCounts,
+                    };
+                }
+            })
+            .addCase(activateNode.pending, (state) => {
+                // No loading state needed — version switch is instant in UI
+            })
+            .addCase(activateNode.rejected, (state, action) => {
+                state.error = action.payload || 'Failed to activate node';
             });
 
     },
@@ -1110,6 +1283,7 @@ export const {
     appendMessageChunk,
     startRetry,
     switchMessageVersion,
+    truncateMessagesFromNode,
 } = conversationSlice.actions;
 export default conversationSlice.reducer;
 
