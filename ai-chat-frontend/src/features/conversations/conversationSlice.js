@@ -339,11 +339,14 @@ export const regenerateNode = createAsyncThunk(
                 }
             };
 
+            let accumulated = '';
             const onChunk = (chunk) => {
+                accumulated += chunk;
                 dispatch(updateAssistantText({
                     conversationId,
-                    messageId: realAssistantId,
-                    chunk,
+                    tempId: realAssistantId,
+                    text: accumulated,
+                    status: 'streaming',
                 }));
             };
 
