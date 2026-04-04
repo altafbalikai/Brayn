@@ -43,6 +43,10 @@ export default function ChatFeature() {
   const { llmmodels, selectedModelId, llmsloading, memoizedLLMModels } =
     useLLMIntegration(currentConversation);
 
+  const conversationNotFound = useSelector(
+    (state) => state.conversation.conversationNotFound,
+  );
+
   // 2. Actions
   const {
     sending,
@@ -185,6 +189,20 @@ export default function ChatFeature() {
                       />
                     )}
                   />
+                </div>
+              </div>
+            ) : conversationNotFound ? (
+              <div className="flex-1 flex items-center justify-center px-4">
+                <div className="text-center">
+                  <p className="text-theme-muted text-lg mb-4">
+                    This conversation has been deleted or no longer exists.
+                  </p>
+                  <button
+                    onClick={handleNewChatWrapper}
+                    className="px-6 py-2 bg-theme-light rounded-lg text-theme-text hover:bg-theme-secondary transition-colors"
+                  >
+                    Start a New Chat
+                  </button>
                 </div>
               </div>
             ) : (

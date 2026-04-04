@@ -84,9 +84,10 @@ export const fetchMessages = createAsyncThunk(
                 siblingCounts: data.siblingCounts || null,
             };
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.error || 'Failed to fetch messages'
-            );
+            return rejectWithValue({
+                status: error.status,
+                message: error.message || 'Failed to fetch messages'
+            });
         }
     }
 );
@@ -664,6 +665,7 @@ const initialState = {
     loading: false,
     sending: false,
     error: null,
+    conversationNotFound: false,
     // Pagination state
     conversationsPage: 1,
     conversationsHasMore: true,
@@ -1055,6 +1057,7 @@ const conversationSlice = createSlice({
                     state.messagesLoadingMore[conversationId] = true;
                 } else {
                     state.loading = true;
+                    state.conversationNotFound = false;
                 }
             })
             .addCase(fetchMessages.fulfilled, (state, action) => {
@@ -1095,7 +1098,13 @@ const conversationSlice = createSlice({
                 if (conversationId) {
                     state.messagesLoadingMore[conversationId] = false;
                 }
-                state.error = action.payload;
+                const errorPayload = action.payload;
+                if (errorPayload?.status === 404) {
+                    state.conversationNotFound = true;
+                    state.error = null;
+                } else {
+                    state.error = errorPayload?.message || 'Failed to fetch messages';
+                }
             })
             // Send message
             .addCase(sendMessage.pending, (state) => {
