@@ -56,7 +56,7 @@ const MessageSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['streaming', 'sent', 'error'],
+    enum: ['streaming', 'sent', 'error', 'cancelled'],
     default: 'sent'
   },
 

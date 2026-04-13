@@ -171,14 +171,16 @@ export const llmService = {
         editNodeId = null,
         regenerateNodeId = null,
         signal: externalSignal = null,
-        requestKey = generateUuid()
-    }) => {
+        requestKey = generateUuid(),
+        useWebSearch = false,
+    }, options = {}) => {
         if (!conversationId) {
             throw new Error("conversationId is required");
         }
 
-        const controller = externalSignal ? null : new AbortController();
-        const signal = externalSignal ?? controller.signal;
+        const signal = options?.signal ?? externalSignal;
+        const controller = signal ? null : new AbortController();
+        const activeSignal = signal ?? controller.signal;
         const token = getAccessToken();
 
         async function start(onMetadata, onChunk, onComplete, retry = true) {
@@ -206,9 +208,10 @@ export const llmService = {
                                 ...(overrideModelId && { overrideModelId }),
                                 ...(editNodeId && { editNodeId }),
                                 ...(regenerateNodeId && { regenerateNodeId }),
-                                ...(requestKey && { requestKey })
+                                ...(requestKey && { requestKey }),
+                                useWebSearch,
                             }),
-                            signal,
+                            signal: activeSignal,
                         });
                     },
                     {

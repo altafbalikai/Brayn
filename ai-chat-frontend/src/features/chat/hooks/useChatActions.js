@@ -74,7 +74,7 @@ export const useChatActions = (currentConversation, selectedModelId) => {
     }, [dispatch, navigate]);
 
     const handleSendMessage = useCallback(
-        async (message) => {
+        async (message, signal) => {
             if (!message?.trim() || !currentConversation) return;
             const convo_title = message.trim();
             let conversationId = currentConversation._id;
@@ -114,6 +114,7 @@ export const useChatActions = (currentConversation, selectedModelId) => {
                     message: convo_title,
                     conversationId,
                     tempAssistantId,
+                    signal,
                 })
             );
         },

@@ -6,6 +6,19 @@ import { switchVersion, retryMessage, updateModelFailover, clearModelFailover } 
 import { generateUuid } from '../../api/utils/retryWithBackoff';
 import { classifyError } from '../../api/utils/modelFailover';
 
+// Helpers to normalize messages of orphaned 'streaming' status to 'cancelled'
+function normalizeMessage(msg) {
+    if (!msg) return msg;
+    return msg.status === 'streaming'
+        ? { ...msg, status: 'cancelled' }
+        : msg;
+}
+
+function normalizeMessages(messages) {
+    if (!Array.isArray(messages)) return messages;
+    return messages.map(normalizeMessage);
+}
+
 // Helper to calculate exponential backoff delay
 function calculateBackoff(attempt) {
     const baseDelay = 500;
@@ -113,7 +126,7 @@ export const activateNode = createAsyncThunk(
 
 export const sendMessage = createAsyncThunk(
     'conversation/sendMessage',
-    async ({ message, conversationId, tempAssistantId, editNodeId = null }, { dispatch, getState, rejectWithValue }) => {
+    async ({ text, message = text, conversationId, tempAssistantId, editNodeId = null, signal: externalSignal }, { dispatch, getState, rejectWithValue }) => {
         const state = getState();
         const currentConv = state.conversation.currentConversation;
         const selectedModelId = currentConv?.selectedModelId;
@@ -130,8 +143,20 @@ export const sendMessage = createAsyncThunk(
             abortControllers[conversationId].abort();
             delete abortControllers[conversationId];
         }
-        abortControllers[conversationId] = new AbortController();
-        const signal = abortControllers[conversationId].signal;
+        const controller = new AbortController();
+        abortControllers[conversationId] = controller;
+        if (externalSignal) {
+            if (externalSignal.aborted) {
+                controller.abort();
+            } else {
+                externalSignal.addEventListener(
+                    'abort',
+                    () => controller.abort(),
+                    { once: true }
+                );
+            }
+        }
+        const signal = controller.signal;
 
         let requestKey = generateUuid();
         let streamSucceeded = false;
@@ -182,14 +207,16 @@ export const sendMessage = createAsyncThunk(
 
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     try {
+                        const useWebSearch = selectUseWebSearch(getState());
+
                         const stream = llmService.askStream({
                             message,
                             conversationId,
                             overrideModelId: model._id,
                             editNodeId,
                             requestKey,
-                            signal
-                        });
+                            useWebSearch,
+                        }, { signal });
 
                         let realMessageId = null;
                         let accumulated = '';
@@ -226,6 +253,11 @@ export const sendMessage = createAsyncThunk(
 
                         const full = await stream.start(onMetadata, onChunk);
 
+                        if (signal.aborted) {
+                            dispatch(setAssistantTyping({ conversationId, value: false }));
+                            return rejectWithValue({ cancelled: true, conversationId });
+                        }
+
                         if (realMessageId) {
                             dispatch(finalizeAssistantMessage({
                                 conversationId,
@@ -258,6 +290,11 @@ export const sendMessage = createAsyncThunk(
                         return { conversationId, aiMessage: { _id: realMessageId, text: full } };
 
                     } catch (err) {
+                        if (signal.aborted) {
+                            dispatch(setAssistantTyping({ conversationId, value: false }));
+                            return rejectWithValue({ cancelled: true, conversationId });
+                        }
+
                         const { isUnavailable, isRetriable } = classifyError(err);
                         lastError = err;
 
@@ -679,6 +716,7 @@ const initialState = {
     pendingNavigationConversationId: null,
     siblingCounts: {},
     // shape: { [conversationId]: { [messageId]: { total, position, siblingIds } } }
+    useWebSearch: true,
 };
 
 const conversationSlice = createSlice({
@@ -699,7 +737,7 @@ const conversationSlice = createSlice({
             state.currentConversation = conversation;
 
             const conversationId = conversation._id;
-            state.messages[conversationId] = (messages || []).map(item => ({
+            state.messages[conversationId] = normalizeMessages(messages || []).map(item => ({
                 ...item,
                 currentVersion: item.currentVersion || (item.versions?.length || 1)
             }));
@@ -716,6 +754,9 @@ const conversationSlice = createSlice({
         },
         cancelEditing(state) {
             state.editingMessageId = null;
+        },
+        setUseWebSearch(state, action) {
+            state.useWebSearch = Boolean(action.payload);
         },
         registerBranch(state, action) {
             const {
@@ -928,7 +969,7 @@ const conversationSlice = createSlice({
             if (!state.messages[conversationId]) {
                 state.messages[conversationId] = [];
             }
-            state.messages[conversationId].push(message);
+            state.messages[conversationId].push(normalizeMessage(message));
         },
         truncateMessagesFromNode: (state, action) => {
             const { conversationId, fromNodeId } = action.payload;
@@ -1068,8 +1109,8 @@ const conversationSlice = createSlice({
                 state.loading = false;
                 state.messagesLoadingMore[conversationId] = false;
 
-                // Initialize currentVersion for messages with multiple versions
-                const processedItems = (items || []).map(item => ({
+                // Initialize currentVersion and normalize statuses
+                const processedItems = normalizeMessages(items || []).map(item => ({
                     ...item,
                     // Default to latest version if versions exist, otherwise default to 1
                     currentVersion: item.currentVersion || (item.versions?.length || 1)
@@ -1122,6 +1163,12 @@ const conversationSlice = createSlice({
                 }
             })
             .addCase(sendMessage.rejected, (state, action) => {
+                if (action.payload?.cancelled) {
+                    state.sending = false;
+                    const cid = action.payload.conversationId ?? action.meta.arg.conversationId;
+                    if (cid) state.assistantTyping[cid] = false;
+                    return;
+                }
                 state.sending = false;
                 state.error = action.payload;
                 const { conversationId } = action.meta.arg;
@@ -1246,11 +1293,11 @@ const conversationSlice = createSlice({
                     m => String(m._id) === firstUpdatedId
                 );
                 if (splitIndex === -1) {
-                    state.messages[conversationId] = updatedPath;
+                    state.messages[conversationId] = normalizeMessages(updatedPath);
                 } else {
                     state.messages[conversationId] = [
                         ...existingMessages.slice(0, splitIndex),
-                        ...updatedPath,
+                        ...normalizeMessages(updatedPath),
                     ];
                 }
 
@@ -1296,6 +1343,9 @@ export const {
     startRetry,
     switchMessageVersion,
     truncateMessagesFromNode,
+    setUseWebSearch,
 } = conversationSlice.actions;
+
+export const selectUseWebSearch = (state) => state.conversation.useWebSearch;
 export default conversationSlice.reducer;
 

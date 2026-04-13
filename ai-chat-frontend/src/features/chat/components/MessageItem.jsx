@@ -436,6 +436,34 @@ function MessageItem({
                       {processedText}
                     </ReactMarkdown>
 
+                    {msg.status === "cancelled" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          marginTop: "6px",
+                          fontSize: "12px",
+                          color: "var(--color-text-tertiary)",
+                        }}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        >
+                          <circle cx="8" cy="8" r="6.5" />
+                          <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" />
+                        </svg>
+                        {displayText
+                          ? "Generation stopped"
+                          : "Generation stopped before any response was received"}
+                      </div>
+                    )}
+
                     {/* Show "Generating..." while isProcessing AND text is empty */}
                     {isProcessing && !displayText && (
                       <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs animate-pulse">

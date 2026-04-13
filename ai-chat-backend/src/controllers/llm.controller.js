@@ -2,6 +2,7 @@ const llmService = require('../services/llm.service');
 const { idempotencyCache } = require('../config/idempotencyCache');
 const logger = require('../config/logger');
 const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
 
 async function ask(req, res, next) {
   try {
@@ -11,7 +12,8 @@ async function ask(req, res, next) {
       message,
       overrideModelId,
       editNodeId = null,
-      regenerateNodeId = null
+      regenerateNodeId = null,
+      useWebSearch = false
     } = req.body;
 
     // ================================================================================
@@ -68,6 +70,14 @@ async function ask(req, res, next) {
     // ================================================================================
     idempotencyCache.set(requestKey, 'pending');
 
+    const abortController = new AbortController();
+    let clientDisconnected = false;
+    req.on('close', () => {
+      clientDisconnected = true;
+      abortController.abort();
+      logger.info('Client disconnected mid-stream', { conversationId, requestKey });
+    });
+
     logger.info('Entered LLM ask controller', { conversationId, requestKey });
 
     // ================================================================================
@@ -92,38 +102,48 @@ async function ask(req, res, next) {
       // ✅ NEW: Support Node Tree ask flow if editNodeId is provided
       let context;
       if (editNodeId) {
-        context = await llmService.prepareAskContextNodeTree(
-          userId,
-          conversationId,
-          message,
-          overrideModelId,
-          editNodeId
-        );
-      } else if (regenerateNodeId) {
-        context = await llmService.prepareRegenerateContextNodeTree(
-          userId,
-          conversationId,
-          overrideModelId,
-          regenerateNodeId
-        );
-      } else {
-        const useNodeTree = process.env.USE_NODE_TREE === 'true';
-        if (useNodeTree) {
-          context = await llmService.prepareAskContextNodeTree(
-            userId,
-            conversationId,
-            message,
-            overrideModelId
-          );
-        } else {
-          context = await llmService.prepareAskContext(
-            userId,
-            conversationId,
-            message,
-            overrideModelId
-          );
-        }
-      }
+            context = await llmService.prepareAskContextNodeTree(
+              userId,
+              conversationId,
+              message,
+              overrideModelId,
+              editNodeId,
+              useWebSearch,
+              abortController.signal
+            );
+          } else if (regenerateNodeId) {
+            context = await llmService.prepareRegenerateContextNodeTree(
+              userId,
+              conversationId,
+              overrideModelId,
+              regenerateNodeId,
+              useWebSearch,
+              abortController.signal
+            );
+          } else {
+            const useNodeTree = process.env.USE_NODE_TREE === 'true';
+            if (useNodeTree) {
+              context = await llmService.prepareAskContextNodeTree(
+                userId,
+                conversationId,
+                message,
+                overrideModelId,
+                null,
+                useWebSearch,
+                abortController.signal
+              );
+            } else {
+              context = await llmService.prepareAskContext(
+                userId,
+                conversationId,
+                message,
+                overrideModelId,
+                useWebSearch,
+                abortController.signal
+              );
+            }
+          }
+      if (!context) return; // Request aborted before stream started
       const { stream, userMsg, assistantMsg } = context;
 
       // START SSE RESPONSE
@@ -147,6 +167,7 @@ async function ask(req, res, next) {
       // ================================================================================
       try {
         for await (const chunk of stream) {
+          if (clientDisconnected || abortController.signal.aborted) break;
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
             fullReply += content;
@@ -157,6 +178,15 @@ async function ask(req, res, next) {
           }
         }
 
+        if (clientDisconnected || abortController.signal.aborted) {
+          // Save whatever partial text was collected and mark as cancelled
+          await Message.findByIdAndUpdate(
+            assistantMsg._id,
+            { $set: { text: fullReply || '', status: 'cancelled' } }
+          );
+          return; // do not send SSE done event, connection is already gone
+        }
+
         if (!fullReply || !fullReply.trim()) {
           res.write(`\n\n⚠️ LLM returned empty response`);
           res.end();
@@ -165,6 +195,15 @@ async function ask(req, res, next) {
           idempotencyCache.set(requestKey, 'failed', null, {
             message: 'LLM returned empty response'
           });
+          return;
+        }
+
+        // Final safety guard: catch the race where signal aborts in the same tick
+        if (clientDisconnected || abortController.signal.aborted) {
+          await Message.findByIdAndUpdate(
+            assistantMsg._id,
+            { $set: { text: fullReply || '', status: 'cancelled' } }
+          );
           return;
         }
 
@@ -186,6 +225,13 @@ async function ask(req, res, next) {
         res.end();
 
       } catch (streamErr) {
+        if (clientDisconnected || abortController.signal.aborted || streamErr.name === 'AbortError') {
+          await Message.findByIdAndUpdate(
+            assistantMsg._id,
+            { $set: { text: fullReply || '', status: 'cancelled' } }
+          );
+          return;
+        }
         // Stream interrupted mid-transfer (NOT retriable)
         logger.error('Stream iteration error (non-retriable)', {
           requestKey,

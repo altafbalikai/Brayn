@@ -33,6 +33,11 @@ const askValidation = [
     .not()
     .exists()
     .withMessage("modelId must not be provided; model is resolved from conversation"),
+
+  body('useWebSearch')
+    .optional()
+    .isBoolean()
+    .withMessage('useWebSearch must be a boolean'),
 ];
 
 const branchValidation = [

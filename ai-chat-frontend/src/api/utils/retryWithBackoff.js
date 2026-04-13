@@ -35,6 +35,10 @@ export async function retryWithBackoff(fn, {
         try {
             return await fn();
         } catch (error) {
+            if (error.name === 'AbortError' || error instanceof DOMException && error.code === DOMException.ABORT_ERR) {
+                throw error; // do not retry — this was a deliberate cancellation
+            }
+
             lastError = error;
 
             // Check if this error is retriable

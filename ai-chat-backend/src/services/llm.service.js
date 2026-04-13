@@ -6,6 +6,7 @@ const Message = require('../models/Message');
 const ConversationService = require('../services/conversation.service');
 const { getSystemPrompt } = require("../utils/systemPromptCache");
 const { readRelevantMemory } = require("../services/memoryRead.service");
+const { searchAndFetch } = require('./webSearch.service');
 const { assemblePrompt } = require("../utils/promptAssembler");
 const { getLatestSummary, triggerSummaryIfNeeded } = require('../services/summary.service');
 const { writeMessageToMemory } = require('../services/memoryWrite.service');
@@ -223,6 +224,72 @@ async function assembleSystemPrompt(userId, conversationId) {
   }
 }
 
+/**
+ * Formats searchAndFetch() results into a system prompt string.
+ * Returns '' if webResults is null or has no usable content — never throws.
+ * @param {{ snippets: Array, pages: Array } | null} webResults
+ * @returns {string}
+ */
+function formatWebContext(webResults) {
+  if (!webResults) return '';
+  const parts = [];
+
+  if (webResults.pages && webResults.pages.length > 0) {
+    parts.push(
+      '### Live Web Search Results (retrieved just now — treat as current ground truth)\n' +
+      'The following was fetched from the web seconds ago and supersedes your training data. ' +
+      'Answer using ONLY what is stated in these results. ' +
+      'Cite ONLY the exact Source URLs listed below — do NOT invent, guess, or substitute any other URLs. ' +
+      'If the content is insufficient to answer fully, say so explicitly instead of supplementing with training data.\n' +
+      'If the source appears to be a prediction market, forum, or opinion site, ' +
+      'explicitly note that uncertainty to the user rather than presenting it as confirmed fact.\n'
+    );
+    for (const page of webResults.pages) {
+      parts.push(`**Source:** ${page.url}\n${page.content}\n---`);
+    }
+  } else if (webResults.snippets && webResults.snippets.length > 0) {
+    parts.push(
+      '### Live Web Search Results — snippets (retrieved just now)\n' +
+      'Answer using ONLY these snippets. Do not invent facts beyond what is stated here. ' +
+      'Cite only the URLs listed below — do not fabricate sources.\n'
+    );
+    for (const s of webResults.snippets.slice(0, 3)) {
+      parts.push(`**${s.title}** (${s.url})\n${s.snippet}`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Returns the tool definition passed to OpenRouter when web search is enabled.
+ * The model uses this description to decide whether to search.
+ */
+function buildWebSearchTool() {
+  return {
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description:
+        'Search the internet for current, real-time information. ' +
+        'Call this tool when the user asks about recent events, live data, sports results, ' +
+        'news, prices, weather, date, time or anything that may have changed after your training cutoff. ' +
+        'Do NOT call this for general knowledge questions you can answer confidently from training. ' +
+        'Formulate a concise 3-8 word search query — not the full user message.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'A concise search query, e.g. "IPL 2026 final winner"',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  };
+}
+
 /* ===========================
    STREAMING RESPONSE
    =========================== */
@@ -233,7 +300,9 @@ async function askConversationStream(
   summaryText = null,
   excludeMessageIds = [],
   overrideModelId = null,
-  parentConversationId = undefined
+  parentConversationId = undefined,
+  useWebSearch = false,
+  signal = null
 ) {
   try {
     const openrouter = await getOpenRouter();
@@ -315,15 +384,93 @@ async function askConversationStream(
 
     console.log("Final LLM Payload:", payload);
 
-    // 5️⃣ Send to LLM
-    return {
-      stream: await openrouter.chat.send({
+    // — Agentic web search: model decides whether to call the tool ———————————
+    if (useWebSearch) {
+      // First call — non-streaming, tool definition attached
+      // Model will either respond directly OR emit a tool_use block
+      const webSearchToolDef = buildWebSearchTool();
+
+      const firstCallOptions = {
         model: model.openRouterModelId,
         messages: payload,
-        stream: true,
-      }),
-      modelId: model._id,
-    };
+        tools: [webSearchToolDef],
+        tool_choice: 'auto',   // model decides — never force or block
+        stream: false,
+        max_tokens: 1024,      // only need enough for a tool call decision
+      };
+
+      let firstResponse;
+      try {
+        firstResponse = await openrouter.chat.send(firstCallOptions);
+      } catch (err) {
+        logger.error('[llm] First-pass tool-use call failed', { error: err.message });
+        throw err;
+      }
+
+      const responseMessage = firstResponse?.choices?.[0]?.message;
+      const toolCall = responseMessage?.toolCalls?.find(
+        (tc) => tc.function?.name === 'web_search'
+      );
+
+      // Only execute tool flow if model actually called the tool
+      if (toolCall) {
+        // Safer version — parse failure falls back to lastUserMessage silently
+        let modelQuery = lastUserMessage;
+        try {
+          modelQuery = JSON.parse(toolCall.function.arguments)?.query || lastUserMessage;
+        } catch {
+          logger.warn('[llm] Failed to parse tool call arguments, using raw user message', {
+            arguments: toolCall.function.arguments,
+          });
+        }
+        logger.info('[llm] Model triggered web_search tool', { query: modelQuery });
+
+        let toolResultContent;
+        try {
+          const webResults = await searchAndFetch(modelQuery);
+          const webContext = formatWebContext(webResults);
+          toolResultContent = webContext || 'No relevant results found for this query.';
+        } catch (err) {
+          logger.warn('[llm] Web search failed after tool call', { error: err.message });
+          toolResultContent = 'Web search is temporarily unavailable.';
+        }
+
+        // Append tool exchange to payload for the final streaming call
+        payload.push({
+          role: 'assistant',
+          content: responseMessage.content || null,
+          toolCalls: responseMessage.toolCalls,
+        });
+        payload.push({
+          role: 'tool',
+          toolCallId: toolCall.id,
+          content: toolResultContent,
+        });
+
+        logger.debug('[llm] Tool result appended, making final streaming call');
+      }
+    } else {
+      // Model decided no search needed — stream the first response directly
+      logger.debug('[llm] Model did not call web_search tool, streaming direct response');
+      // Fall through to streaming call below without tool definition
+    }
+
+    // Final streaming call — with or without tool results
+    try {
+      return {
+        stream: await openrouter.chat.send({
+          model: model.openRouterModelId,
+          messages: payload,
+          stream: true,
+          signal,
+          // No tools on the final call — model just generates the answer
+        }),
+        modelId: model._id,
+      };
+    } catch (err) {
+      if (err.name === 'AbortError') return null;
+      throw err;
+    }
   } catch (err) {
     logger.error("LLM stream error", {
       message: err.message,
@@ -539,7 +686,7 @@ async function getContextMessagesNodeTree(conversationId, maxContext) {
  * - Loads context
  * - Loads summary
  */
-async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null) {
+async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null, useWebSearch = false, signal = null) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) {
     throw Object.assign(new Error('Conversation not found'), { status: 404 });
@@ -619,15 +766,20 @@ async function prepareAskContext(userId, conversationId, messageText, overrideMo
   const latestSummary = await getLatestSummary(conversationId);
   const summaryText = latestSummary?.summaryText || null;
 
-  const { stream, modelId } = await askConversationStream(
+  const context = await askConversationStream(
     conversationId,
     ordered,
     userId,
     summaryText,
     [userMsg._id, assistantMsg._id],
     overrideModelId,
-    conversation.parentConversationId || null
+    conversation.parentConversationId || null,
+    useWebSearch,
+    signal
   );
+
+  if (!context) return null;
+  const { stream, modelId } = context;
 
   return { stream, modelId, userMsg, assistantMsg };
 }
@@ -637,7 +789,9 @@ async function prepareAskContextNodeTree(
   conversationId,
   messageText,
   overrideModelId = null,
-  editNodeId = null
+  editNodeId = null,
+  useWebSearch = false,
+  signal = null
 ) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) {
@@ -771,15 +925,20 @@ async function prepareAskContextNodeTree(
   const latestSummary = await getLatestSummary(conversationId);
   const summaryText = latestSummary?.summaryText || null;
 
-  const { stream, modelId } = await askConversationStream(
+  const context = await askConversationStream(
     conversationId,
     ordered,
     userId,
     summaryText,
     [userMsg._id, assistantMsg._id],
     overrideModelId,
-    null   // parentConversationId is null — node tree uses single conversationId
+    null,   // parentConversationId is null — node tree uses single conversationId
+    useWebSearch,
+    signal
   );
+
+  if (!context) return null;
+  const { stream, modelId } = context;
 
   return { stream, modelId, userMsg, assistantMsg };
 }
@@ -788,7 +947,9 @@ async function prepareRegenerateContextNodeTree(
   userId,
   conversationId,
   overrideModelId,
-  regenerateNodeId
+  regenerateNodeId,
+  useWebSearch = false,
+  signal = null
 ) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) throw Object.assign(
@@ -867,15 +1028,20 @@ async function prepareRegenerateContextNodeTree(
   const latestSummary = await getLatestSummary(conversationId);
   const summaryText = latestSummary?.summaryText || null;
 
-  const { stream, modelId } = await askConversationStream(
+  const context = await askConversationStream(
     conversationId,
     ordered,
     userId,
     summaryText,
     [parentUserNode._id, assistantMsg._id],
     overrideModelId,
-    null
+    null,
+    useWebSearch,
+    signal
   );
+
+  if (!context) return null;
+  const { stream, modelId } = context;
 
   return { stream, modelId, userMsg: parentUserNode, assistantMsg };
 }

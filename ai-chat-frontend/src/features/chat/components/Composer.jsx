@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import ConversationModelSelector from "./ConversationModelSelector";
-import { PersonaSwitcher } from "../../persona/PersonaSwitcher";
+import PlusMenu from "./PlusMenu";
 import { useSelector } from "react-redux";
 import { GoArrowUpRight } from "react-icons/go";
 import { TbSquareRoundedFilled } from "react-icons/tb";
@@ -21,12 +21,21 @@ function Composer({
   const [text, setText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   const submit = (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
-    onSend(text.trim());
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    onSend(trimmed, controller.signal);
     setText("");
+  };
+
+  const handleStop = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
   };
 
   const handleKeyDown = (e) => {
@@ -69,7 +78,7 @@ function Composer({
   }, [text]);
 
   const isStreaming = useSelector(
-    (state) => state.conversation.assistantTyping[currentConversationId]
+    (state) => state.conversation.assistantTyping[currentConversationId],
   );
 
   // console.log("Composer.jsx Page repainting.");
@@ -104,6 +113,23 @@ function Composer({
           transition-all
         "
       >
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          style={{
+            position: 'absolute',
+            width: '1px',
+            height: '1px',
+            padding: 0,
+            margin: '-1px',
+            overflow: 'hidden',
+            clip: 'rect(0,0,0,0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {isStreaming ? 'Generating response\u2026' : ''}
+        </div>
         {/* Textarea */}
         <textarea
           ref={textareaRef}
@@ -149,42 +175,29 @@ function Composer({
             overflow-x-auto scrollbar
           "
         >
-          {/* Column 1 — Upload (future use) */}
+          {/* Column 1 — composer tools */}
           <div className="flex items-center justify-start">
-            {/* <button
-              type="button"
-              disabled
-              className="
-              h-9 w-9
-              rounded-lg
-              border border-theme-secondary
-              text-theme-muted
-              opacity-40
-              cursor-not-allowed
-            "
-              title="Upload coming soon"
-            >
-              +
-            </button> */}
+            <PlusMenu conversationId={currentConversationId} />
           </div>
 
-          {/* Column 2 — Model selector & Persona Switcher */}
+          {/* Column 2 — spacer */}
+          <div />
+
+          {/* Column 3 — Model selector & Send button */}
           <div className="flex items-center justify-end gap-2">
-            <PersonaSwitcher conversationId={currentConversationId} />
             <ConversationModelSelector
               llmmodels={llmmodels}
               selectedModelId={selectedModelId}
               llmsloading={llmsloading}
               currentConversation={currentConversation}
             />
-          </div>
-
-          {/* Column 3 — Send button */}
-          <div className="flex justify-end">
             {/* Send button */}
             <button
-              type="submit"
-              disabled={!text.trim() || disabled}
+              onClick={isStreaming ? handleStop : undefined}
+              type={isStreaming ? "button" : "submit"}
+              aria-label={isStreaming ? 'Stop generation' : 'Send message'}
+              title={isStreaming ? 'Stop generation' : 'Send message'}
+              disabled={!isStreaming && (disabled || !text.trim())}
               className="
             shrink-0
             h-9 w-9

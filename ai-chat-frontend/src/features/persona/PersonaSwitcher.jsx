@@ -1,153 +1,175 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { FaAngleDown } from 'react-icons/fa';
-import { BiCheck } from 'react-icons/bi';
-import { getPersonaIcon } from '../../utils/personaIcons';
-import { usePersona } from './usePersona';
-import {
-    switchPersonaThunk,
-    setCurrentPersona,
-} from './personaSlice';
+import React, { useRef, useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { FaAngleRight } from "react-icons/fa";
+import { BiCheck } from "react-icons/bi";
+import { getPersonaIcon } from "../../utils/personaIcons";
+import { usePersona } from "./usePersona";
+import { switchPersonaThunk, setCurrentPersona } from "./personaSlice";
 import ModalPortal from "../../components/ui/ModalPortal";
 
-export const PersonaSwitcher = ({ conversationId }) => {
-    const dispatch = useDispatch();
-    const { personas, currentPersona } = usePersona();
-    
-    // UI State
-    const [isOpen, setIsOpen] = useState(false);
-    const [menuPos, setMenuPos] = useState(null);
-    const dropdownRef = useRef(null);
-    const buttonRef = useRef(null);
-    const activeItemRef = useRef(null);
-    const MENU_HEIGHT = 200; // Expected max height of the dropdown
+export const PersonaSwitcher = ({ conversationId, dropdownRef: externalDropdownRef }) => {
+  const dispatch = useDispatch();
+  const { personas, currentPersona } = usePersona();
 
-    const handleOpen = (e) => {
-        e.stopPropagation();
-        if (isOpen) {
-            setIsOpen(false);
-            return;
-        }
+  // UI State
+  const [isOpen, setIsOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
+  const internalDropdownRef = useRef(null);
+  const buttonRef = useRef(null);
+  const activeItemRef = useRef(null);
+  const dropdownRef = externalDropdownRef ?? internalDropdownRef;
+  const SUBMENU_WIDTH = 224;
+  const SUBMENU_MAX_HEIGHT = 256;
+  const VIEWPORT_PADDING = 8;
+  const SUBMENU_GAP = 6;
 
-        const rect = buttonRef.current.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const spaceBelow = viewportHeight - rect.bottom;
-        const openUpwards = spaceBelow < MENU_HEIGHT;
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
 
-        setMenuPos({
-            left: rect.left,
-            top: openUpwards ? rect.top - 8 : rect.bottom + 6,
-            placement: openUpwards ? "top" : "bottom",
-        });
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-        setOpen(true);
-    };
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
 
-    // Close menu on outside click, resize, or scroll
-    useEffect(() => {
-        if (!isOpen) return;
+    let top = rect.top;
+    if (top + SUBMENU_MAX_HEIGHT > viewportHeight - VIEWPORT_PADDING) {
+      top = Math.max(
+        VIEWPORT_PADDING,
+        viewportHeight - SUBMENU_MAX_HEIGHT - VIEWPORT_PADDING,
+      );
+    }
 
-        const handleClickOutside = (e) => {
-            if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(e.target) &&
-                buttonRef.current &&
-                !buttonRef.current.contains(e.target)
-            ) {
-                setIsOpen(false);
-            }
-        };
+    let left = rect.right + SUBMENU_GAP;
+    if (viewportWidth - rect.right < SUBMENU_WIDTH) {
+      left = rect.left - SUBMENU_WIDTH - SUBMENU_GAP;
+    }
 
-        const handleResize = () => {
-            setIsOpen(false);
-        };
+    const maxLeft = Math.max(
+      VIEWPORT_PADDING,
+      viewportWidth - SUBMENU_WIDTH - VIEWPORT_PADDING,
+    );
 
-        document.addEventListener("mousedown", handleClickOutside);
-        window.addEventListener("resize", handleResize);
+    left = Math.min(Math.max(VIEWPORT_PADDING, left), maxLeft);
 
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            window.removeEventListener("resize", handleResize);
-        };
-    }, [isOpen]);
+    setMenuPos({
+      left,
+      top,
+    });
 
-    // Auto scroll to active persona when menu opened
-    useEffect(() => {
-        if (isOpen && activeItemRef.current) {
-            activeItemRef.current.scrollIntoView({
-                block: "center",
-                behavior: "instant",
-            });
-        }
-    }, [isOpen]);
+    setIsOpen(true);
+  };
 
-    const handleSwitch = (personaId) => {
-        // console.log("Clicked persona switch", personaId)
-        
-        if (!conversationId || conversationId === 'draft') {
-            // Local switch for draft chats
-            dispatch(setCurrentPersona(personaId));
-        } else {
-            // Backend switch for existing conversations
-            dispatch(
-                switchPersonaThunk({
-                    conversationId,
-                    personaId,
-                })
-            );
-        }
+  // Close menu on outside click, resize, or scroll
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target)
+      ) {
         setIsOpen(false);
+      }
     };
 
-    // Helper to set open state for clarify (matches model selector handleOpen)
-    const setOpen = (val) => setIsOpen(val);
+    const handleResize = () => {
+      setIsOpen(false);
+    };
 
-    return (
-        <div className="relative">
-            {/* Trigger Button */}
-            <button
-                ref={buttonRef}
-                type="button"
-                onClick={handleOpen}
-                // className={`
-                //     flex items-center gap-2 px-3 py-1.5 rounded-lg
-                //     border border-theme-accent hover:bg-theme-secondary
-                //     text-sm text-theme-text transition-colors
-                //     ${!conversationId || conversationId === 'draft' ? 'moving-border' : ''}
-                // `}
+    const handleScroll = (event) => {
+      if (dropdownRef.current?.contains(event.target)) return;
+      setIsOpen(false);
+    };
 
-                // ${
-                //         (!conversationId || conversationId === 'draft') && !isOpen
-                //         ? "moving-border" 
-                //         : "rounded-lg border border-theme-accent hover:bg-theme-secondary"
-                //     }
-                className={`
-                    rounded-lg border border-theme-dark hover:bg-theme-secondary
-                    flex items-center gap-1
-                    px-2 py-1
-                    text-sm
-                    text-theme-text
-                    `}
-                title={currentPersona?.name}
-            >
-                {(() => {
-                    const Icon = getPersonaIcon(currentPersona?.slug);
-                    return <Icon className="w-5 h-5 text-theme-text" />;
-                })()}
-                <span className="hidden lg:inline truncate max-w-[120px]">
-                    {currentPersona?.name || 'Assign Identity'}
-                </span>
-                <span className="pt-0.5">
-                    <FaAngleDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                </span>
-            </button>
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll, true);
 
-            {/* Dropdown Menu */}
-            {isOpen && menuPos && (
-                <ModalPortal>
-                    <div
-                        ref={dropdownRef}
-                        className="
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [dropdownRef, isOpen]);
+
+  // Auto scroll to active persona when menu opened
+  useEffect(() => {
+    if (isOpen && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: "center",
+        behavior: "instant",
+      });
+    }
+  }, [isOpen]);
+
+  const handleSwitch = (personaId) => {
+    // console.log("Clicked persona switch", personaId)
+
+    if (!conversationId || conversationId === "draft") {
+      // Local switch for draft chats
+      dispatch(setCurrentPersona(personaId));
+    } else {
+      // Backend switch for existing conversations
+      dispatch(
+        switchPersonaThunk({
+          conversationId,
+          personaId,
+        }),
+      );
+    }
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      {/* Trigger Button */}
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={handleOpen}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className={[
+          "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-theme-text transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]/40",
+          isOpen ? "bg-theme-light" : "hover:bg-theme-secondary",
+        ].join(" ")}
+        title={currentPersona?.name || "Use style"}
+      >
+        {(() => {
+          const Icon = getPersonaIcon(currentPersona?.slug);
+          return (
+            <Icon
+              className="h-[18px] w-[18px] flex-shrink-0 text-theme-text"
+              aria-hidden="true"
+            />
+          );
+        })()}
+        <span className="min-w-0 flex-1 truncate">
+          {currentPersona?.name || "Use style"}
+        </span>
+        <span className="flex-shrink-0 text-theme-muted">
+          <FaAngleRight
+            size={14}
+            aria-hidden="true"
+            className="transition-colors duration-150"
+          />
+        </span>
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && menuPos && (
+        <ModalPortal>
+          <div
+            ref={dropdownRef}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="
                             fixed z-[1000]
                             w-56 max-h-64
                             rounded-lg
@@ -158,57 +180,59 @@ export const PersonaSwitcher = ({ conversationId }) => {
                             overflow-y-auto
                             p-1 custom-scrollbar
                         "
-                        style={{
-                            top: menuPos.top,
-                            left: menuPos.left,
-                            transform:
-                                menuPos.placement === "top"
-                                    ? "translateY(-100%)"
-                                    : "translateY(0)",
-                        }}
-                    >
-                        {personas.length === 0 && (
-                            <div className="px-3 py-4 text-center text-xs text-theme-muted italic">
-                                No personas loaded
-                            </div>
-                        )}
-                        {personas.map((persona) => {
-                            const isActive = currentPersona?.id === persona.id;
-                            const Icon = getPersonaIcon(persona.slug);
-                            
-                            return (
-                                <button
-                                    key={persona.id}
-                                    ref={isActive ? activeItemRef : null}
-                                    onClick={() => handleSwitch(persona.id)}
-                                    className={`
-                                        w-full text-left px-2 py-2 flex items-start gap-2.5
-                                        transition-colors rounded-md mb-0.5 last:mb-0
+            style={{
+              top: menuPos.top,
+              left: menuPos.left,
+              transform: "none",
+            }}
+          >
+            {personas.length === 0 && (
+              <div className="px-3 py-4 text-center text-xs text-theme-muted italic">
+                No personas loaded
+              </div>
+            )}
+            {personas.map((persona) => {
+              const isActive = currentPersona?.id === persona.id;
+              const Icon = getPersonaIcon(persona.slug);
+
+              return (
+                <button
+                  key={persona.id}
+                  ref={isActive ? activeItemRef : null}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSwitch(persona.id);
+                  }}
+                  className={`
+                                        mb-0.5 flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left transition-colors last:mb-0
                                         ${
-                                            isActive
-                                                ? 'bg-theme-secondary moving-border text-theme-text'
-                                                : 'text-theme-textaccent hover:bg-theme-light'
+                                          isActive
+                                            ? "bg-theme-light text-theme-text"
+                                            : "text-theme-text hover:bg-theme-light"
                                         }
                                     `}
-                                >
-                                    <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isActive ? 'text-theme-muted' : 'text-theme-muted'}`} />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[13px] font-semibold truncate leading-tight">
-                                            {persona.name}
-                                        </div>
-                                        <div className="text-[11px] text-theme-muted line-clamp-1 mt-0.5">
-                                            {persona.description}
-                                        </div>
-                                    </div>
-                                    {isActive && (
-                                        <BiCheck className="w-4 h-4 text-theme-accent flex-shrink-0 mt-0.5" />
-                                    )}
-                                </button>
-                            );
-                        })}
+                >
+                  <Icon
+                    className={`mt-0.5 h-4 w-4 flex-shrink-0 ${isActive ? "text-theme-text" : "text-theme-muted"}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold truncate leading-tight">
+                      {persona.name}
                     </div>
-                </ModalPortal>
-            )}
-        </div>
-    );
+                    <div className="mt-0.5 line-clamp-2 text-[11px] text-theme-muted">
+                      {persona.description}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <BiCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--theme-focus-ring)]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </ModalPortal>
+      )}
+    </div>
+  );
 };
