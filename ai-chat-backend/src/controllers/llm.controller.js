@@ -167,7 +167,7 @@ async function ask(req, res, next) {
       // ================================================================================
       try {
         for await (const chunk of stream) {
-          if (clientDisconnected || abortController.signal.aborted) break;
+          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) break;
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
             fullReply += content;
@@ -178,7 +178,7 @@ async function ask(req, res, next) {
           }
         }
 
-        if (clientDisconnected || abortController.signal.aborted) {
+        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
           // Save whatever partial text was collected and mark as cancelled
           await Message.findByIdAndUpdate(
             assistantMsg._id,
@@ -199,7 +199,7 @@ async function ask(req, res, next) {
         }
 
         // Final safety guard: catch the race where signal aborts in the same tick
-        if (clientDisconnected || abortController.signal.aborted) {
+        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
           await Message.findByIdAndUpdate(
             assistantMsg._id,
             { $set: { text: fullReply || '', status: 'cancelled' } }
@@ -225,7 +225,7 @@ async function ask(req, res, next) {
         res.end();
 
       } catch (streamErr) {
-        if (clientDisconnected || abortController.signal.aborted || streamErr.name === 'AbortError') {
+        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed || streamErr.name === 'AbortError') {
           await Message.findByIdAndUpdate(
             assistantMsg._id,
             { $set: { text: fullReply || '', status: 'cancelled' } }

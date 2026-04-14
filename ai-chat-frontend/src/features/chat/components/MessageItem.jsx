@@ -458,7 +458,7 @@ function MessageItem({
                           <circle cx="8" cy="8" r="6.5" />
                           <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" />
                         </svg>
-                        {displayText
+                        {msg.text?.trim()
                           ? "Generation stopped"
                           : "Generation stopped before any response was received"}
                       </div>

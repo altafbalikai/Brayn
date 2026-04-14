@@ -29,6 +29,18 @@ function calculateBackoff(attempt) {
 
 const abortControllers = {};
 
+/**
+ * Abort the active stream for a conversation.
+ * Callable from any component — not tied to a specific Composer instance.
+ */
+export function stopGeneration(conversationId) {
+    const controller = abortControllers[conversationId];
+    if (controller) {
+        controller.abort();
+        delete abortControllers[conversationId];
+    }
+}
+
 // Async thunks
 export const fetchConversations = createAsyncThunk(
     'conversation/fetchConversations',
@@ -1166,7 +1178,20 @@ const conversationSlice = createSlice({
                 if (action.payload?.cancelled) {
                     state.sending = false;
                     const cid = action.payload.conversationId ?? action.meta.arg.conversationId;
-                    if (cid) state.assistantTyping[cid] = false;
+                    if (cid) {
+                        state.assistantTyping[cid] = false;
+                        // Update the last streaming assistant message to 'cancelled'
+                        // so isProcessing becomes false and actions become visible immediately
+                        const msgs = state.messages[cid];
+                        if (msgs) {
+                            for (let i = msgs.length - 1; i >= 0; i--) {
+                                if (msgs[i].role === 'assistant' && msgs[i].status === 'streaming') {
+                                    msgs[i].status = 'cancelled';
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     return;
                 }
                 state.sending = false;

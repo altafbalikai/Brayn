@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import ConversationModelSelector from "./ConversationModelSelector";
 import PlusMenu from "./PlusMenu";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { stopGeneration } from "../../conversations/conversationSlice";
 import { GoArrowUpRight } from "react-icons/go";
 import { TbSquareRoundedFilled } from "react-icons/tb";
 
@@ -21,21 +22,20 @@ function Composer({
   const [text, setText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const textareaRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const dispatch = useDispatch();
 
   const submit = (e) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    onSend(trimmed, controller.signal);
+    onSend(trimmed);
     setText("");
   };
 
   const handleStop = () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+    if (currentConversationId) {
+      dispatch(stopGeneration(currentConversationId));
+    }
   };
 
   const handleKeyDown = (e) => {

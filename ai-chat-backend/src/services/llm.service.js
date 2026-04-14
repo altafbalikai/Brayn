@@ -397,15 +397,19 @@ async function askConversationStream(
         tool_choice: 'auto',   // model decides — never force or block
         stream: false,
         max_tokens: 1024,      // only need enough for a tool call decision
+        signal,
       };
 
       let firstResponse;
       try {
         firstResponse = await openrouter.chat.send(firstCallOptions);
       } catch (err) {
+        if (err.name === 'AbortError') return null;
         logger.error('[llm] First-pass tool-use call failed', { error: err.message });
         throw err;
       }
+
+      if (signal?.aborted) return null;
 
       const responseMessage = firstResponse?.choices?.[0]?.message;
       const toolCall = responseMessage?.toolCalls?.find(
@@ -423,6 +427,9 @@ async function askConversationStream(
             arguments: toolCall.function.arguments,
           });
         }
+        console.log('Original User Query', lastUserMessage)
+        console.log('Model Query', modelQuery)
+        console.log(logger.info('[llm] Model triggered web_search tool', { query: modelQuery }))
         logger.info('[llm] Model triggered web_search tool', { query: modelQuery });
 
         let toolResultContent;
@@ -434,6 +441,8 @@ async function askConversationStream(
           logger.warn('[llm] Web search failed after tool call', { error: err.message });
           toolResultContent = 'Web search is temporarily unavailable.';
         }
+
+        if (signal?.aborted) return null;
 
         // Append tool exchange to payload for the final streaming call
         payload.push({
