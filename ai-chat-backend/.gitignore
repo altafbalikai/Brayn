@@ -19,3 +19,10 @@ coverage
 
 # Test Scripts
 test
+
+# Test Outputs
+accuracy_test_out.txt
+verify_out_cmd.txt
+verify_out_cmd_2.txt
+verify_out_final.txt
+verify_output.txt
