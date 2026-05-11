@@ -16,3 +16,6 @@ logs
 
 # Jest coverage
 coverage
+
+# Test Scripts
+test

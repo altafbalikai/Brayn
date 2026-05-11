@@ -9,3 +9,4 @@ export { default as NewChatControl } from './NewChatControl';
 export { default as SidebarFooter } from './SidebarFooter';
 export { default as UserProfile } from './UserMenu/UserProfile';
 export { default as LoadingIndicator } from './LoadingIndicator';
+export { default as ReasoningDisplay } from './ReasoningDisplay';

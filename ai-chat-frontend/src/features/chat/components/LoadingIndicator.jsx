@@ -7,11 +7,11 @@ import { FaCircle } from "react-icons/fa";
  */
 function LoadingIndicator() {
   return (
-    <div className="pt-2">
-    <FaCircle
-      size={14}
-      className="text-theme-text animate-pulse drop-shadow-[0_0_12px_rgba(120,180,255,0.35)]"
-    />
+    <div className="flex items-center pt-2 gap-2 text-theme-textaccent font-medium text-sm">
+      <span className="relative flex h-2 w-2 mx-1">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-textaccent opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-theme-textaccent"></span>
+      </span>
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
 } from "react-icons/fa6";
 import LoadingIndicator from "./LoadingIndicator";
 import { MessageActions } from "./MessageActions";
+import ReasoningDisplay from "./ReasoningDisplay";
 import SpiningLoader from "../../../components/ui/SpiningLoader";
 /**
  * Validate that an ID is a real MongoDB ObjectId (24-char hex string)
@@ -275,8 +276,8 @@ function MessageItem({
 
   const displayText = msg.text || "";
 
-  // Show loading when message is being processed but has no content yet
-  const isLoading = isProcessing && !displayText;
+  // Show loading when message is being processed but has no content yet (including no reasoning)
+  const isLoading = isProcessing && !displayText && !msg.isReasoning && !msg.reasoning;
   const isAssistant = msg.role === "assistant";
 
   // 1. Hooks MUST be at top level
@@ -360,6 +361,15 @@ function MessageItem({
                 // Assistant message with markdown rendering
                 <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
                   <div className="relative">
+                    {msg.role === 'assistant' && (msg.reasoning || msg.isReasoning) && (
+                      <ReasoningDisplay
+                        reasoning={msg.reasoning ?? ''}
+                        isReasoning={msg.isReasoning ?? false}
+                        reasoningDoneAt={msg.reasoningDoneAt ?? null}
+                        startedAt={msg.timestamp ? new Date(msg.timestamp).getTime() : new Date(msg.createdAt).getTime()}
+                        reasoningDurationSeconds={msg.reasoningDurationSeconds ?? null}
+                      />
+                    )}
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm, remarkBreaks]}
                       rehypePlugins={
@@ -468,7 +478,6 @@ function MessageItem({
                     {isProcessing && !displayText && (
                       <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs animate-pulse">
                         <LoadingIndicator />
-                        <span>Generating new response...</span>
                       </div>
                     )}
 

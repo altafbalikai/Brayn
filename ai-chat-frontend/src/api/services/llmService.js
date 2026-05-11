@@ -183,19 +183,18 @@ export const llmService = {
         const activeSignal = signal ?? controller.signal;
         const token = getAccessToken();
 
-        async function start(onMetadata, onChunk, onComplete, retry = true) {
+        async function start(onMetadata, onChunk, onReasoning, onReasoningDone, onComplete, retry = true) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
 
             const headers = {
                 "Content-Type": "application/json",
-                "X-Request-Idempotency-Key": requestKey, // ✅ NEW: Idempotency key
+                "X-Request-Idempotency-Key": requestKey,
             };
 
             if (token) {
                 headers.Authorization = `Bearer ${token}`;
             }
 
-            // ✅ NEW: Wrap fetch in retry logic (not streaming loop)
             let res;
             try {
                 res = await retryWithBackoff(
@@ -217,11 +216,8 @@ export const llmService = {
                     {
                         maxAttempts: 5,
                         isRetriable: (error) => {
-                            // Network error
                             if (!error.status) return true;
-                            // 409 duplicate in-flight
                             if (error.status === 409) return true;
-                            // Server errors
                             return [500, 502, 503, 504].includes(error.status);
                         }
                     }
@@ -233,10 +229,6 @@ export const llmService = {
                 throw new Error(`Network error: ${error.message}`);
             }
 
-            // ✅ Fetch succeeded → response received
-            // ❌ DO NOT RETRY AFTER THIS POINT
-
-            // Handle 401 BEFORE streaming
             if (res.status === 401 && retry) {
                 try {
                     const newToken = await refreshAccessToken();
@@ -244,8 +236,10 @@ export const llmService = {
                     return start(
                         onMetadata,
                         onChunk,
+                        onReasoning,
+                        onReasoningDone,
                         onComplete,
-                        false // Only retry refresh once
+                        false
                     );
                 } catch (refreshError) {
                     setAccessToken(null);
@@ -281,7 +275,6 @@ export const llmService = {
             let realMessageId = null;
             let pendingChunks = [];
 
-            // ✅ STREAMING LOOP - Errors here NOT retriable
             try {
                 while (true) {
                     const { value, done } = await reader.read();
@@ -293,11 +286,15 @@ export const llmService = {
                         buffer = events.pop();
 
                         for (const evt of events) {
-                            if (evt.includes('event: metadata')) {
+                            const eventTypeMatch = evt.match(/event:\s*(\w+)/);
+                            const eventType = eventTypeMatch ? eventTypeMatch[1] : null;
+                            const dataParts = evt.split('data: ');
+                            const dataBuffer = dataParts.length > 1 ? dataParts[1] : null;
+
+                            if (eventType === 'metadata') {
                                 try {
-                                    const dataParts = evt.split('data: ');
-                                    if (dataParts.length > 1) {
-                                        const data = JSON.parse(dataParts[1]);
+                                    if (dataBuffer) {
+                                        const data = JSON.parse(dataBuffer);
                                         realMessageId = data.messageId;
 
                                         if (onMetadata) {
@@ -308,7 +305,6 @@ export const llmService = {
                                             }
                                         }
 
-                                        // Flush early chunks
                                         pendingChunks.forEach(chunk => {
                                             fullText += chunk;
                                             if (onChunk) {
@@ -326,11 +322,10 @@ export const llmService = {
                                 }
                             }
 
-                            if (evt.includes('event: chunk')) {
+                            if (eventType === 'chunk') {
                                 try {
-                                    const dataParts = evt.split('data: ');
-                                    if (dataParts.length > 1) {
-                                        const content = JSON.parse(dataParts[1]);
+                                    if (dataBuffer) {
+                                        const content = JSON.parse(dataBuffer);
 
                                         if (!realMessageId) {
                                             pendingChunks.push(content);
@@ -349,6 +344,21 @@ export const llmService = {
                                     console.error("Error parsing chunk JSON:", e);
                                 }
                             }
+
+                            if (eventType === 'reasoning') {
+                                try {
+                                    if (dataBuffer) {
+                                        const parsed = JSON.parse(dataBuffer);
+                                        onReasoning?.(parsed.delta);
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing reasoning JSON:", e);
+                                }
+                            }
+
+                            if (eventType === 'reasoning_done') {
+                                onReasoningDone?.();
+                            }
                         }
                     }
                 }
@@ -361,7 +371,6 @@ export const llmService = {
                 if (error.name === "AbortError") {
                     throw new Error("Streaming was cancelled");
                 }
-                // Stream error → don't retry
                 throw error;
             } finally {
                 reader.releaseLock();

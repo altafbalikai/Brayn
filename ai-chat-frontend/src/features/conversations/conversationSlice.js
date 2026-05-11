@@ -263,7 +263,15 @@ export const sendMessage = createAsyncThunk(
                             }));
                         };
 
-                        const full = await stream.start(onMetadata, onChunk);
+                        const onReasoning = (delta) => {
+                            dispatch(appendReasoningDelta({ conversationId, delta }));
+                        };
+
+                        const onReasoningDone = () => {
+                            dispatch(markReasoningDone({ conversationId }));
+                        };
+
+                        const full = await stream.start(onMetadata, onChunk, onReasoning, onReasoningDone);
 
                         if (signal.aborted) {
                             dispatch(setAssistantTyping({ conversationId, value: false }));
@@ -399,7 +407,15 @@ export const regenerateNode = createAsyncThunk(
                 }));
             };
 
-            const fullText = await stream.start(onMetadata, onChunk);
+            const onReasoning = (delta) => {
+                dispatch(appendReasoningDelta({ conversationId, delta }));
+            };
+
+            const onReasoningDone = () => {
+                dispatch(markReasoningDone({ conversationId }));
+            };
+
+            const fullText = await stream.start(onMetadata, onChunk, onReasoning, onReasoningDone);
 
             dispatch(finalizeAssistantMessage({
                 conversationId,
@@ -594,7 +610,15 @@ export const editMessage = createAsyncThunk(
                             }));
                         };
 
-                        const full = await stream.start(onMetadata, onChunk);
+                        const onReasoning = (delta) => {
+                            dispatch(appendReasoningDelta({ conversationId: newConversationId, delta }));
+                        };
+
+                        const onReasoningDone = () => {
+                            dispatch(markReasoningDone({ conversationId: newConversationId }));
+                        };
+
+                        const full = await stream.start(onMetadata, onChunk, onReasoning, onReasoningDone);
 
                         if (realMessageId) {
                             dispatch(finalizeAssistantMessage({
@@ -814,7 +838,13 @@ const conversationSlice = createSlice({
             if (!state.messages[conversationId]) {
                 state.messages[conversationId] = [];
             }
-            state.messages[conversationId].push(message);
+            state.messages[conversationId].push({
+                ...message,
+                reasoning: '',
+                isReasoning: false,
+                reasoningDoneAt: null,
+                isPlaceholder: true, // Added to support appendReasoningDelta and markReasoningDone
+            });
         },
         // Replace temporary pending placeholder with real message ID when metadata arrives
         updatePendingPlaceholderWithRealId: (state, action) => {
@@ -823,7 +853,7 @@ const conversationSlice = createSlice({
             if (!messages) return;
 
             // Find the temporary pending message (usually the last one)
-            const tempIndex = messages.findIndex(m => m._id === tempId && m.status === 'pending');
+            const tempIndex = messages.findIndex(m => m._id === tempId && (m.status === 'pending' || m.isPlaceholder));
             if (tempIndex !== -1) {
                 // Update the message with real ID and status
                 messages[tempIndex]._id = realId;
@@ -857,6 +887,11 @@ const conversationSlice = createSlice({
             if (idx !== -1) {
                 messages[idx].text = text;
                 messages[idx].status = status || 'streaming';
+                
+                // If it's no longer a placeholder, clear the flag
+                if (status === 'streaming' || status === 'sent') {
+                    messages[idx].isPlaceholder = false;
+                }
 
                 // Update versions array during streaming
                 if (messages[idx].versions && messages[idx].versions.length > 0) {
@@ -947,7 +982,13 @@ const conversationSlice = createSlice({
                 const msg = list[idx];
                 msg.status = status || 'sent';
                 msg.text = text;
-                msg.createdAt = new Date().toISOString();
+                if (!msg.createdAt) {
+                    msg.createdAt = new Date().toISOString();
+                }
+                msg.isPlaceholder = false;
+                if (action.payload.reasoningDurationSeconds != null) {
+                    msg.reasoningDurationSeconds = action.payload.reasoningDurationSeconds;
+                }
 
                 // Initialize or update versions array properly
                 if (!msg.versions || msg.versions.length === 0) {
@@ -1048,6 +1089,26 @@ const conversationSlice = createSlice({
                 }
             }
         },
+
+        appendReasoningDelta(state, action) {
+            const { conversationId, delta } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+            const msg = messages.find((m) => m.isPlaceholder);
+            if (!msg) return;
+            msg.reasoning = (msg.reasoning ?? '') + delta;
+            msg.isReasoning = true;
+        },
+
+        markReasoningDone(state, action) {
+            const { conversationId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+            const msg = messages.find((m) => m.isPlaceholder);
+            if (!msg) return;
+            msg.isReasoning = false;
+            msg.reasoningDoneAt = Date.now();
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -1125,7 +1186,11 @@ const conversationSlice = createSlice({
                 const processedItems = normalizeMessages(items || []).map(item => ({
                     ...item,
                     // Default to latest version if versions exist, otherwise default to 1
-                    currentVersion: item.currentVersion || (item.versions?.length || 1)
+                    currentVersion: item.currentVersion || (item.versions?.length || 1),
+                    reasoningDurationSeconds: item.reasoningDurationSeconds ?? null,
+                    reasoning: item.reasoning ?? '',
+                    isReasoning: false,
+                    reasoningDoneAt: null,
                 }));
 
                 const existing = state.messages[conversationId] || [];
@@ -1185,8 +1250,9 @@ const conversationSlice = createSlice({
                         const msgs = state.messages[cid];
                         if (msgs) {
                             for (let i = msgs.length - 1; i >= 0; i--) {
-                                if (msgs[i].role === 'assistant' && msgs[i].status === 'streaming') {
+                                if (msgs[i].role === 'assistant' && (msgs[i].status === 'streaming' || msgs[i].isPlaceholder)) {
                                     msgs[i].status = 'cancelled';
+                                    msgs[i].isPlaceholder = false;
                                     break;
                                 }
                             }
@@ -1369,6 +1435,8 @@ export const {
     switchMessageVersion,
     truncateMessagesFromNode,
     setUseWebSearch,
+    appendReasoningDelta,
+    markReasoningDone,
 } = conversationSlice.actions;
 
 export const selectUseWebSearch = (state) => state.conversation.useWebSearch;

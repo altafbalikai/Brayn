@@ -13,6 +13,14 @@ const MessageSchema = new Schema({
     },
     default: ''
   },
+  reasoning: {
+    type: String,
+    default: '',
+  },
+  reasoningDurationSeconds: {
+    type: Number,
+    default: null,
+  },
   importance: { type: Number, default: 0 },
   tokens: { type: Number },
   llmMetadata: {

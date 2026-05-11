@@ -161,6 +161,9 @@ async function ask(req, res, next) {
       })}\n\n`);
 
       let fullReply = "";
+      let accumulatedReasoning = '';
+      const streamStartedAt = Date.now();
+      let reasoningFinished = false;
 
       // ================================================================================
       // STREAMING LOOP - Errors here are NOT retriable
@@ -168,8 +171,24 @@ async function ask(req, res, next) {
       try {
         for await (const chunk of stream) {
           if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) break;
+
+          const reasoningDelta = chunk.choices?.[0]?.delta?.reasoning;
+          if (reasoningDelta) {
+            accumulatedReasoning += reasoningDelta;
+            res.write(`event: reasoning\n`);
+            res.write(`data: ${JSON.stringify({ delta: reasoningDelta })}\n\n`);
+            if (res.flush) res.flush();
+          }
+
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
+            if (!reasoningFinished && accumulatedReasoning.length > 0) {
+              reasoningFinished = true;
+              res.write(`event: reasoning_done\n`);
+              res.write(`data: ${JSON.stringify({ totalLength: accumulatedReasoning.length })}\n\n`);
+              if (res.flush) res.flush();
+            }
+
             fullReply += content;
             // 2. Stream JSON-Safe Chunk Events
             res.write(`event: chunk\n`);
@@ -208,10 +227,20 @@ async function ask(req, res, next) {
         }
 
         // Finalize persistence and side effects via Service Orchestrator
+        const reasoningDurationSeconds = accumulatedReasoning.length > 0
+          ? Math.round((Date.now() - streamStartedAt) / 1000)
+          : null;
+
         if (assistantMsg.status === 'streaming') {
-          await llmService.handlePostStreamTasksNodeTree(userId, conversationId, fullReply, userMsg, assistantMsg);
+          await llmService.handlePostStreamTasksNodeTree(userId, conversationId, fullReply, userMsg, assistantMsg, {
+            reasoning: accumulatedReasoning,
+            reasoningDurationSeconds,
+          });
         } else {
-          await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg);
+          await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg, {
+            reasoning: accumulatedReasoning,
+            reasoningDurationSeconds,
+          });
         }
 
         // ================================================================================

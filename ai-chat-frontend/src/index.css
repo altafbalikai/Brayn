@@ -225,12 +225,11 @@ body {
   background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Hide scrollbar but keep scroll (mobile) */
+/* Hide scrollbar but keep scroll */
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

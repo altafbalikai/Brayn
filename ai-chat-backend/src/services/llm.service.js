@@ -253,12 +253,17 @@ function formatWebContext(webResults) {
       'Answer using ONLY these snippets. Do not invent facts beyond what is stated here. ' +
       'Cite only the URLs listed below — do not fabricate sources.\n'
     );
-    for (const s of webResults.snippets.slice(0, 3)) {
+    for (const s of webResults.snippets) {
       parts.push(`**${s.title}** (${s.url})\n${s.snippet}`);
     }
   }
 
-  return parts.join('\n');
+  const MAX_CHARS = parseInt(process.env.WEB_SEARCH_MAX_CHARS, 10) || 8000;
+  const MAX_URLS_TO_FETCH = 2;
+  const MAX_TOTAL_CHARS = MAX_CHARS * MAX_URLS_TO_FETCH;
+
+  const resultStr = parts.join('\n');
+  return resultStr.length > MAX_TOTAL_CHARS ? resultStr.slice(0, MAX_TOTAL_CHARS) : resultStr;
 }
 
 /**
@@ -281,7 +286,7 @@ function buildWebSearchTool() {
         properties: {
           query: {
             type: 'string',
-            description: 'A concise search query, e.g. "IPL 2026 final winner"',
+            description: 'A concise 3-8 word search query. Never append a year or date unless the user explicitly mentioned a specific year or date in their question. Use present-tense phrasing for current-state queries (e.g. "current Federal Reserve interest rate" not "Federal Reserve interest rate 2024").',
           },
         },
         required: ['query'],
@@ -416,6 +421,8 @@ async function askConversationStream(
         (tc) => tc.function?.name === 'web_search'
       );
 
+      let webResults = null;
+
       // Only execute tool flow if model actually called the tool
       if (toolCall) {
         // Safer version — parse failure falls back to lastUserMessage silently
@@ -434,7 +441,7 @@ async function askConversationStream(
 
         let toolResultContent;
         try {
-          const webResults = await searchAndFetch(modelQuery);
+          webResults = await searchAndFetch(modelQuery);
           const webContext = formatWebContext(webResults);
           toolResultContent = webContext || 'No relevant results found for this query.';
         } catch (err) {
@@ -458,6 +465,15 @@ async function askConversationStream(
 
         logger.debug('[llm] Tool result appended, making final streaming call');
       }
+
+      logger.info('web_search_pipeline', {
+        conversationId,
+        triggeredSearch: Boolean(toolCall),
+        modelQuery: toolCall ? JSON.parse(toolCall.function.arguments)?.query : null,
+        resultsCount: webResults ? (webResults.snippets?.length ?? 0) + (webResults.pages?.length ?? 0) : null,
+        pagesFetched: webResults?.pages?.length ?? null,
+        fallbackToSnippets: webResults ? (webResults.pages?.length === 0 && webResults.snippets?.length > 0) : null,
+      });
     } else {
       // Model decided no search needed — stream the first response directly
       logger.debug('[llm] Model did not call web_search tool, streaming direct response');
@@ -1060,9 +1076,15 @@ async function prepareRegenerateContextNodeTree(
  * - Persists assistant message
  * - Fire-and-forget background tasks
  */
-async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg) {
+async function handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg, assistantPayload = {}) {
   // 1. Save assistant message (update the placeholder)
   assistantMsg.text = fullReply;
+  if (assistantPayload.reasoning) {
+    assistantMsg.reasoning = assistantPayload.reasoning;
+  }
+  if (assistantPayload.reasoningDurationSeconds != null) {
+    assistantMsg.reasoningDurationSeconds = assistantPayload.reasoningDurationSeconds;
+  }
   await assistantMsg.save();
 
   // 2. Fire-and-forget side effects
@@ -1082,14 +1104,25 @@ async function handlePostStreamTasksNodeTree(
   conversationId,
   fullReply,
   userMsg,
-  assistantMsg
+  assistantMsg,
+  assistantPayload = {}
 ) {
   // Save assistant message text and update status
+  const updateFields = { text: fullReply, status: 'sent' };
+  if (assistantPayload.reasoning) {
+    updateFields.reasoning = assistantPayload.reasoning;
+  }
+  if (assistantPayload.reasoningDurationSeconds != null) {
+    updateFields.reasoningDurationSeconds = assistantPayload.reasoningDurationSeconds;
+  }
   await Message.findByIdAndUpdate(
     assistantMsg._id,
-    { $set: { text: fullReply, status: 'sent' } }
+    { $set: updateFields }
   );
   assistantMsg.text = fullReply;
+  if (assistantPayload.reasoning) {
+    assistantMsg.reasoning = assistantPayload.reasoning;
+  }
 
   // Fire-and-forget side effects (same as original)
   safeFireAndForget(() => writeMessageToMemory(userMsg));
@@ -1116,6 +1149,8 @@ module.exports = {
   handlePostStreamTasks,
   prepareAskContextNodeTree,
   prepareRegenerateContextNodeTree,
-  handlePostStreamTasksNodeTree
+  handlePostStreamTasksNodeTree,
+  formatWebContext,
+  buildWebSearchTool
 };
 
