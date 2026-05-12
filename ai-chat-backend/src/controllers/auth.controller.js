@@ -261,10 +261,39 @@ async function changePasswordController(req, res, next) {
   }
 }
 
+async function googleAuth(req, res, next) {
+  try {
+    const { credential } = req.body || {};
+    const result = await authService.googleAuth({ credential });
+    const { user, accessToken, refreshToken } = result;
+
+    if (refreshToken) {
+      setRefreshCookie(res, refreshToken);
+    }
+
+    auditLog('user.google_auth', { userId: user._id.toString(), email: user.email });
+
+    return res.json({
+      user: { id: user._id, email: user.email, name: user.name, role: user.role },
+      accessToken,
+    });
+  } catch (err) {
+    if (err instanceof HttpError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    logger.error('[GOOGLE_AUTH] unexpected error', {
+      message: err?.message,
+      stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined,
+    });
+    return next(err);
+  }
+}
+
 module.exports = {
   signup, login, me, refresh, logout,
   forgotPassword,
   resetPasswordController,
-  changePasswordController
+  changePasswordController,
+  googleAuth
 };
 

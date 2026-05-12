@@ -5,6 +5,7 @@ const dayjs = require('dayjs');
 const validator = require('validator'); // npm i validator
 const ms = require('ms'); // npm i ms
 const mongoose = require('mongoose');
+const { OAuth2Client } = require('google-auth-library');
 const logger = require('../config/logger');
 
 const User = require('../models/User');
@@ -13,6 +14,8 @@ const PasswordResetToken = require('../models/PasswordResetToken');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const HttpError = require('../utils/httpError');
 const mailer = require('../utils/mailer'); // implement sendPasswordResetEmail(email, link)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10);
 const REFRESH_TOKEN_EXPIRES = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -401,7 +404,7 @@ async function forgotPassword({ email, origin }) {
  */
 async function resetPassword({ token: rawToken, newPassword }) {
   if (!rawToken || !newPassword) {
-    console.log('Missing parameters', { rawToken, newPassword });
+    logger.warn('[resetPassword] missing parameters', { hasToken: !!rawToken, hasPassword: !!newPassword });
     throw new HttpError('Invalid request', 400, 'INVALID_REQUEST');
   }
 
@@ -549,6 +552,77 @@ async function revokeAllRefreshTokensForUser(userId, session = null) {
   return RefreshToken.updateMany({ userId }, { $set: { revoked: true } });
 }
 
+async function googleAuth({ credential }) {
+  if (!GOOGLE_CLIENT_ID) {
+    throw new HttpError('Google auth not configured', 500, 'GOOGLE_NOT_CONFIGURED');
+  }
+  if (!credential) {
+    throw new HttpError('Missing credential', 400, 'MISSING_CREDENTIAL');
+  }
+
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID,
+    });
+  } catch (err) {
+    logger.warn('[googleAuth] token verification failed', { message: err?.message });
+    throw new HttpError('Invalid Google token', 401, 'INVALID_GOOGLE_TOKEN');
+  }
+
+  const payload = ticket.getPayload();
+  const { sub: googleId, email, name, email_verified } = payload;
+
+  if (!email_verified) {
+    throw new HttpError('Google email not verified', 400, 'UNVERIFIED_EMAIL');
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  let user = await User.findOne({ email: normalizedEmail });
+
+  if (user) {
+    if (!user.googleId) {
+      // link Google account to existing email account
+      user.googleId = googleId;
+      await user.save();
+      logger.info('[googleAuth] linked Google account to existing user', { userId: user._id.toString() });
+    } else if (user.googleId !== googleId) {
+      throw new HttpError('Account conflict', 409, 'ACCOUNT_CONFLICT');
+    }
+  } else {
+    try {
+      user = await User.create({
+        email: normalizedEmail,
+        name: String(name || '').trim(),
+        googleId,
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        user = await User.findOne({ email: normalizedEmail });
+        if (!user) throw new HttpError('Account creation failed', 500, 'CREATE_FAILED');
+        if (!user.googleId) {
+          user.googleId = googleId;
+          await user.save();
+        }
+      } else {
+        throw err;
+      }
+    }
+    logger.info('[googleAuth] created new user via Google', { userId: user._id.toString() });
+  }
+
+  const accessToken = signAccessToken({
+    id: user._id.toString(),
+    email: user.email,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  });
+
+  const { refreshToken } = await createRefreshTokenForUser(user);
+
+  return { user, accessToken, refreshToken };
+}
 
 module.exports = {
   signup,
@@ -558,6 +632,7 @@ module.exports = {
   forgotPassword,
   resetPassword,
   changePassword,
-  revokeAllRefreshTokensForUser
+  revokeAllRefreshTokensForUser,
+  googleAuth
 };
 

@@ -10,6 +10,7 @@ const {
   forgotPassword,
   resetPasswordValidation,
   changePasswordValidation,
+  googleAuthValidation,
 } = require('../validators/auth.validator');
 
 router.post('/signup', signupValidation, handleValidationErrors, ctrl.signup);
@@ -20,5 +21,6 @@ router.post('/logout', refreshValidation, handleValidationErrors, ctrl.logout);
 router.post('/forgot-password', forgotPassword, handleValidationErrors, ctrl.forgotPassword);
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, ctrl.resetPasswordController);
 router.post('/change-password', authMiddleware, changePasswordValidation, handleValidationErrors, ctrl.changePasswordController);
+router.post('/google', googleAuthValidation, handleValidationErrors, ctrl.googleAuth);
 
 module.exports = router;

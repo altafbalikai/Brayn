@@ -3,3 +3,7 @@ BRAYN_AI_RULES.md
 
 # Script
 scripts
+
+# Environment variables (NEVER COMMIT)
+.env
+.env.*

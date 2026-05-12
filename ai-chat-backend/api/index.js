@@ -5,6 +5,7 @@
  */
 
 const app = require('../src/app');
+const logger = require('../src/config/logger');
 const { connect } = require('../src/db/mongoose');
 
 // Ensure DB is connected on cold start
@@ -19,7 +20,7 @@ module.exports = async (req, res) => {
 
         return app(req, res);
     } catch (error) {
-        console.error('Serverless handler error:', error);
+        logger.error('Serverless handler error:', error);
         return res.status(500).json({
             error: 'Internal Server Error',
         });

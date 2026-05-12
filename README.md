@@ -40,3 +40,6 @@ It focuses on **clean UX**, **model flexibility**, and **production-grade archit
 - Multiple LLMs via OpenRouter  
 - Model-agnostic architecture  
 - Streaming token handling  
+
+### Key Optional Variables
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID used to verify Google Sign-In ID tokens on the backend.

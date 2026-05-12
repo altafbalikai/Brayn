@@ -73,6 +73,12 @@ const changePasswordValidation = [
     .withMessage('Password must be at least 8 characters long'),
 ];
 
+const googleAuthValidation = [
+  body('credential')
+    .notEmpty().withMessage('credential is required')
+    .isString().withMessage('credential must be a string'),
+];
+
 module.exports = {
   signupValidation,
   loginValidation,
@@ -80,5 +86,6 @@ module.exports = {
   forgotPassword,
   resetPasswordValidation,
   changePasswordValidation,
+  googleAuthValidation,
 };
 

@@ -25,29 +25,16 @@ app.use(helmet());
 // Trust first proxy if behind one (e.g., Vercel, Heroku)
 app.set('trust proxy', 1);
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://brayn-ai.vercel.app',
+];
+
 const isAllowedOrigin = (origin) => {
   if (!origin) return true; // Postman, server-to-server
 
-  // Local development
-  if (
-    origin === "http://localhost:3000" ||
-    origin === "http://localhost:5173" ||
-    origin === "http://localhost:4000"
-  ) {
-    return true;
-  }
-
-  // Production frontend (custom domain)
-  if (origin === "https://brayn-ai.vercel.app") {
-    return true;
-  }
-
-  // ✅ ALL Vercel preview deployments of YOUR project
-  if (origin.endsWith("-altafbalikais-projects.vercel.app")) {
-    return true;
-  }
-
-  return false;
+  return allowedOrigins.includes(origin);
 };
 
 
@@ -60,11 +47,6 @@ app.use(
 
       // Allow local dev
       if (isAllowedOrigin(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow all Vercel preview + prod domains
-      if (origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
 
@@ -126,13 +108,6 @@ app.use(cookieParser());
 //   'http://localhost:5173',
 // ];
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  "https://brayn-ai.vercel.app", // prod frontend
-  "https://brayn-ai-git-feature-development-altafbalikais-projects.vercel.app", // preview frontend
-];
-
 // Dynamic CORS for Vercel + local dev
 app.use(
   cors({
@@ -142,11 +117,6 @@ app.use(
 
       // Allow local dev
       if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow all Vercel preview + prod domains
-      if (origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
 
@@ -163,6 +133,7 @@ app.use('/api/auth/login', authLimitMiddleware);
 app.use('/api/auth/signup', authLimitMiddleware);
 app.use('/api/auth/reset-password', authLimitMiddleware);
 app.use('/api/auth/forgot-password', authLimitMiddleware);
+app.use('/api/auth/google', authLimitMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', convRoutes);
 app.use('/api/llm', llmRoutes);

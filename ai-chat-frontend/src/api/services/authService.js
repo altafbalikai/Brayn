@@ -20,6 +20,19 @@ export const authService = {
         return { user, accessToken };
     },
 
+    googleAuth: async (credential) => {
+        const response = await api.post('/auth/google', { credential });
+        const { user, accessToken } = response.data;
+
+        if (!accessToken) {
+            throw new Error('No access token received');
+        }
+
+        setAccessToken(accessToken);
+
+        return { user, accessToken };
+    },
+
     logout: async () => {
         try {
             await api.post('/auth/logout', {});

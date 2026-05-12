@@ -6,6 +6,7 @@ import { GiBrain } from "react-icons/gi";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import RewindBackground from "../components/ui/RewindBackground.jsx";
 import SpiningLoader from "../components/ui/SpiningLoader.jsx";
+import GoogleAuthButton from "../features/auth/components/GoogleAuthButton.jsx";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -127,6 +128,14 @@ export default function Login() {
               {loading ? <SpiningLoader /> : "Sign In"}
             </button>
           </form>
+
+          <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-[0.2em] text-theme-muted">
+            <div className="h-px flex-1 bg-theme-secondary/40" />
+            <span>OR</span>
+            <div className="h-px flex-1 bg-theme-secondary/40" />
+          </div>
+
+          <GoogleAuthButton />
 
           <div className="text-right mt-2">
             <Link

@@ -43,14 +43,25 @@ export const signup = createAsyncThunk(
     }
 );
 
+export const googleLogin = createAsyncThunk(
+    "auth/googleLogin",
+    async (credential, { rejectWithValue }) => {
+        try {
+            const data = await authService.googleAuth(credential);
+            return data;
+        } catch (error) {
+            return rejectWithValue({ status: error.status, message: error.message });
+        }
+    }
+);
+
 export const logout = createAsyncThunk(
     "auth/logout",
     async () => {
 
         // Fire-and-forget server logout
         authService.logout().catch(() => {
-            // optional: log error, but DO NOT block logout
-            console.warn("Server logout failed");
+            // silently ignore — error surfaced via rejectWithValue
         });
 
         // No await needed
@@ -150,6 +161,21 @@ const authSlice = createSlice({
                 state.isAuthenticated = true;
             })
             .addCase(login.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload?.message;
+            })
+
+            /* -------- Google Login -------- */
+            .addCase(googleLogin.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(googleLogin.fulfilled, (state, action) => {
+                state.loading = false;
+                state.user = action.payload.user;
+                state.isAuthenticated = true;
+            })
+            .addCase(googleLogin.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload?.message;
             })
