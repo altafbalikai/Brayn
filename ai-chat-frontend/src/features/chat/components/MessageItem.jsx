@@ -25,6 +25,8 @@ import LoadingIndicator from "./LoadingIndicator";
 import { MessageActions } from "./MessageActions";
 import ReasoningDisplay from "./ReasoningDisplay";
 import SpiningLoader from "../../../components/ui/SpiningLoader";
+import { parseSources } from '../../../utils/sourcesParser';
+import { SourcesPanel } from './SourcesPanel';
 /**
  * Validate that an ID is a real MongoDB ObjectId (24-char hex string)
  * Temp frontend IDs like 'user-1772849303104' will fail this check
@@ -291,9 +293,10 @@ function MessageItem({
 
   const PersonaIcon = persona ? getPersonaIcon(persona.slug) : null;
 
-  const processedText = useMemo(() => {
-    if (!displayText) return "";
-    return isProcessing ? quickFixMarkdown(displayText) : displayText;
+  const { body: processedText, sources } = useMemo(() => {
+    if (!displayText) return { body: '', sources: [] };
+    const raw = isProcessing ? quickFixMarkdown(displayText) : displayText;
+    return parseSources(raw);
   }, [displayText, isProcessing]);
 
   // console.log("MessageItem repainting");
@@ -445,6 +448,10 @@ function MessageItem({
                     >
                       {processedText}
                     </ReactMarkdown>
+
+                    {!isProcessing && sources.length > 0 && (
+                      <SourcesPanel sources={sources} />
+                    )}
 
                     {msg.status === "cancelled" && (
                       <div

@@ -363,10 +363,15 @@ export const llmService = {
                     }
                 }
 
+                const cleanText = fullText
+                    .replace(/\u3010[^\u3011]*\u3011/g, '')  // strips 【...】
+                    .replace(/\[\d+\u2020[^\]]*\]/g, '')      // strips [N†...]
+                    .trim();
+
                 if (onComplete) {
-                    onComplete(fullText);
+                    onComplete(cleanText);
                 }
-                return fullText;
+                return cleanText;
             } catch (error) {
                 if (error.name === "AbortError") {
                     throw new Error("Streaming was cancelled");

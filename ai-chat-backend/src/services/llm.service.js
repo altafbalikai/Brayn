@@ -263,7 +263,24 @@ function formatWebContext(webResults) {
   const MAX_TOTAL_CHARS = MAX_CHARS * MAX_URLS_TO_FETCH;
 
   const resultStr = parts.join('\n');
-  return resultStr.length > MAX_TOTAL_CHARS ? resultStr.slice(0, MAX_TOTAL_CHARS) : resultStr;
+  if (!resultStr.trim()) return '';
+
+  const citationRules =
+    '\n---\n' +
+    'CRITICAL OUTPUT RULE — violations will break the UI:\n' +
+    '- You MUST NOT output 【】 markers, [N†] markers, footnote numbers, or ANY inline citation symbols.\n' +
+    '- These characters — 【 】 † — are FORBIDDEN in your response text.\n' +
+    '- Instead, after your answer, output a Sources section using ONLY this exact markdown format:\n' +
+    '  **Sources**\n' +
+    '  - [descriptive title](exact_url_from_above)\n' +
+    '- Only list URLs that appear verbatim in the search results above.\n' +
+    '- If none of the sources were useful, omit the Sources section entirely.';
+
+  const truncated = resultStr.length > MAX_TOTAL_CHARS
+    ? resultStr.slice(0, MAX_TOTAL_CHARS)
+    : resultStr;
+
+  return truncated + citationRules;
 }
 
 /**

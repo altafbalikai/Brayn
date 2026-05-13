@@ -197,6 +197,11 @@ async function ask(req, res, next) {
           }
         }
 
+        fullReply = fullReply
+          .replace(/\u3010[^\u3011]*\u3011/g, '')
+          .replace(/\[\d+\u2020[^\]]*\]/g, '')
+          .trim();
+
         if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
           // Save whatever partial text was collected and mark as cancelled
           await Message.findByIdAndUpdate(
