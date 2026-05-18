@@ -5,6 +5,7 @@ import {
   cancelEditing,
   editMessage,
   activateNode,
+  selectStreamStatus,
 } from "../../../features/conversations/conversationSlice";
 import { selectPersonas } from "../../../features/persona/personaSlice";
 import { getPersonaIcon } from "../../../utils/personaIcons";
@@ -25,8 +26,8 @@ import LoadingIndicator from "./LoadingIndicator";
 import { MessageActions } from "./MessageActions";
 import ReasoningDisplay from "./ReasoningDisplay";
 import SpiningLoader from "../../../components/ui/SpiningLoader";
-import { parseSources } from '../../../utils/sourcesParser';
-import { SourcesPanel } from './SourcesPanel';
+import { parseSources } from "../../../utils/sourcesParser";
+import { SourcesPanel } from "./SourcesPanel";
 /**
  * Validate that an ID is a real MongoDB ObjectId (24-char hex string)
  * Temp frontend IDs like 'user-1772849303104' will fail this check
@@ -128,6 +129,9 @@ function MessageItem({
 }) {
   const dispatch = useDispatch();
   const sending = useSelector((state) => state.conversation.sending);
+  const streamStatus = useSelector(
+    selectStreamStatus(currentConversationId || conversationId),
+  );
   const isUser = msg.role === "user";
   const realMessageId = msg._id?.toString();
   const useNodeTree = import.meta.env.VITE_USE_NODE_TREE === "true";
@@ -142,6 +146,14 @@ function MessageItem({
   const [isCopied, setIsCopied] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const textareaRef = useRef(null);
+
+  const streamLabel = (() => {
+    if (streamStatus === 'reading_conversation') return "Reading your conversation…";
+    if (streamStatus === 'preparing_prompt') return "Preparing…";
+    if (streamStatus === 'context_ready') return "Reading your conversation…";
+    if (streamStatus === 'waiting') return "Working on it…";
+    return null;
+  })();
 
   useEffect(() => {
     setEditContent(msg.text || "");
@@ -279,7 +291,8 @@ function MessageItem({
   const displayText = msg.text || "";
 
   // Show loading when message is being processed but has no content yet (including no reasoning)
-  const isLoading = isProcessing && !displayText && !msg.isReasoning && !msg.reasoning;
+  const isLoading =
+    isProcessing && !displayText && !msg.isReasoning && !msg.reasoning;
   const isAssistant = msg.role === "assistant";
 
   // 1. Hooks MUST be at top level
@@ -294,7 +307,7 @@ function MessageItem({
   const PersonaIcon = persona ? getPersonaIcon(persona.slug) : null;
 
   const { body: processedText, sources } = useMemo(() => {
-    if (!displayText) return { body: '', sources: [] };
+    if (!displayText) return { body: "", sources: [] };
     const raw = isProcessing ? quickFixMarkdown(displayText) : displayText;
     return parseSources(raw);
   }, [displayText, isProcessing]);
@@ -347,7 +360,14 @@ function MessageItem({
         >
           {isLoading ? (
             // Initial loading state (no content yet)
-            <LoadingIndicator />
+            <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs">
+              <LoadingIndicator />
+              {msg.isPlaceholder && streamStatus !== 'idle' && streamLabel && (
+                <span className="text-theme-textaccent opacity-60">
+                  {streamLabel}
+                </span>
+              )}
+            </div>
           ) : (
             <>
               {isAssistant && persona && (
@@ -364,15 +384,22 @@ function MessageItem({
                 // Assistant message with markdown rendering
                 <div className="prose prose-invert max-w-none text-sm min-w-0 overflow-x-hidden">
                   <div className="relative">
-                    {msg.role === 'assistant' && (msg.reasoning || msg.isReasoning) && (
-                      <ReasoningDisplay
-                        reasoning={msg.reasoning ?? ''}
-                        isReasoning={msg.isReasoning ?? false}
-                        reasoningDoneAt={msg.reasoningDoneAt ?? null}
-                        startedAt={msg.timestamp ? new Date(msg.timestamp).getTime() : new Date(msg.createdAt).getTime()}
-                        reasoningDurationSeconds={msg.reasoningDurationSeconds ?? null}
-                      />
-                    )}
+                    {msg.role === "assistant" &&
+                      (msg.reasoning || msg.isReasoning) && (
+                        <ReasoningDisplay
+                          reasoning={msg.reasoning ?? ""}
+                          isReasoning={msg.isReasoning ?? false}
+                          reasoningDoneAt={msg.reasoningDoneAt ?? null}
+                          startedAt={
+                            msg.timestamp
+                              ? new Date(msg.timestamp).getTime()
+                              : new Date(msg.createdAt).getTime()
+                          }
+                          reasoningDurationSeconds={
+                            msg.reasoningDurationSeconds ?? null
+                          }
+                        />
+                      )}
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm, remarkBreaks]}
                       rehypePlugins={
@@ -457,11 +484,12 @@ function MessageItem({
                       <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
+                          alignItems: "flex-start",
                           gap: "5px",
                           marginTop: "6px",
                           fontSize: "12px",
                           color: "var(--color-text-tertiary)",
+                          whiteSpace: "pre-line"
                         }}
                       >
                         <svg
@@ -471,22 +499,20 @@ function MessageItem({
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="1.6"
+                          style={{ marginTop: "2px" }}
                         >
                           <circle cx="8" cy="8" r="6.5" />
                           <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" />
                         </svg>
-                        {msg.text?.trim()
-                          ? "Generation stopped"
-                          : "Generation stopped before any response was received"}
+                        <span>
+                          {msg.text?.trim()
+                            ? (msg.error ? `Generation stopped: ${msg.error}` : "Generation stopped")
+                            : `Generation stopped before any response was received${msg.error ? `:\n${msg.error}` : ''}`}
+                        </span>
                       </div>
                     )}
 
-                    {/* Show "Generating..." while isProcessing AND text is empty */}
-                    {isProcessing && !displayText && (
-                      <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs animate-pulse">
-                        <LoadingIndicator />
-                      </div>
-                    )}
+
 
                     {/* Show actions and versions ONLY when NOT processing */}
                     {!isProcessing && (

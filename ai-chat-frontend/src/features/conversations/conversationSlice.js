@@ -228,7 +228,20 @@ export const sendMessage = createAsyncThunk(
                             editNodeId,
                             requestKey,
                             useWebSearch,
-                        }, { signal });
+                        }, {
+                            signal,
+                            onError: (errorMessage) => {
+                                dispatch(setError(errorMessage));
+                            },
+                            onProcessing: (data) => {
+                                dispatch(setStreamStatus({ conversationId, status: data?.stage || 'reading_conversation' }));
+                            },
+                            onHeartbeat: () => {
+                                dispatch(setStreamStatus({ conversationId, status: 'waiting' }));
+                            },
+                        }, (ackData) => {
+                            dispatch(acknowledgeAssistantPlaceholder({ conversationId }));
+                        });
 
                         let realMessageId = null;
                         let accumulated = '';
@@ -255,6 +268,9 @@ export const sendMessage = createAsyncThunk(
                         const onChunk = (chunk) => {
                             accumulated += chunk;
                             if (!realMessageId) return;
+                            if (getState().conversation.streamStatus[conversationId] !== 'streaming') {
+                                dispatch(setStreamStatus({ conversationId, status: 'streaming' }));
+                            }
                             dispatch(updateAssistantText({
                                 conversationId,
                                 tempId: realMessageId,
@@ -264,6 +280,9 @@ export const sendMessage = createAsyncThunk(
                         };
 
                         const onReasoning = (delta) => {
+                            if (getState().conversation.streamStatus[conversationId] !== 'streaming') {
+                                dispatch(setStreamStatus({ conversationId, status: 'streaming' }));
+                            }
                             dispatch(appendReasoningDelta({ conversationId, delta }));
                         };
 
@@ -312,6 +331,11 @@ export const sendMessage = createAsyncThunk(
                     } catch (err) {
                         if (signal.aborted) {
                             dispatch(setAssistantTyping({ conversationId, value: false }));
+                            try {
+                                await dispatch(fetchMessages({ conversationId, page: 1, append: false })).unwrap();
+                            } catch (fetchErr) {
+                                console.error('Failed to sync sibling counts on abort:', fetchErr);
+                            }
                             return rejectWithValue({ cancelled: true, conversationId });
                         }
 
@@ -337,12 +361,23 @@ export const sendMessage = createAsyncThunk(
             }
 
         } catch (error) {
+            if (signal.aborted) {
+                dispatch(setAssistantTyping({ conversationId, value: false }));
+                dispatch(clearModelFailover(conversationId));
+                try {
+                    await dispatch(fetchMessages({ conversationId, page: 1, append: false })).unwrap();
+                } catch (fetchErr) {
+                    console.error('Failed to sync sibling counts on abort in outer catch:', fetchErr);
+                }
+                return rejectWithValue({ cancelled: true, conversationId });
+            }
             const errMsg = error.message || 'Failed to stream message';
             dispatch(setAssistantTyping({ conversationId, value: false }));
             dispatch(clearModelFailover(conversationId));
             return rejectWithValue(errMsg);
         } finally {
             delete abortControllers[conversationId];
+            dispatch(clearStreamStatus({ conversationId }));
         }
     }
 );
@@ -350,7 +385,15 @@ export const sendMessage = createAsyncThunk(
 export const regenerateNode = createAsyncThunk(
     'conversation/regenerateNode',
     async ({ conversationId, nodeId },
-        { dispatch, rejectWithValue }) => {
+        { dispatch, getState, rejectWithValue }) => {
+        if (abortControllers[conversationId]) {
+            abortControllers[conversationId].abort();
+            delete abortControllers[conversationId];
+        }
+        const controller = new AbortController();
+        abortControllers[conversationId] = controller;
+        const signal = controller.signal;
+
         try {
             const tempAssistantId = `temp-regen-${Date.now()}`;
 
@@ -373,12 +416,26 @@ export const regenerateNode = createAsyncThunk(
                     createdAt: new Date().toISOString(),
                 }
             }));
+            dispatch(setAssistantTyping({ conversationId, value: true }));
 
             const stream = llmService.askStream({
                 message: '',
                 conversationId,
                 regenerateNodeId: nodeId,
                 requestKey: generateUuid(),
+                signal
+            }, {
+                onError: (errorMessage) => {
+                    dispatch(setError(errorMessage));
+                },
+                onProcessing: (data) => {
+                    dispatch(setStreamStatus({ conversationId, status: data?.stage || 'reading_conversation' }));
+                },
+                onHeartbeat: () => {
+                    dispatch(setStreamStatus({ conversationId, status: 'waiting' }));
+                },
+            }, (ackData) => {
+                dispatch(acknowledgeAssistantPlaceholder({ conversationId }));
             });
 
             let realAssistantId = tempAssistantId;
@@ -399,6 +456,9 @@ export const regenerateNode = createAsyncThunk(
             let accumulated = '';
             const onChunk = (chunk) => {
                 accumulated += chunk;
+                if (getState().conversation.streamStatus[conversationId] !== 'streaming') {
+                    dispatch(setStreamStatus({ conversationId, status: 'streaming' }));
+                }
                 dispatch(updateAssistantText({
                     conversationId,
                     tempId: realAssistantId,
@@ -408,6 +468,9 @@ export const regenerateNode = createAsyncThunk(
             };
 
             const onReasoning = (delta) => {
+                if (getState().conversation.streamStatus[conversationId] !== 'streaming') {
+                    dispatch(setStreamStatus({ conversationId, status: 'streaming' }));
+                }
                 dispatch(appendReasoningDelta({ conversationId, delta }));
             };
 
@@ -430,11 +493,25 @@ export const regenerateNode = createAsyncThunk(
                 append: false,
             })).unwrap();
 
+            dispatch(clearStreamStatus({ conversationId }));
             return { conversationId, nodeId };
         } catch (error) {
+            dispatch(clearStreamStatus({ conversationId }));
+            if (signal.aborted) {
+                try {
+                    await dispatch(fetchMessages({ conversationId, page: 1, append: false })).unwrap();
+                } catch (fetchErr) {
+                    console.error('Failed to sync sibling counts on retry abort:', fetchErr);
+                }
+                return rejectWithValue({ cancelled: true, conversationId });
+            }
             return rejectWithValue(
                 error?.message || 'Regeneration failed'
             );
+        } finally {
+            delete abortControllers[conversationId];
+            dispatch(clearStreamStatus({ conversationId }));
+            dispatch(setAssistantTyping({ conversationId, value: false }));
         }
     }
 );
@@ -575,6 +652,18 @@ export const editMessage = createAsyncThunk(
                             overrideModelId: model._id,
                             requestKey,
                             signal
+                        }, {
+                            onError: (errorMessage) => {
+                                dispatch(setError(errorMessage));
+                            },
+                            onProcessing: (data) => {
+                                dispatch(setStreamStatus({ conversationId: newConversationId, status: data?.stage || 'reading_conversation' }));
+                            },
+                            onHeartbeat: () => {
+                                dispatch(setStreamStatus({ conversationId: newConversationId, status: 'waiting' }));
+                            },
+                        }, (ackData) => {
+                            dispatch(acknowledgeAssistantPlaceholder({ conversationId: newConversationId }));
                         });
 
                         let realMessageId = null;
@@ -602,6 +691,9 @@ export const editMessage = createAsyncThunk(
                         const onChunk = (chunk) => {
                             accumulated += chunk;
                             if (!realMessageId) return;
+                            if (getState().conversation.streamStatus[newConversationId] !== 'streaming') {
+                                dispatch(setStreamStatus({ conversationId: newConversationId, status: 'streaming' }));
+                            }
                             dispatch(updateAssistantText({
                                 conversationId: newConversationId,
                                 tempId: realMessageId,
@@ -611,6 +703,9 @@ export const editMessage = createAsyncThunk(
                         };
 
                         const onReasoning = (delta) => {
+                            if (getState().conversation.streamStatus[newConversationId] !== 'streaming') {
+                                dispatch(setStreamStatus({ conversationId: newConversationId, status: 'streaming' }));
+                            }
                             dispatch(appendReasoningDelta({ conversationId: newConversationId, delta }));
                         };
 
@@ -679,6 +774,7 @@ export const editMessage = createAsyncThunk(
             dispatch(setBranchSwitching(false));
             if (newConversationId) {
                 delete abortControllers[newConversationId];
+                dispatch(clearStreamStatus({ conversationId: newConversationId }));
             }
         }
     }
@@ -747,6 +843,7 @@ const initialState = {
     conversationsHasMore: true,
     conversationsLoadingMore: false,
     assistantTyping: {},
+    streamStatus: {},
     messagesPages: {}, // { conversationId: { page: 1, hasMore: true } }
     messagesLoadingMore: {},
     pendingNavigationConversationId: null,
@@ -793,6 +890,29 @@ const conversationSlice = createSlice({
         },
         setUseWebSearch(state, action) {
             state.useWebSearch = Boolean(action.payload);
+        },
+        setStreamStatus(state, action) {
+            const { conversationId, status } = action.payload || {};
+            if (conversationId) {
+                const currentStatus = state.streamStatus[conversationId] || 'idle';
+                const allowed = {
+                    'idle': ['reading_conversation', 'context_ready'],
+                    'context_ready': ['preparing_prompt', 'waiting', 'streaming'],
+                    'reading_conversation': ['preparing_prompt', 'waiting', 'streaming'],
+                    'preparing_prompt': ['waiting', 'streaming'],
+                    'waiting': ['streaming'],
+                    'streaming': ['idle']
+                };
+                if ((allowed[currentStatus] || []).includes(status)) {
+                    state.streamStatus[conversationId] = status;
+                }
+            }
+        },
+        clearStreamStatus(state, action) {
+            const { conversationId } = action.payload || {};
+            if (conversationId) {
+                delete state.streamStatus[conversationId];
+            }
         },
         registerBranch(state, action) {
             const {
@@ -846,6 +966,29 @@ const conversationSlice = createSlice({
                 isPlaceholder: true, // Added to support appendReasoningDelta and markReasoningDone
             });
         },
+        acknowledgeAssistantPlaceholder: (state, action) => {
+            const { conversationId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+            const placeholder = messages.find(
+                (m) => m.isPlaceholder && m.role === 'assistant'
+            );
+            if (!placeholder) return;
+            placeholder.status = 'streaming';
+        },
+        removeAssistantPlaceholder: (state, action) => {
+            const { conversationId } = action.payload;
+            const messages = state.messages[conversationId];
+            if (!messages) return;
+            const idx = messages.findIndex(
+                (m) => m.isPlaceholder && m.role === 'assistant'
+            );
+            if (idx !== -1) messages.splice(idx, 1);
+            state.assistantTyping[conversationId] = false;
+        },
+        setError: (state, action) => {
+            state.error = action.payload;
+        },
         // Replace temporary pending placeholder with real message ID when metadata arrives
         updatePendingPlaceholderWithRealId: (state, action) => {
             const { conversationId, tempId, realId } = action.payload;
@@ -887,7 +1030,7 @@ const conversationSlice = createSlice({
             if (idx !== -1) {
                 messages[idx].text = text;
                 messages[idx].status = status || 'streaming';
-                
+
                 // If it's no longer a placeholder, clear the flag
                 if (status === 'streaming' || status === 'sent') {
                     messages[idx].isPlaceholder = false;
@@ -1234,17 +1377,19 @@ const conversationSlice = createSlice({
             })
             .addCase(sendMessage.fulfilled, (state, action) => {
                 state.sending = false;
-                const { conversationId } = action.payload;
+                const conversationId = action.payload?.conversationId ?? action.meta.arg?.conversationId;
                 if (conversationId) {
                     state.assistantTyping[conversationId] = false;
+                    delete state.streamStatus[conversationId];
                 }
             })
             .addCase(sendMessage.rejected, (state, action) => {
                 if (action.payload?.cancelled) {
                     state.sending = false;
-                    const cid = action.payload.conversationId ?? action.meta.arg.conversationId;
+                    const cid = action.payload.conversationId ?? action.meta.arg?.conversationId;
                     if (cid) {
                         state.assistantTyping[cid] = false;
+                        delete state.streamStatus[cid];
                         // Update the last streaming assistant message to 'cancelled'
                         // so isProcessing becomes false and actions become visible immediately
                         const msgs = state.messages[cid];
@@ -1262,9 +1407,73 @@ const conversationSlice = createSlice({
                 }
                 state.sending = false;
                 state.error = action.payload;
-                const { conversationId } = action.meta.arg;
+                const conversationId = action.meta.arg?.conversationId;
                 if (conversationId) {
                     state.assistantTyping[conversationId] = false;
+                    delete state.streamStatus[conversationId];
+                    const msgs = state.messages[conversationId];
+                    if (msgs) {
+                        for (let i = msgs.length - 1; i >= 0; i--) {
+                            if (msgs[i].role === 'assistant' && (msgs[i].status === 'streaming' || msgs[i].isPlaceholder || msgs[i].status === 'pending')) {
+                                msgs[i].status = 'cancelled';
+                                msgs[i].isPlaceholder = false;
+                                msgs[i].error = action.payload;
+                                break;
+                            }
+                        }
+                    }
+                }
+            })
+            // Regenerate node
+            .addCase(regenerateNode.pending, (state) => {
+                state.sending = true;
+                state.error = null;
+            })
+            .addCase(regenerateNode.fulfilled, (state, action) => {
+                state.sending = false;
+                const conversationId = action.payload?.conversationId ?? action.meta.arg?.conversationId;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                    delete state.streamStatus[conversationId];
+                }
+            })
+            .addCase(regenerateNode.rejected, (state, action) => {
+                if (action.payload?.cancelled) {
+                    state.sending = false;
+                    const cid = action.payload.conversationId ?? action.meta.arg?.conversationId;
+                    if (cid) {
+                        state.assistantTyping[cid] = false;
+                        delete state.streamStatus[cid];
+                        const msgs = state.messages[cid];
+                        if (msgs) {
+                            for (let i = msgs.length - 1; i >= 0; i--) {
+                                if (msgs[i].role === 'assistant' && (msgs[i].status === 'streaming' || msgs[i].isPlaceholder)) {
+                                    msgs[i].status = 'cancelled';
+                                    msgs[i].isPlaceholder = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
+                state.sending = false;
+                state.error = action.payload;
+                const conversationId = action.meta.arg?.conversationId;
+                if (conversationId) {
+                    state.assistantTyping[conversationId] = false;
+                    delete state.streamStatus[conversationId];
+                    const msgs = state.messages[conversationId];
+                    if (msgs) {
+                        for (let i = msgs.length - 1; i >= 0; i--) {
+                            if (msgs[i].role === 'assistant' && (msgs[i].status === 'streaming' || msgs[i].isPlaceholder || msgs[i].status === 'pending')) {
+                                msgs[i].status = 'cancelled';
+                                msgs[i].isPlaceholder = false;
+                                msgs[i].error = action.payload;
+                                break;
+                            }
+                        }
+                    }
                 }
             })
             // Edit message
@@ -1286,6 +1495,17 @@ const conversationSlice = createSlice({
                 const { conversationId } = action.meta.arg;
                 if (conversationId) {
                     state.assistantTyping[conversationId] = false;
+                    const msgs = state.messages[conversationId];
+                    if (msgs) {
+                        for (let i = msgs.length - 1; i >= 0; i--) {
+                            if (msgs[i].role === 'assistant' && (msgs[i].status === 'streaming' || msgs[i].isPlaceholder || msgs[i].status === 'pending')) {
+                                msgs[i].status = 'cancelled';
+                                msgs[i].isPlaceholder = false;
+                                msgs[i].error = action.payload;
+                                break;
+                            }
+                        }
+                    }
                 }
             })
             // Rename conversation title
@@ -1418,10 +1638,15 @@ export const {
     setEditingMessage,
     cancelEditing,
     registerBranch,
+    setStreamStatus,
+    clearStreamStatus,
     clearCurrentConversation,
     addMessageToConversation,
     setAssistantTyping,
     addAssistantPlaceholder,
+    acknowledgeAssistantPlaceholder,
+    removeAssistantPlaceholder,
+    setError,
     updatePendingPlaceholderWithRealId,
     updateUserMessageId,
     updateAssistantText,
@@ -1440,5 +1665,6 @@ export const {
 } = conversationSlice.actions;
 
 export const selectUseWebSearch = (state) => state.conversation.useWebSearch;
+export const selectStreamStatus = (conversationId) => (state) => state.conversation.streamStatus?.[conversationId] ?? 'idle';
 export default conversationSlice.reducer;
 

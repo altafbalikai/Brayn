@@ -505,6 +505,7 @@ async function askConversationStream(
           messages: payload,
           stream: true,
           signal,
+          max_tokens: model.maxTokens || 8000,
           // No tools on the final call — model just generates the answer
         }),
         modelId: model._id,

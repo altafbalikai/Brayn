@@ -9,8 +9,84 @@ if (!API_BASE_URL) {
 
 let _accessToken = null;
 
+function getTokenExpiry(token) {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return typeof payload.exp === 'number' ? payload.exp : null;
+    } catch {
+        return null;
+    }
+}
+
+const REFRESH_BUFFER_SECONDS = 60;
+let _refreshTimer = null;
+
+function scheduleTokenRefresh(token) {
+    if (_refreshTimer) {
+        clearTimeout(_refreshTimer);
+        _refreshTimer = null;
+    }
+
+    const exp = getTokenExpiry(token);
+    if (!exp) return;
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const msUntilRefresh = (exp - nowSeconds - REFRESH_BUFFER_SECONDS) * 1000;
+
+    if (msUntilRefresh <= 0) {
+        _refreshTimer = setTimeout(() => _doProactiveRefresh(), 0);
+        return;
+    }
+
+    _refreshTimer = setTimeout(() => _doProactiveRefresh(), msUntilRefresh);
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+
+        const token = getAccessToken();
+        if (!token) return;
+
+        const exp = getTokenExpiry(token);
+        if (!exp) return;
+
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const secondsRemaining = exp - nowSeconds;
+
+        if (secondsRemaining <= REFRESH_BUFFER_SECONDS) {
+            if (_refreshTimer) {
+                clearTimeout(_refreshTimer);
+                _refreshTimer = null;
+            }
+            _doProactiveRefresh();
+        } else {
+            scheduleTokenRefresh(token);
+        }
+    });
+}
+
+async function _doProactiveRefresh() {
+    _refreshTimer = null;
+    try {
+        const newToken = await refreshAccessToken();
+        setAccessToken(newToken);
+        scheduleTokenRefresh(newToken);
+    } catch {
+        // Silent failure — reactive 401 path handles the fallback.
+    }
+}
+
+export function clearTokenRefreshTimer() {
+    if (_refreshTimer) {
+        clearTimeout(_refreshTimer);
+        _refreshTimer = null;
+    }
+}
+
 export function setAccessToken(token) {
     _accessToken = token || null;
+    scheduleTokenRefresh(token);
 }
 
 export function getAccessToken() {

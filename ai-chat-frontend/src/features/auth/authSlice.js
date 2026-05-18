@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { authService } from "../../api/services/authService";
+import { clearTokenRefreshTimer } from "../../api/axios";
 
 /* =========================
    Async thunks
@@ -58,6 +59,8 @@ export const googleLogin = createAsyncThunk(
 export const logout = createAsyncThunk(
     "auth/logout",
     async () => {
+
+        clearTokenRefreshTimer();
 
         // Fire-and-forget server logout
         authService.logout().catch(() => {

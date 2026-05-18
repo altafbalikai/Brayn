@@ -92,199 +92,246 @@ async function ask(req, res, next) {
         });
         return res.status(504).json({ error: 'Stream timeout (pre-start)' });
       }
-      // Already streaming → close connection
-      res.write('\n\n⚠️ Stream timeout: LLM response took too long');
+      // Already streaming → error event
+      res.write('event: error\n');
+      res.write(`data: ${JSON.stringify({ message: 'Stream timeout — the model took too long to respond' })}\n\n`);
       res.end();
     }, STREAM_TIMEOUT);
 
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    res.write('event: ack\n');
+    res.write(`data: ${JSON.stringify({ status: 'acknowledged' })}\n\n`);
+    if (res.flush) res.flush();
+
     try {
-      // Prepare context and start LLM stream via Service Orchestrator
-      // ✅ NEW: Support Node Tree ask flow if editNodeId is provided
-      let context;
-      if (editNodeId) {
+      try {
+        // Prepare context and start LLM stream via Service Orchestrator
+        // ✅ NEW: Support Node Tree ask flow if editNodeId is provided
+        res.write('event: processing\n');
+        res.write(`data: ${JSON.stringify({ stage: 'reading_conversation' })}\n\n`);
+        if (res.flush) res.flush();
+
+        let context;
+        if (editNodeId) {
+          context = await llmService.prepareAskContextNodeTree(
+            userId,
+            conversationId,
+            message,
+            overrideModelId,
+            editNodeId,
+            useWebSearch,
+            abortController.signal
+          );
+        } else if (regenerateNodeId) {
+          context = await llmService.prepareRegenerateContextNodeTree(
+            userId,
+            conversationId,
+            overrideModelId,
+            regenerateNodeId,
+            useWebSearch,
+            abortController.signal
+          );
+        } else {
+          const useNodeTree = process.env.USE_NODE_TREE === 'true';
+          if (useNodeTree) {
             context = await llmService.prepareAskContextNodeTree(
               userId,
               conversationId,
               message,
               overrideModelId,
-              editNodeId,
-              useWebSearch,
-              abortController.signal
-            );
-          } else if (regenerateNodeId) {
-            context = await llmService.prepareRegenerateContextNodeTree(
-              userId,
-              conversationId,
-              overrideModelId,
-              regenerateNodeId,
+              null,
               useWebSearch,
               abortController.signal
             );
           } else {
-            const useNodeTree = process.env.USE_NODE_TREE === 'true';
-            if (useNodeTree) {
-              context = await llmService.prepareAskContextNodeTree(
-                userId,
-                conversationId,
-                message,
-                overrideModelId,
-                null,
-                useWebSearch,
-                abortController.signal
-              );
-            } else {
-              context = await llmService.prepareAskContext(
-                userId,
-                conversationId,
-                message,
-                overrideModelId,
-                useWebSearch,
-                abortController.signal
-              );
+            context = await llmService.prepareAskContext(
+              userId,
+              conversationId,
+              message,
+              overrideModelId,
+              useWebSearch,
+              abortController.signal
+            );
+          }
+        }
+        if (!context) return; // Request aborted before stream started
+        const { stream, userMsg, assistantMsg } = context;
+
+        res.write('event: processing\n');
+        res.write(`data: ${JSON.stringify({ stage: 'preparing_prompt' })}\n\n`);
+        if (res.flush) res.flush();
+
+        // 1. Send Metadata Event FIRST
+        res.write(`event: metadata\n`);
+        res.write(`data: ${JSON.stringify({
+          messageId: assistantMsg._id,
+          userMessageId: userMsg?._id,
+        })}\n\n`);
+        if (res.flush) res.flush();
+
+        let fullReply = "";
+        let accumulatedReasoning = '';
+        const streamStartedAt = Date.now();
+        let reasoningFinished = false;
+        let firstChunkReceived = false;
+        const heartbeatInterval = setInterval(() => {
+          if (firstChunkReceived) return;
+          if (res.writableEnded || res.destroyed) {
+            clearInterval(heartbeatInterval);
+            return;
+          }
+          res.write('event: heartbeat\n');
+          res.write(`data: ${JSON.stringify({ ts: Date.now() })}\n\n`);
+          if (res.flush) res.flush();
+        }, 3000);
+
+        // ================================================================================
+        // STREAMING LOOP - Errors here are NOT retriable
+        // ================================================================================
+        try {
+          for await (const chunk of stream) {
+            if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) break;
+            if (!firstChunkReceived) {
+              firstChunkReceived = true;
+              clearInterval(heartbeatInterval);
             }
-          }
-      if (!context) return; // Request aborted before stream started
-      const { stream, userMsg, assistantMsg } = context;
 
-      // START SSE RESPONSE
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders?.();
-
-      // 1. Send Metadata Event FIRST
-      res.write(`event: metadata\n`);
-      res.write(`data: ${JSON.stringify({
-        messageId: assistantMsg._id,
-        userMessageId: userMsg?._id,
-      })}\n\n`);
-
-      let fullReply = "";
-      let accumulatedReasoning = '';
-      const streamStartedAt = Date.now();
-      let reasoningFinished = false;
-
-      // ================================================================================
-      // STREAMING LOOP - Errors here are NOT retriable
-      // ================================================================================
-      try {
-        for await (const chunk of stream) {
-          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) break;
-
-          const reasoningDelta = chunk.choices?.[0]?.delta?.reasoning;
-          if (reasoningDelta) {
-            accumulatedReasoning += reasoningDelta;
-            res.write(`event: reasoning\n`);
-            res.write(`data: ${JSON.stringify({ delta: reasoningDelta })}\n\n`);
-            if (res.flush) res.flush();
-          }
-
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            if (!reasoningFinished && accumulatedReasoning.length > 0) {
-              reasoningFinished = true;
-              res.write(`event: reasoning_done\n`);
-              res.write(`data: ${JSON.stringify({ totalLength: accumulatedReasoning.length })}\n\n`);
+            const reasoningDelta = chunk.choices?.[0]?.delta?.reasoning;
+            if (reasoningDelta) {
+              accumulatedReasoning += reasoningDelta;
+              res.write(`event: reasoning\n`);
+              res.write(`data: ${JSON.stringify({ delta: reasoningDelta })}\n\n`);
               if (res.flush) res.flush();
             }
 
-            fullReply += content;
-            // 2. Stream JSON-Safe Chunk Events
-            res.write(`event: chunk\n`);
-            res.write(`data: ${JSON.stringify(content)}\n\n`);
-            if (res.flush) res.flush();
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              if (!reasoningFinished && accumulatedReasoning.length > 0) {
+                reasoningFinished = true;
+                res.write(`event: reasoning_done\n`);
+                res.write(`data: ${JSON.stringify({ totalLength: accumulatedReasoning.length })}\n\n`);
+                if (res.flush) res.flush();
+              }
+
+              fullReply += content;
+              // 2. Stream JSON-Safe Chunk Events
+              res.write(`event: chunk\n`);
+              res.write(`data: ${JSON.stringify(content)}\n\n`);
+              if (res.flush) res.flush();
+            }
           }
-        }
 
-        fullReply = fullReply
-          .replace(/\u3010[^\u3011]*\u3011/g, '')
-          .replace(/\[\d+\u2020[^\]]*\]/g, '')
-          .trim();
+          fullReply = fullReply
+            .replace(/\u3010[^\u3011]*\u3011/g, '')
+            .replace(/\[\d+\u2020[^\]]*\]/g, '')
+            .trim();
 
-        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
-          // Save whatever partial text was collected and mark as cancelled
-          await Message.findByIdAndUpdate(
-            assistantMsg._id,
-            { $set: { text: fullReply || '', status: 'cancelled' } }
-          );
-          return; // do not send SSE done event, connection is already gone
-        }
+          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
+            // Save whatever partial text was collected and mark as cancelled
+            await Message.findByIdAndUpdate(
+              assistantMsg._id,
+              { $set: { text: fullReply || '', status: 'cancelled' } }
+            );
+            return; // do not send SSE done event, connection is already gone
+          }
 
-        if (!fullReply || !fullReply.trim()) {
-          res.write(`\n\n⚠️ LLM returned empty response`);
+          if (!fullReply || !fullReply.trim()) {
+            res.write('event: error\n');
+            res.write(`data: ${JSON.stringify({ message: 'The model returned an empty response' })}\n\n`);
+            res.end();
+
+            // Cache this error for duplicate prevention
+            idempotencyCache.set(requestKey, 'failed', null, {
+              message: 'LLM returned empty response'
+            });
+            return;
+          }
+
+          // Final safety guard: catch the race where signal aborts in the same tick
+          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
+            await Message.findByIdAndUpdate(
+              assistantMsg._id,
+              { $set: { text: fullReply || '', status: 'cancelled' } }
+            );
+            return;
+          }
+
+          // Finalize persistence and side effects via Service Orchestrator
+          const reasoningDurationSeconds = accumulatedReasoning.length > 0
+            ? Math.round((Date.now() - streamStartedAt) / 1000)
+            : null;
+
+          if (assistantMsg.status === 'streaming') {
+            await llmService.handlePostStreamTasksNodeTree(userId, conversationId, fullReply, userMsg, assistantMsg, {
+              reasoning: accumulatedReasoning,
+              reasoningDurationSeconds,
+            });
+          } else {
+            await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg, {
+              reasoning: accumulatedReasoning,
+              reasoningDurationSeconds,
+            });
+          }
+
+          // ================================================================================
+          // SUCCESS: Cache the result
+          // ================================================================================
+          idempotencyCache.set(requestKey, 'completed', {
+            messageId: assistantMsg._id
+          });
+
+          res.write("event: done\ndata: [DONE]\n\n");
           res.end();
 
-          // Cache this error for duplicate prevention
+        } catch (streamErr) {
+          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed || streamErr.name === 'AbortError') {
+            await Message.findByIdAndUpdate(
+              assistantMsg._id,
+              { $set: { text: fullReply || '', status: 'cancelled' } }
+            );
+            return;
+          }
+          // Stream interrupted mid-transfer (NOT retriable)
+          logger.error('Stream iteration error (non-retriable)', {
+            requestKey,
+            error: streamErr.message,
+            messageId: assistantMsg._id
+          });
+
+          if (res.writable) {
+            res.write('event: error\n');
+            res.write(`data: ${JSON.stringify({ message: 'Stream interrupted — response was not saved' })}\n\n`);
+          }
+          res.end();
+
+          // Cache the error (don't auto-retry stream failures)
           idempotencyCache.set(requestKey, 'failed', null, {
-            message: 'LLM returned empty response'
-          });
-          return;
-        }
-
-        // Final safety guard: catch the race where signal aborts in the same tick
-        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) {
-          await Message.findByIdAndUpdate(
-            assistantMsg._id,
-            { $set: { text: fullReply || '', status: 'cancelled' } }
-          );
-          return;
-        }
-
-        // Finalize persistence and side effects via Service Orchestrator
-        const reasoningDurationSeconds = accumulatedReasoning.length > 0
-          ? Math.round((Date.now() - streamStartedAt) / 1000)
-          : null;
-
-        if (assistantMsg.status === 'streaming') {
-          await llmService.handlePostStreamTasksNodeTree(userId, conversationId, fullReply, userMsg, assistantMsg, {
-            reasoning: accumulatedReasoning,
-            reasoningDurationSeconds,
-          });
-        } else {
-          await llmService.handlePostStreamTasks(userId, conversationId, fullReply, userMsg, assistantMsg, {
-            reasoning: accumulatedReasoning,
-            reasoningDurationSeconds,
+            message: 'Stream interrupted'
           });
         }
-
-        // ================================================================================
-        // SUCCESS: Cache the result
-        // ================================================================================
-        idempotencyCache.set(requestKey, 'completed', {
-          messageId: assistantMsg._id
-        });
-
-        res.write("event: done\ndata: [DONE]\n\n");
-        res.end();
-
-      } catch (streamErr) {
-        if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed || streamErr.name === 'AbortError') {
-          await Message.findByIdAndUpdate(
-            assistantMsg._id,
-            { $set: { text: fullReply || '', status: 'cancelled' } }
-          );
-          return;
-        }
-        // Stream interrupted mid-transfer (NOT retriable)
-        logger.error('Stream iteration error (non-retriable)', {
+      } catch (afterHeadersErr) {
+        logger.error('LLM ask controller error after headers sent', {
           requestKey,
-          error: streamErr.message,
-          messageId: assistantMsg._id
+          conversationId,
+          error: afterHeadersErr.message
         });
 
-        if (res.writable) {
-          res.write(`\n\n⚠️ Connection interrupted. Response was not saved.`);
+        if (!res.writableEnded && !res.destroyed) {
+          res.write('event: error\n');
+          res.write(`data: ${JSON.stringify({ message: afterHeadersErr.message })}\n\n`);
+          res.end();
         }
-        res.end();
-
-        // Cache the error (don't auto-retry stream failures)
-        idempotencyCache.set(requestKey, 'failed', null, {
-          message: 'Stream interrupted'
-        });
       }
 
     } finally {
+      if (typeof heartbeatInterval !== 'undefined') {
+        clearInterval(heartbeatInterval);
+      }
       clearTimeout(timeoutHandle); // ✅ Always clear timeout
     }
 
@@ -316,8 +363,9 @@ async function ask(req, res, next) {
       });
     }
 
-    // If streaming has started, push the error directly to the active stream
-    res.write(`\n\n⚠️ ${err.message}`);
+    logger.error('Post-header error in ask()', { error: err.message, conversationId });
+    res.write('event: error\n');
+    res.write(`data: ${JSON.stringify({ message: err.message })}\n\n`);
     res.end();
   }
 }

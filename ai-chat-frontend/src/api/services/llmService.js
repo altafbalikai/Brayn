@@ -173,7 +173,7 @@ export const llmService = {
         signal: externalSignal = null,
         requestKey = generateUuid(),
         useWebSearch = false,
-    }, options = {}) => {
+    }, options = {}, onAcknowledged = null) => {
         if (!conversationId) {
             throw new Error("conversationId is required");
         }
@@ -183,7 +183,7 @@ export const llmService = {
         const activeSignal = signal ?? controller.signal;
         const token = getAccessToken();
 
-        async function start(onMetadata, onChunk, onReasoning, onReasoningDone, onComplete, retry = true) {
+        async function start(onMetadata, onChunk, onReasoning, onReasoningDone, onComplete, retry = true, onError = null, onAcknowledged = null) {
             const url = `${API_BASE_URL}/llm/conversations/${conversationId}/ask`;
 
             const headers = {
@@ -239,7 +239,9 @@ export const llmService = {
                         onReasoning,
                         onReasoningDone,
                         onComplete,
-                        false
+                        false,
+                        options.onError ?? null,
+                        onAcknowledged
                     );
                 } catch (refreshError) {
                     setAccessToken(null);
@@ -291,6 +293,52 @@ export const llmService = {
                             const dataParts = evt.split('data: ');
                             const dataBuffer = dataParts.length > 1 ? dataParts[1] : null;
 
+                            if (eventType === 'ack') {
+                                if (onAcknowledged) {
+                                    try {
+                                        const parsed = dataBuffer ? JSON.parse(dataBuffer) : undefined;
+                                        onAcknowledged(parsed);
+                                    } catch (err) {
+                                        // ignore ack handler errors
+                                    }
+                                }
+                                continue;
+                            }
+                            if (eventType === 'processing') {
+                                const errorHandler = onError ?? options?.onError ?? null;
+                                try {
+                                    const parsed = dataBuffer ? JSON.parse(dataBuffer) : {};
+                                    if (typeof options?.onProcessing === 'function') {
+                                        options.onProcessing(parsed);
+                                    }
+                                } catch {
+                                }
+                                continue;
+                            }
+                            if (eventType === 'heartbeat') {
+                                try {
+                                    const parsed = dataBuffer ? JSON.parse(dataBuffer) : {};
+                                    if (typeof options?.onHeartbeat === 'function') {
+                                        options.onHeartbeat(parsed);
+                                    }
+                                } catch {
+                                }
+                                continue;
+                            }
+                            if (eventType === 'error') {
+                                let errorMessage = 'An error occurred';
+                                try {
+                                    const parsed = dataBuffer ? JSON.parse(dataBuffer) : undefined;
+                                    errorMessage = parsed?.message || errorMessage;
+                                } catch {
+                                }
+                                const errorHandler = onError ?? options?.onError ?? null;
+                                if (typeof errorHandler === 'function') errorHandler(errorMessage);
+                                
+                                const sseErr = new Error(errorMessage);
+                                sseErr.isSseError = true;
+                                throw sseErr;
+                            }
                             if (eventType === 'metadata') {
                                 try {
                                     if (dataBuffer) {
