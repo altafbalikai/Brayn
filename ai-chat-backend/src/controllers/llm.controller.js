@@ -116,6 +116,13 @@ async function ask(req, res, next) {
         res.write(`data: ${JSON.stringify({ stage: 'reading_conversation' })}\n\n`);
         if (res.flush) res.flush();
 
+        const onProcessing = (stage) => {
+          if (clientDisconnected || abortController.signal.aborted || res.writableEnded || res.destroyed) return;
+          res.write('event: processing\n');
+          res.write(`data: ${JSON.stringify({ stage })}\n\n`);
+          if (res.flush) res.flush();
+        };
+
         let context;
         if (editNodeId) {
           context = await llmService.prepareAskContextNodeTree(
@@ -125,7 +132,8 @@ async function ask(req, res, next) {
             overrideModelId,
             editNodeId,
             useWebSearch,
-            abortController.signal
+            abortController.signal,
+            onProcessing
           );
         } else if (regenerateNodeId) {
           context = await llmService.prepareRegenerateContextNodeTree(
@@ -134,7 +142,8 @@ async function ask(req, res, next) {
             overrideModelId,
             regenerateNodeId,
             useWebSearch,
-            abortController.signal
+            abortController.signal,
+            onProcessing
           );
         } else {
           const useNodeTree = process.env.USE_NODE_TREE === 'true';
@@ -146,7 +155,8 @@ async function ask(req, res, next) {
               overrideModelId,
               null,
               useWebSearch,
-              abortController.signal
+              abortController.signal,
+              onProcessing
             );
           } else {
             context = await llmService.prepareAskContext(
@@ -155,7 +165,8 @@ async function ask(req, res, next) {
               message,
               overrideModelId,
               useWebSearch,
-              abortController.signal
+              abortController.signal,
+              onProcessing
             );
           }
         }

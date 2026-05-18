@@ -202,7 +202,7 @@ async function fetchPage(url) {
  * @param {string} query
  * @returns {Promise<{ snippets: Array, pages: Array } | null>}
  */
-async function searchAndFetch(query) {
+async function searchAndFetch(query, onProcessing = null) {
     // Step 1 — Global disable guard
     if (!WEB_SEARCH_ENABLED) {
         logger.debug('[webSearch] Disabled via WEB_SEARCH_ENABLED env var');
@@ -299,6 +299,9 @@ async function searchAndFetch(query) {
 
     // Step 9 — Parallel fetch of top URLs
     const topUrls = filtered.slice(0, MAX_URLS_TO_FETCH).map((r) => r.url);
+    if (typeof onProcessing === 'function') {
+        onProcessing('fetching_sources');
+    }
     const fetchedContents = await Promise.all(topUrls.map(fetchPage));
 
     // Step 10 — Deduplicate by content hash

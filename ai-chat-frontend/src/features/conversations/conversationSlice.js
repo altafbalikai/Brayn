@@ -896,9 +896,13 @@ const conversationSlice = createSlice({
             if (conversationId) {
                 const currentStatus = state.streamStatus[conversationId] || 'idle';
                 const allowed = {
-                    'idle': ['reading_conversation', 'context_ready'],
-                    'context_ready': ['preparing_prompt', 'waiting', 'streaming'],
-                    'reading_conversation': ['preparing_prompt', 'waiting', 'streaming'],
+                    'idle': ['reading_conversation', 'context_ready', 'deciding_web_search', 'searching_web', 'fetching_sources', 'preparing_web_results', 'preparing_prompt'],
+                    'context_ready': ['preparing_prompt', 'waiting', 'streaming', 'deciding_web_search', 'searching_web', 'fetching_sources', 'preparing_web_results'],
+                    'reading_conversation': ['preparing_prompt', 'waiting', 'streaming', 'deciding_web_search', 'searching_web', 'fetching_sources', 'preparing_web_results'],
+                    'deciding_web_search': ['searching_web', 'preparing_prompt', 'waiting', 'streaming'],
+                    'searching_web': ['fetching_sources', 'preparing_web_results', 'preparing_prompt', 'waiting', 'streaming'],
+                    'fetching_sources': ['preparing_web_results', 'preparing_prompt', 'waiting', 'streaming'],
+                    'preparing_web_results': ['preparing_prompt', 'waiting', 'streaming'],
                     'preparing_prompt': ['waiting', 'streaming'],
                     'waiting': ['streaming'],
                     'streaming': ['idle']

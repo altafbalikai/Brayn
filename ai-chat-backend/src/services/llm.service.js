@@ -324,7 +324,8 @@ async function askConversationStream(
   overrideModelId = null,
   parentConversationId = undefined,
   useWebSearch = false,
-  signal = null
+  signal = null,
+  onProcessing = null
 ) {
   try {
     const openrouter = await getOpenRouter();
@@ -408,6 +409,10 @@ async function askConversationStream(
 
     // — Agentic web search: model decides whether to call the tool ———————————
     if (useWebSearch) {
+      if (typeof onProcessing === 'function') {
+        onProcessing('deciding_web_search');
+      }
+
       // First call — non-streaming, tool definition attached
       // Model will either respond directly OR emit a tool_use block
       const webSearchToolDef = buildWebSearchTool();
@@ -442,6 +447,9 @@ async function askConversationStream(
 
       // Only execute tool flow if model actually called the tool
       if (toolCall) {
+        if (typeof onProcessing === 'function') {
+          onProcessing('searching_web');
+        }
         // Safer version — parse failure falls back to lastUserMessage silently
         let modelQuery = lastUserMessage;
         try {
@@ -458,7 +466,10 @@ async function askConversationStream(
 
         let toolResultContent;
         try {
-          webResults = await searchAndFetch(modelQuery);
+          webResults = await searchAndFetch(modelQuery, onProcessing);
+          if (typeof onProcessing === 'function') {
+            onProcessing('preparing_web_results');
+          }
           const webContext = formatWebContext(webResults);
           toolResultContent = webContext || 'No relevant results found for this query.';
         } catch (err) {
@@ -729,7 +740,7 @@ async function getContextMessagesNodeTree(conversationId, maxContext) {
  * - Loads context
  * - Loads summary
  */
-async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null, useWebSearch = false, signal = null) {
+async function prepareAskContext(userId, conversationId, messageText, overrideModelId = null, useWebSearch = false, signal = null, onProcessing = null) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) {
     throw Object.assign(new Error('Conversation not found'), { status: 404 });
@@ -818,7 +829,8 @@ async function prepareAskContext(userId, conversationId, messageText, overrideMo
     overrideModelId,
     conversation.parentConversationId || null,
     useWebSearch,
-    signal
+    signal,
+    onProcessing
   );
 
   if (!context) return null;
@@ -834,7 +846,8 @@ async function prepareAskContextNodeTree(
   overrideModelId = null,
   editNodeId = null,
   useWebSearch = false,
-  signal = null
+  signal = null,
+  onProcessing = null
 ) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) {
@@ -977,7 +990,8 @@ async function prepareAskContextNodeTree(
     overrideModelId,
     null,   // parentConversationId is null — node tree uses single conversationId
     useWebSearch,
-    signal
+    signal,
+    onProcessing
   );
 
   if (!context) return null;
@@ -992,7 +1006,8 @@ async function prepareRegenerateContextNodeTree(
   overrideModelId,
   regenerateNodeId,
   useWebSearch = false,
-  signal = null
+  signal = null,
+  onProcessing = null
 ) {
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) throw Object.assign(
@@ -1080,7 +1095,8 @@ async function prepareRegenerateContextNodeTree(
     overrideModelId,
     null,
     useWebSearch,
-    signal
+    signal,
+    onProcessing
   );
 
   if (!context) return null;

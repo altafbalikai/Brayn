@@ -152,6 +152,10 @@ function MessageItem({
     if (streamStatus === 'preparing_prompt') return "Preparing…";
     if (streamStatus === 'context_ready') return "Reading your conversation…";
     if (streamStatus === 'waiting') return "Working on it…";
+    if (streamStatus === 'deciding_web_search') return "Deciding whether web search is needed…";
+    if (streamStatus === 'searching_web') return "Searching the web…";
+    if (streamStatus === 'fetching_sources') return "Fetching sources…";
+    if (streamStatus === 'preparing_web_results') return "Preparing web results…";
     return null;
   })();
 
