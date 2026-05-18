@@ -367,7 +367,7 @@ function MessageItem({
             <div className="flex items-center gap-2 py-2 text-theme-muted italic text-xs">
               <LoadingIndicator />
               {msg.isPlaceholder && streamStatus !== 'idle' && streamLabel && (
-                <span className="text-theme-textaccent opacity-60">
+                <span className="text-theme-textaccent opacity-60 animate-text-shimmer">
                   {streamLabel}
                 </span>
               )}
